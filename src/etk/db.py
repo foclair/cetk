@@ -1,11 +1,7 @@
 """Database management."""
 
-import shutil
 import os
-import json
-from pathlib import Path
-import django
-from django.conf import settings
+
 
 class EtkDatabaseError(Exception):
     pass

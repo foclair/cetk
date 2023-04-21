@@ -8,42 +8,35 @@ CHAR_FIELD_LENGTH = 100
 SRID = 4326
 
 
-
 class Substance(models.Model):
-    '''A substance.'''
+    """A substance."""
 
-    id = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    id = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
-    name = models.CharField('name', max_length=64, unique=True)
-    slug = models.SlugField('slug', max_length=64, unique=True)
-    long_name = models.CharField(
-        verbose_name='Descriptive name', max_length=64
-    )
+    name = models.CharField("name", max_length=64, unique=True)
+    slug = models.SlugField("slug", max_length=64, unique=True)
+    long_name = models.CharField(verbose_name="Descriptive name", max_length=64)
 
     class Meta:
-        db_table = 'substance'
-        default_related_name = 'substances'
+        db_table = "substance"
+        default_related_name = "substances"
 
     def __str__(self):
         return self.name
 
 
 class Fuel(models.Model):
-    '''A fuel.'''
+    """A fuel."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     name = models.CharField(max_length=CHAR_FIELD_LENGTH)
 
     class Meta:
-        db_table = 'fuel'
-        
+        db_table = "fuel"
+
     def __str__(self):
         return self.name
 
@@ -51,28 +44,17 @@ class Fuel(models.Model):
 class ActivityCode(models.Model):
     """An abstract model for an activity code."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
-    label = models.CharField(
-        verbose_name='activity code label',
-        max_length=100
-    )
+    label = models.CharField(verbose_name="activity code label", max_length=100)
 
-    code = models.CharField(
-        verbose_name='activity code',
-        max_length=20,
-        unique=True
-    )
+    code = models.CharField(verbose_name="activity code", max_length=20, unique=True)
 
     class Meta:
         abstract = True
@@ -91,11 +73,11 @@ class ActivityCode(models.Model):
         i.e. the code 1.A.2.i will match the filter 1.A
         """
 
-        code_parts = self.code.split('.')
+        code_parts = self.code.split(".")
 
         for f in filters:
             matches = True
-            filter_parts = f.code.split('.')
+            filter_parts = f.code.split(".")
 
             # filter has more code-parts than code
             if len(filter_parts) > len(code_parts):
@@ -116,21 +98,21 @@ class ActivityCode1(ActivityCode):
     """Actvity code 1."""
 
     class Meta:
-        db_table = 'activitycode1'
+        db_table = "activitycode1"
 
 
 class ActivityCode2(ActivityCode):
     """Actvity code 2."""
 
     class Meta:
-        db_table = 'activitycode2'
+        db_table = "activitycode2"
 
 
 class ActivityCode3(ActivityCode):
     """Actvity code 3."""
 
     class Meta:
-        db_table = 'activitycode3'
+        db_table = "activitycode3"
 
 
 def default_timevar_typeday():
@@ -142,33 +124,29 @@ def default_timevar_month():
 
 
 class Timevar(models.Model):
-    '''A base class for an emission time-variation.'''
+    """A base class for an emission time-variation."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     name = models.CharField(
-        verbose_name='name of time variation profile',
+        verbose_name="name of time variation profile",
         max_length=CHAR_FIELD_LENGTH,
-        unique=True
+        unique=True,
     )
 
     typeday = models.CharField(
-        verbose_name='A table of hourly variation within a typical week',
-        max_length=1000
+        verbose_name="A table of hourly variation within a typical week",
+        max_length=1000,
     )
 
     month = models.CharField(
-        verbose_name='A table of monthly variations',
+        verbose_name="A table of monthly variations",
         max_length=100,
         default=default_timevar_month,
     )
@@ -185,14 +163,14 @@ class SourceTimevar(Timevar):
     """A source time-variation profile."""
 
     class Meta:
-        db_table = 'sourcetimevar'
+        db_table = "sourcetimevar"
 
 
 class RoadTimevar(Timevar):
     """A road time-variation profile."""
 
     class Meta:
-        db_table = 'roadtimevar'
+        db_table = "roadtimevar"
 
 
 def default_congestion_profile_traffic_condition():
@@ -202,22 +180,18 @@ def default_congestion_profile_traffic_condition():
 class CongestionProfile(models.Model):
     """A congestion level time profile."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     name = models.CharField(
-        verbose_name='name of congestion profile',
+        verbose_name="name of congestion profile",
         max_length=CHAR_FIELD_LENGTH,
-        unique=True
+        unique=True,
     )
 
     # a 2d-field of traffic condition indices
@@ -225,13 +199,13 @@ class CongestionProfile(models.Model):
     # typical conditions given for a typeweek
     # hours are rows and days are columns
     traffic_condition = models.CharField(
-        verbose_name='A table of hourly congestion levels in a typical week.',
+        verbose_name="A table of hourly congestion levels in a typical week.",
         max_length=800,
         default=default_congestion_profile_traffic_condition,
     )
 
     class Meta:
-        db_table = 'congestion_profile'
+        db_table = "congestion_profile"
 
     def __str__(self):
         return self.name
@@ -240,27 +214,20 @@ class CongestionProfile(models.Model):
 class Activity(models.Model):
     """An emitting activity."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     name = models.CharField(
-        verbose_name='name of activity',
-        max_length=CHAR_FIELD_LENGTH,
-        unique=True
+        verbose_name="name of activity", max_length=CHAR_FIELD_LENGTH, unique=True
     )
 
     class Meta:
-        db_table = 'activity'
-
+        db_table = "activity"
 
     def __str__(self):
         """Return a unicode representation of this activity."""
@@ -270,109 +237,90 @@ class Activity(models.Model):
 class EmissionFactor(models.Model):
     """An emission factor."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     activity = models.ForeignKey(
-        'Activity',
+        "Activity",
         on_delete=models.CASCADE,
         db_index=True,
-        related_name='emissionfactors'
+        related_name="emissionfactors",
     )
 
     substance = models.ForeignKey(
-        'Substance',
-        on_delete=models.CASCADE,
-        related_name='+',
-        db_index=True
+        "Substance", on_delete=models.CASCADE, related_name="+", db_index=True
     )
 
     factor = models.FloatField(default=0)
 
     class Meta:
-        db_table = 'emissionfactor'
-        default_related_name = 'substances'
-        unique_together = ('activity', 'substance')
+        db_table = "emissionfactor"
+        default_related_name = "substances"
+        unique_together = ("activity", "substance")
 
     def __str__(self):
         """Return a unicode representation of this emission factor."""
-        return '{}: {}'.format(self.activity.name, self.substance.name)
+        return "{}: {}".format(self.activity.name, self.substance.name)
 
 
 class SourceEmission(models.Model):
     """An abstract model for source emissions."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     timevar = models.ForeignKey(
-        'SourceTimevar',
-        on_delete=models.PROTECT,
-        related_name='+',
-        db_index=True
+        "SourceTimevar", on_delete=models.PROTECT, related_name="+", db_index=True
     )
 
     activitycode1 = models.ForeignKey(
-        'ActivityCode1',
+        "ActivityCode1",
         on_delete=models.PROTECT,
-        related_name='+',
+        related_name="+",
         null=True,
-        blank=True
+        blank=True,
     )
 
     activitycode2 = models.ForeignKey(
-        'ActivityCode2',
+        "ActivityCode2",
         on_delete=models.PROTECT,
-        related_name='+',
+        related_name="+",
         null=True,
-        blank=True
+        blank=True,
     )
 
     activitycode3 = models.ForeignKey(
-        'ActivityCode3',
+        "ActivityCode3",
         on_delete=models.PROTECT,
-        related_name='+',
+        related_name="+",
         null=True,
-        blank=True
+        blank=True,
     )
 
     class Meta:
         abstract = True
-        index_together = ('activitycode1', 'activitycode2', 'activitycode3')
-        default_related_name = 'sources'
+        index_together = ("activitycode1", "activitycode2", "activitycode3")
+        default_related_name = "sources"
 
 
 class SourceActivity(SourceEmission):
     """Base class for an emitting activity."""
 
     activity = models.ForeignKey(
-        'Activity',
-        on_delete=models.PROTECT,
-        related_name='+',
-        db_index=True
+        "Activity", on_delete=models.PROTECT, related_name="+", db_index=True
     )
 
-    rate = models.FloatField(
-        verbose_name='activity rate'
-    )
+    rate = models.FloatField(verbose_name="activity rate")
 
     class Meta:
         abstract = True
@@ -382,76 +330,64 @@ class PointSourceActivity(SourceActivity):
     """An emitting activity of a point source."""
 
     source = models.ForeignKey(
-        'PointSource',
-        related_name='activities',
+        "PointSource",
+        related_name="activities",
         on_delete=models.CASCADE,
-        db_index=True
+        db_index=True,
     )
-    
+
     class Meta:
-        db_table = 'pointsource_activity'
+        db_table = "pointsource_activity"
 
     def __str__(self):
-        return '{}'.format(self.activity.name)
+        return "{}".format(self.activity.name)
 
 
 class AreaSourceActivity(SourceActivity):
     """An emitting activity of an area source."""
 
     source = models.ForeignKey(
-        'AreaSource',
-        related_name='activities',
-        on_delete=models.CASCADE,
-        db_index=True
+        "AreaSource", related_name="activities", on_delete=models.CASCADE, db_index=True
     )
-    
+
     class Meta:
-        db_table = 'areasource_activity'
+        db_table = "areasource_activity"
 
     def __str__(self):
-        return '{}'.format(self.activity.name)
+        return "{}".format(self.activity.name)
 
 
 class SourceBase(models.Model):
     """Abstract base model for an emission source."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     name = models.CharField(
-        'name',
-        max_length=CHAR_FIELD_LENGTH,
-        blank=False,
-        db_index=True
+        "name", max_length=CHAR_FIELD_LENGTH, blank=False, db_index=True
     )
     info = models.CharField(
-        verbose_name='general information',
-        max_length=CHAR_FIELD_LENGTH, blank=True,
-        null=True,
-        db_index=True
-    )
-    infogiver = models.CharField(
-        verbose_name='information source',
+        verbose_name="general information",
+        max_length=CHAR_FIELD_LENGTH,
         blank=True,
         null=True,
-        max_length=CHAR_FIELD_LENGTH
+        db_index=True,
+    )
+    infogiver = models.CharField(
+        verbose_name="information source",
+        blank=True,
+        null=True,
+        max_length=CHAR_FIELD_LENGTH,
     )
     created = models.DateField(
-        verbose_name='date of creation',
-        auto_now_add=True,
-        editable=False
+        verbose_name="date of creation", auto_now_add=True, editable=False
     )
     updated = models.DateTimeField(
-        verbose_name='date of last update',
-        auto_now=True,
-        editable=False
+        verbose_name="date of last update", auto_now=True, editable=False
     )
     tags = models.CharField(
-        verbose_name='dictionary of key-value pairs',
-        max_length=100
+        verbose_name="dictionary of key-value pairs", max_length=100
     )
 
     def __str__(self):
@@ -465,10 +401,7 @@ class SourceBase(models.Model):
 class SourceSubstance(SourceEmission):
     """An abstract models for source substance emissions."""
 
-    value = models.FloatField(
-        default=0,
-        verbose_name='source emission'
-    )
+    value = models.FloatField(default=0, verbose_name="source emission")
 
     class Meta:
         abstract = True
@@ -481,230 +414,168 @@ class PointSourceSubstance(SourceSubstance):
     """A point-source substance emission."""
 
     source = models.ForeignKey(
-        'PointSource',
-        related_name='substances',
+        "PointSource",
+        related_name="substances",
         on_delete=models.CASCADE,
-        db_index=True
+        db_index=True,
     )
 
     substance = models.ForeignKey(
-        'Substance', on_delete=models.CASCADE,
-        related_name='+',
-        db_index=True
+        "Substance", on_delete=models.CASCADE, related_name="+", db_index=True
     )
 
     class Meta:
-        db_table = 'pointsource_substance'
+        db_table = "pointsource_substance"
 
 
 class AreaSourceSubstance(SourceSubstance):
     """A area-source substance emission."""
 
     source = models.ForeignKey(
-        'AreaSource',
-        related_name='substances',
-        on_delete=models.CASCADE,
-        db_index=True
+        "AreaSource", related_name="substances", on_delete=models.CASCADE, db_index=True
     )
 
     substance = models.ForeignKey(
-        'Substance', on_delete=models.CASCADE,
-        related_name='+',
-        db_index=True
+        "Substance", on_delete=models.CASCADE, related_name="+", db_index=True
     )
 
     class Meta:
-        db_table = 'areasource_substance'
+        db_table = "areasource_substance"
 
 
 class PointSource(SourceBase):
     """A point-source."""
 
     geom = models.PointField(
-        'the position of the point-source',
-        srid=SRID,
-        geography=True,
-        db_index=True
+        "the position of the point-source", srid=SRID, geography=True, db_index=True
     )
 
-    chimney_height = models.FloatField(
-        'chimney height [m]',
-        default=0
-    )
-    chimney_outer_diameter = models.FloatField(
-        'chimney outer diameter [m]',
-        default=0
-    )
-    chimney_inner_diameter = models.FloatField(
-        'chimney inner diameter [m]',
-        default=0
-    )
-    chimney_gas_speed = models.FloatField(
-        'chimney gas speed [m/s]',
-        default=0
-    )
+    chimney_height = models.FloatField("chimney height [m]", default=0)
+    chimney_outer_diameter = models.FloatField("chimney outer diameter [m]", default=0)
+    chimney_inner_diameter = models.FloatField("chimney inner diameter [m]", default=0)
+    chimney_gas_speed = models.FloatField("chimney gas speed [m/s]", default=0)
     chimney_gas_temperature = models.FloatField(
-        'chimney gas temperature [deg C]',
-        default=0
+        "chimney gas temperature [deg C]", default=0
     )
     house_width = models.IntegerField(
-        'house width [m] (to estimate down draft)',
-        default=0
+        "house width [m] (to estimate down draft)", default=0
     )
     house_height = models.IntegerField(
-        'house height [m] (to estimate down draft)',
-        default=0
+        "house height [m] (to estimate down draft)", default=0
     )
 
     class Meta:
-        default_related_name = 'pointsources'
-        db_table = 'pointsource'
+        default_related_name = "pointsources"
+        db_table = "pointsource"
 
 
 class AreaSource(SourceBase):
     """An area source."""
 
     geom = models.PolygonField(
-        'the extent of the area source',
-        srid=SRID,
-        geography=True,
-        db_index=True
+        "the extent of the area source", srid=SRID, geography=True, db_index=True
     )
-    
+
     class Meta:
-        default_related_name = 'areasources'
-        db_table = 'areasource'
+        default_related_name = "areasources"
+        db_table = "areasource"
 
 
 class RoadClassAttribute(models.Model):
-    '''A manadatory attribute of a roadclass.'''
+    """A manadatory attribute of a roadclass."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     name = models.CharField(
-        verbose_name='Road class attribute verbose name',
+        verbose_name="Road class attribute verbose name",
         max_length=CHAR_FIELD_LENGTH,
-        unique=True
+        unique=True,
     )
 
     label = models.SlugField(
-        verbose_name='Road class attribute label',
-        max_length=CHAR_FIELD_LENGTH
+        verbose_name="Road class attribute label", max_length=CHAR_FIELD_LENGTH
     )
 
-    order = models.IntegerField(verbose_name='Roadclass attribute ordering')
+    order = models.IntegerField(verbose_name="Roadclass attribute ordering")
 
     class Meta:
-        db_table = 'roadclass_attribute'
+        db_table = "roadclass_attribute"
 
     def __str__(self):
         return self.label
 
 
 class RoadClassAttributeValue(models.Model):
-    '''Acceptet values for a roadclass attribute.'''
+    """Acceptet values for a roadclass attribute."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     roadclass_attribute = models.ForeignKey(
-        'RoadClassAttribute',
-        on_delete=models.CASCADE,
-        related_name='values'
+        "RoadClassAttribute", on_delete=models.CASCADE, related_name="values"
     )
 
-    value = models.CharField(
-        verbose_name='Attribute value',
-        max_length=60
-    )
+    value = models.CharField(verbose_name="Attribute value", max_length=60)
 
     class Meta:
-        db_table = 'roadclass_attribute_value'
-        unique_together = ('roadclass_attribute', 'value')
+        db_table = "roadclass_attribute_value"
+        unique_together = ("roadclass_attribute", "value")
 
     def __str__(self):
         return str(self.value)
 
 
 class RoadClass(models.Model):
-    '''A road class.'''
+    """A road class."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     properties = models.CharField(
-        verbose_name='Road class property dictionary',
-        max_length=100,
-        unique=True
+        verbose_name="Road class property dictionary", max_length=100, unique=True
     )
 
     class Meta:
-        db_table = 'roadclass'
+        db_table = "roadclass"
         verbose_name_plural = "Road classes"
 
 
 class VehicleEF(models.Model):
     """An emission factor for a vehicle on a specific roadclass."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     roadclass = models.ForeignKey(
-        'RoadClass',
-        on_delete=models.CASCADE,
-        related_name='emissionfactors'
+        "RoadClass", on_delete=models.CASCADE, related_name="emissionfactors"
     )
     vehicle = models.ForeignKey(
-        'Vehicle',
-        on_delete=models.CASCADE,
-        related_name='emissionfactors'
+        "Vehicle", on_delete=models.CASCADE, related_name="emissionfactors"
     )
-    fuel = models.ForeignKey(
-        'Fuel',
-        on_delete=models.CASCADE,
-        related_name='+'
-    )
+    fuel = models.ForeignKey("Fuel", on_delete=models.CASCADE, related_name="+")
     substance = models.ForeignKey(
-        'Substance',
-        on_delete=models.CASCADE,
-        related_name='+'
+        "Substance", on_delete=models.CASCADE, related_name="+"
     )
 
     freeflow = models.FloatField(default=0)
@@ -714,67 +585,62 @@ class VehicleEF(models.Model):
     coldstart = models.FloatField(default=0)
 
     class Meta:
-        db_table = 'vehicle_ef'
+        db_table = "vehicle_ef"
         verbose_name_plural = "Vehicle emission factors"
-        unique_together = ('substance', 'vehicle', 'roadclass', 'fuel')
+        unique_together = ("substance", "vehicle", "roadclass", "fuel")
 
     def __str__(self):
-        return 'EF %s, %s, %i' % (
-            self.substance.slug, self.fuel.name, self.roadclass.id
+        return "EF %s, %s, %i" % (
+            self.substance.slug,
+            self.fuel.name,
+            self.roadclass.id,
         )
 
 
 class Vehicle(models.Model):
     """A vehicle."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
-    name = models.CharField(
-        max_length=CHAR_FIELD_LENGTH,
-        unique=True
-    )
-    info = models.CharField(
-        max_length=CHAR_FIELD_LENGTH, null=True, blank=True
-    )
+    name = models.CharField(max_length=CHAR_FIELD_LENGTH, unique=True)
+    info = models.CharField(max_length=CHAR_FIELD_LENGTH, null=True, blank=True)
     isheavy = models.BooleanField(default=False)
     max_speed = models.IntegerField(
-        null=True, blank=True, default=130,
-        choices=((s, f'{s}') for s in range(20, 150, 10))
+        null=True,
+        blank=True,
+        default=130,
+        choices=((s, f"{s}") for s in range(20, 150, 10)),
     )
     activitycode1 = models.ForeignKey(
-        'ActivityCode1',
+        "ActivityCode1",
         on_delete=models.PROTECT,
-        related_name='+',
+        related_name="+",
         null=True,
-        blank=True
+        blank=True,
     )
     activitycode2 = models.ForeignKey(
-        'ActivityCode2',
+        "ActivityCode2",
         on_delete=models.PROTECT,
-        related_name='+',
+        related_name="+",
         null=True,
-        blank=True
+        blank=True,
     )
     activitycode3 = models.ForeignKey(
-        'ActivityCode3',
+        "ActivityCode3",
         on_delete=models.PROTECT,
-        related_name='+',
+        related_name="+",
         null=True,
-        blank=True
+        blank=True,
     )
 
     class Meta:
-        db_table = 'vehicle'
+        db_table = "vehicle"
 
     def __str__(self):
         """Unicode representation of vehicle."""
@@ -784,27 +650,22 @@ class Vehicle(models.Model):
 class Fleet(models.Model):
     """Composition of vehicles."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     name = models.CharField(unique=True, max_length=CHAR_FIELD_LENGTH)
 
     is_template = models.BooleanField(
-        verbose_name='Use fleet composition as a template',
-        default=False
+        verbose_name="Use fleet composition as a template", default=False
     )
 
     class Meta:
-        db_table = 'fleet'
+        db_table = "fleet"
 
     def __str__(self):
         """Unicode representation of fleet."""
@@ -812,11 +673,9 @@ class Fleet(models.Model):
 
     def heavy_vehicle_share(self):
         """Sum of heavy vehicle fraction in Fleet."""
-        share = self.vehicles.filter(
-            vehicle__isheavy=True
-        ).aggregate(Sum('fraction'))
+        share = self.vehicles.filter(vehicle__isheavy=True).aggregate(Sum("fraction"))
 
-        return share['fraction__sum'] or 0
+        return share["fraction__sum"] or 0
 
     def light_vehicle_share(self):
         """Sum of heavy vehicle fraction in Fleet."""
@@ -826,49 +685,36 @@ class Fleet(models.Model):
 class FleetMember(models.Model):
     """A member vehicle of a fleet."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     fleet = models.ForeignKey(
-        'Fleet',
-        on_delete=models.CASCADE,
-        db_index=True,
-        related_name='vehicles'
+        "Fleet", on_delete=models.CASCADE, db_index=True, related_name="vehicles"
     )
 
     vehicle = models.ForeignKey(
-        'Vehicle', on_delete=models.CASCADE,
-        db_index=True,
-        related_name='+'
+        "Vehicle", on_delete=models.CASCADE, db_index=True, related_name="+"
     )
 
     timevar = models.ForeignKey(
-        'RoadTimevar',
-        on_delete=models.PROTECT,
-        related_name='+'
+        "RoadTimevar", on_delete=models.PROTECT, related_name="+"
     )
 
     coldstart_timevar = models.ForeignKey(
-        'RoadTimevar',
-        on_delete=models.PROTECT,
-        related_name='+'
+        "RoadTimevar", on_delete=models.PROTECT, related_name="+"
     )
 
     fraction = models.FloatField(default=0.0)
     coldstart_fraction = models.FloatField(default=0.0)
 
     class Meta:
-        db_table = 'fleet_member'
-        unique_together = ('fleet', 'vehicle')
+        db_table = "fleet_member"
+        unique_together = ("fleet", "vehicle")
 
     def __str__(self):
         """Unicode representation of fleet member vehicle."""
@@ -878,88 +724,64 @@ class FleetMember(models.Model):
 class FleetMemberFuel(models.Model):
     """A fuel used by a fleet member."""
 
-    locid = models.AutoField(
-        primary_key=True, auto_created=True, editable=False
-    )
+    locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
     id = models.IntegerField(editable=False, null=True, blank=True)
 
     updated = models.DateTimeField(
-        verbose_name='date and time of action',
-        auto_now=True,
-        editable=False
+        verbose_name="date and time of action", auto_now=True, editable=False
     )
 
     fleet_member = models.ForeignKey(
-        'FleetMember',
-        on_delete=models.CASCADE,
-        db_index=True,
-        related_name='fuels'
+        "FleetMember", on_delete=models.CASCADE, db_index=True, related_name="fuels"
     )
 
     fuel = models.ForeignKey(
-        'Fuel',
-        on_delete=models.CASCADE,
-        db_index=True,
-        related_name='+'
+        "Fuel", on_delete=models.CASCADE, db_index=True, related_name="+"
     )
 
     fraction = models.FloatField(default=0.0)
 
     class Meta:
-        db_table = 'fleet_member_fuel'
+        db_table = "fleet_member_fuel"
 
 
 class RoadSource(SourceBase):
     """A road source."""
 
     geom = models.LineStringField(
-        'the road coordinates',
-        srid=SRID,
-        geography=True,
-        db_index=True
+        "the road coordinates", srid=SRID, geography=True, db_index=True
     )
 
-    flow = models.IntegerField('Annual average day traffic', default=0)
-    nolanes = models.IntegerField('Number of lanes', default=2)
+    flow = models.IntegerField("Annual average day traffic", default=0)
+    nolanes = models.IntegerField("Number of lanes", default=2)
     speed = models.IntegerField(
-        'Road sign speed [km/h]', default=70,
-        choices=((s, f'{s}') for s in range(20, 150, 10))
+        "Road sign speed [km/h]",
+        default=70,
+        choices=((s, f"{s}") for s in range(20, 150, 10)),
     )
-    width = models.FloatField('Road width [meters]', default=20.0)
+    width = models.FloatField("Road width [meters]", default=20.0)
     slope = models.IntegerField(
-        'Slope [%]', default=0,
-        choices=((s, f'{s}') for s in range(-10, 10))
+        "Slope [%]", default=0, choices=((s, f"{s}") for s in range(-10, 10))
     )
 
-    heavy_vehicle_share = models.FloatField(
-        null=True,
-        blank=True
-    )
+    heavy_vehicle_share = models.FloatField(null=True, blank=True)
 
     roadclass = models.ForeignKey(
-        'RoadClass',
-        on_delete=models.PROTECT,
-        related_name='+'
+        "RoadClass", on_delete=models.PROTECT, related_name="+"
     )
 
     fleet = models.ForeignKey(
-        'Fleet',
-        on_delete=models.PROTECT,
-        related_name='+',
-        null=True,
-        blank=True
+        "Fleet", on_delete=models.PROTECT, related_name="+", null=True, blank=True
     )
 
     congestion_profile = models.ForeignKey(
-        'CongestionProfile',
-        on_delete=models.PROTECT,
-        related_name='+'
+        "CongestionProfile", on_delete=models.PROTECT, related_name="+"
     )
 
     class Meta:
-        db_table = 'roadsource'
-        default_related_name = 'roads'
+        db_table = "roadsource"
+        default_related_name = "roads"
 
     @property
     def light_vehicle_share(self):
@@ -1007,15 +829,12 @@ class RoadSource(SourceBase):
                 elif not veh.activitycode3.matches(ac3):
                     continue
 
-            conditions = self.congestion_profile.get_fractions(
-                fleet_member.timevar
-            )
+            conditions = self.congestion_profile.get_fractions(fleet_member.timevar)
 
             for fleet_member_fuel in fleet_member.fuels.all():
 
                 emissionfactors = self.roadclass.emissionfactors.filter(
-                    vehicle=veh, substance=substance,
-                    fuel=fleet_member_fuel.fuel
+                    vehicle=veh, substance=substance, fuel=fleet_member_fuel.fuel
                 )
                 for ef in emissionfactors:
 
@@ -1028,14 +847,11 @@ class RoadSource(SourceBase):
                     if self.heavy_vehicle_share is not None:
                         if veh.isheavy and fleet_heavy_vehicle_share != 0:
                             vehicle_fraction_corr_factor = (
-                                self.heavy_vehicle_share /
-                                fleet_heavy_vehicle_share
+                                self.heavy_vehicle_share / fleet_heavy_vehicle_share
                             )
-                        elif not veh.isheavy and  \
-                                fleet_heavy_vehicle_share != 1:
-                            vehicle_fraction_corr_factor = (
-                                self.light_vehicle_share /
-                                (1 - fleet_heavy_vehicle_share)
+                        elif not veh.isheavy and fleet_heavy_vehicle_share != 1:
+                            vehicle_fraction_corr_factor = self.light_vehicle_share / (
+                                1 - fleet_heavy_vehicle_share
                             )
                         else:
                             # if the share of light/heavy vehicles is 0
@@ -1044,28 +860,23 @@ class RoadSource(SourceBase):
                         vehicle_fraction_corr_factor = 1
 
                     emis = (
-                        self.flow *  # annual average day vehicle flow
-                        self.geom.transform(srid, clone=True).length *
-                        0.001 *  # km
-                        vehicle_fraction_corr_factor *
-                        fleet_member.fraction *
-                        fleet_member_fuel.fraction *
-                        (
-                            ef.coldstart * fleet_member.coldstart_fraction +
-
-                            ef.freeflow *
-                            conditions['freeflow'] +
-
-                            ef.saturated *
-                            conditions['saturated'] +
-
-                            ef.congested *
-                            conditions['congested'] +
-
-                            ef.stopngo *
-                            conditions['stopngo']
-                        ) *
-                        0.001 / (3600 * 24)  # convert to g/s
+                        self.flow
+                        * self.geom.transform(  # annual average day vehicle flow
+                            srid, clone=True
+                        ).length
+                        * 0.001
+                        * vehicle_fraction_corr_factor  # km
+                        * fleet_member.fraction
+                        * fleet_member_fuel.fraction
+                        * (
+                            ef.coldstart * fleet_member.coldstart_fraction
+                            + ef.freeflow * conditions["freeflow"]
+                            + ef.saturated * conditions["saturated"]
+                            + ef.congested * conditions["congested"]
+                            + ef.stopngo * conditions["stopngo"]
+                        )
+                        * 0.001
+                        / (3600 * 24)  # convert to g/s
                     )
                     if veh.id not in emis_by_veh_and_subst:
                         emis_by_veh_and_subst[veh.id] = {}
@@ -1083,25 +894,17 @@ class GridSourceSubstance(SourceSubstance):
     # TODO: add controls that band exists in GridSource geom
 
     source = models.ForeignKey(
-        'GridSource',
-        related_name='substances',
-        on_delete=models.CASCADE,
-        db_index=True
+        "GridSource", related_name="substances", on_delete=models.CASCADE, db_index=True
     )
 
-    band = models.IntegerField(
-        verbose_name='raster band index',
-        default=0
-    )
+    band = models.IntegerField(verbose_name="raster band index", default=0)
 
     substance = models.ForeignKey(
-        'Substance', on_delete=models.CASCADE,
-        related_name='+',
-        db_index=True
+        "Substance", on_delete=models.CASCADE, related_name="+", db_index=True
     )
 
     class Meta:
-        db_table = 'gridsource_substance'
+        db_table = "gridsource_substance"
 
 
 class GridSourceActivity(SourceActivity):
@@ -1110,19 +913,13 @@ class GridSourceActivity(SourceActivity):
     # TODO: add controls that band exists in GridSource geom
 
     source = models.ForeignKey(
-        'GridSource',
-        related_name='activities',
-        on_delete=models.CASCADE,
-        db_index=True
+        "GridSource", related_name="activities", on_delete=models.CASCADE, db_index=True
     )
 
-    band = models.IntegerField(
-        verbose_name='raster band index',
-        default=0
-    )
+    band = models.IntegerField(verbose_name="raster band index", default=0)
 
     class Meta:
-        db_table = 'gridsource_activity'
+        db_table = "gridsource_activity"
 
 
 class GridSource(SourceBase):
@@ -1132,13 +929,9 @@ class GridSource(SourceBase):
     due to limitations in django, a dummy srid is specified
     """
 
-    raster_file = models.CharField(
-        verbose_name='Path of raster file',
-        max_length=100
-    )
+    raster_file = models.CharField(verbose_name="Path of raster file", max_length=100)
 
-    height = models.FloatField(verbose_name='height above ground', default=2.0)
+    height = models.FloatField(verbose_name="height above ground", default=2.0)
 
     class Meta:
-        db_table = 'gridsource'
-        
+        db_table = "gridsource"

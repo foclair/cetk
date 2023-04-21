@@ -31,4 +31,3 @@ Dependencies are organized in the following files:
 | constraints.txt                    | Version constraints for pinned requirements                               |
 | requirements.txt                   | Pinned requirements for _using_ etk (don't edit)                   |
 | setup.py                    	     | Loose requirements for _using_ etk
-
