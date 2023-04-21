@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools >= 42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+exclude = '''
+/(
+    build
+  | \.direnv
+  | \.git
+  | src/etk\.egg-info
+  | \.pytest_cache
+  | \.venv
+)/
+'''
+
+[tool.check-manifest]
+ignore = [
+]
+
+[tool.coverage.run]
+source = ["etk"]
+branch = true
+omit = [
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+addopts = "--doctest-glob='*.rst' --reuse-db"
+DJANGO_SETTINGS_MODULE = "etk.settings"

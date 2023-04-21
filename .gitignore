@@ -1,0 +1,6 @@
+/build/
+/.coverage
+/dist/
+/.pytest_cache/
+/src/etk.egg-info/
+__pycache__/
