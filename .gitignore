@@ -4,3 +4,4 @@
 /.pytest_cache/
 /src/etk.egg-info/
 __pycache__/
+/.venv/
