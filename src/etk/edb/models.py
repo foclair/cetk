@@ -1,6 +1,9 @@
 """Emission database models."""
 
-# import numpy as np
+import numpy as np
+import pandas as pd
+import ast
+
 from django.conf import settings
 from django.contrib.gis.db import models
 # eller
@@ -71,6 +74,23 @@ class Substance(NamedModel):
     class Meta:
         db_table = "substances"
         default_related_name = "substances"
+
+class SourceSubstance(models.Model):
+    """An abstract models for source substance emissions."""
+
+    value = models.FloatField(default=0, verbose_name="source emission")
+    substance = models.ForeignKey(
+        "Substance", on_delete=models.PROTECT, related_name="+"
+    )
+    updated = models.DateTimeField(verbose_name="date of last update", auto_now=True)
+
+    class Meta:
+        abstract = True
+        default_related_name = "substances"
+        unique_together = ("source", "substance")
+
+    def __str__(self):
+        return self.substance.name
 
 class Domain(NamedModel):
     """A spatial domain."""
@@ -257,3 +277,178 @@ class ActivityCode(models.Model):
     def is_leaf(self):
         """Return True if code is a leaf (i.e. has no sub-codes)."""
         return not self.get_decendents().exists()
+
+def default_timevar_typeday():
+    return str(24 * [7 * [100.0]])
+
+
+def default_timevar_month():
+    return str(12 * [100.0])
+
+
+def get_normalization_constant(typeday, month, timezone):
+    commonyear = pd.date_range("2018", periods=24 * 365, freq="H", tz=timezone)
+    values = typeday[commonyear.hour, commonyear.weekday] * month[commonyear.month - 1]
+    return len(values) / values.sum()
+
+
+def normalize(timevar, timezone=None):
+    """Set the normalization constants on a timevar instance."""
+    if timezone is None:
+        timezone = timevar.domain.timezone
+    typeday = np.array(ast.literal_eval(timevar.typeday))
+    month = np.array(ast.literal_eval(timevar.month))
+    timevar.typeday_sum = typeday.sum()
+    timevar._normalization_constant = get_normalization_constant(
+        typeday, month, timezone
+    )
+    return timevar
+
+class TimevarBase(models.Model):
+    name = models.CharField(max_length=CHAR_FIELD_LENGTH, unique = True)
+    domain = models.ForeignKey(
+        "Domain", on_delete=models.CASCADE
+    )
+    
+    # typeday should be a 2d-field with hours as rows and weekdays as columns
+    #ArrayField not supported in SQLite
+    typeday = models.CharField(
+        max_length=10 * len(default_timevar_typeday()), 
+        default=default_timevar_typeday()
+    )
+    # month should be a 1d field with 12 values
+    month = models.CharField(
+        max_length=10 * len(default_timevar_month()), 
+        default=default_timevar_month()
+    )
+
+    # pre-calculated normalization constants
+    typeday_sum = models.FloatField(editable=False)
+    _normalization_constant = models.FloatField(editable=False)
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        """Return a unicode representation of this timevariation."""
+        return self.name
+
+    @property
+    def normalization_constant(self):
+        if self._normalization_constant is None:
+            normalize(self)
+        return self._normalization_constant
+
+    def save(self, *args, **kwargs):
+        """Overloads save to ensure normalizing factors are calculated."""
+        normalize(self)
+        super(TimevarBase, self).save(*args, **kwargs)
+
+class Timevar(TimevarBase):
+    """A source time-variation profile."""
+
+    class Meta(TimevarBase.Meta):
+        default_related_name = "timevars"
+
+class SourceBase(models.Model):
+    """Abstract base model for an emission source."""
+
+    name = models.CharField("name", max_length=CHAR_FIELD_LENGTH, blank=False)
+    created = models.DateTimeField(verbose_name="time of creation", auto_now_add=True)
+    updated = models.DateTimeField(verbose_name="time of last update", auto_now=True)
+    tags = models.JSONField(
+        verbose_name="user-defined key-value pairs", blank=True, null=True
+    )
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        """Return a unicode representation of this source."""
+        return self.name
+
+class PointAreaGridSourceBase(SourceBase):
+    """Abstract base model for point, area and grid sources"""
+
+    timevar = models.ForeignKey(
+        "Timevar", on_delete=models.SET_NULL, related_name="+", null=True, blank=True
+    )
+    activitycode1 = models.ForeignKey(
+        "ActivityCode",
+        on_delete=models.PROTECT,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
+    activitycode2 = models.ForeignKey(
+        "ActivityCode",
+        on_delete=models.PROTECT,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
+    activitycode3 = models.ForeignKey(
+        "ActivityCode",
+        on_delete=models.PROTECT,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        abstract = True
+        index_together = ["activitycode1", "activitycode2", "activitycode3"]
+
+class Facility(SourceBase):
+    """A facility."""
+
+    official_id = models.CharField(
+        "official_id", max_length=CHAR_FIELD_LENGTH, blank=False, db_index=True, unique=True
+    )
+    
+    class Meta:
+        default_related_name = "facilities"
+        # unique_together = (("inventory", "official_id"), ("inventory", "name"))
+        #TODO not sure if the unique = true in official id is sufficient to replace line above?
+    def __str__(self):
+        return str(self.official_id)
+
+    def __repr__(self):
+        return str(self)
+
+
+class PointSource(PointAreaGridSourceBase):
+    """A point-source."""
+
+    sourcetype = "point"
+
+    chimney_height = models.FloatField("chimney height [m]", default=0)
+    chimney_outer_diameter = models.FloatField(
+        "chimney outer diameter [m]", default=1.0
+    )
+    chimney_inner_diameter = models.FloatField(
+        "chimney inner diameter [m]", default=0.9
+    )
+    chimney_gas_speed = models.FloatField("chimney gas speed [m/s]", default=1.0)
+    chimney_gas_temperature = models.FloatField(
+        "chimney gas temperature [K]", default=373.0
+    )
+    house_width = models.IntegerField(
+        "house width [m] (to estimate down draft)", default=0
+    )
+    house_height = models.IntegerField(
+        "house height [m] (to estimate down draft)", default=0
+    )
+    geom = models.PointField(
+        "the position of the point-source",
+        srid=WGS84_SRID,
+        geography=True,
+        db_index=True,
+    )
+    facility = models.ForeignKey(
+        "Facility", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    
+    class Meta(PointAreaGridSourceBase.Meta):
+        default_related_name = "pointsources"
+        unique_together = ("facility", "name")
