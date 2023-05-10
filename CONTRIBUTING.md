@@ -11,20 +11,21 @@
 ``` console
 $ git clone https://git.smhi.se/foclair/etk.git
 $ cd etk
-$ python3.9 -m venv --prompt gadget .venv
+$ python3.9 -m venv --prompt etk .venv
 $ . .venv/bin/activate
 $ pip install -U pip setuptools wheel
-$ pip install -r dev/requirements.txt
+$ pip install -r requirements.txt
 $ pre-commit install
 ```
-
-This environment won't be able to run the unit tests however.  Use the
-top-level [requirements.txt](requirements.txt) file for this.
-
+To run pre-commit on all files:
+``` console
+$ pre-commit run --all-files
+```
 
 ### Dependency management
 
 Dependencies are organized in the following files:
+TODO these files do not exist here?
 
 | Filename                           | Contents                                                                  |
 | ---------------------------------- | ------------------------------------------------------------------------- |

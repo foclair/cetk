@@ -1,27 +1,36 @@
 """Emission database models."""
 
+import ast
+import datetime
+
 import numpy as np
 import pandas as pd
-import ast
+import pytz
 
-from django.conf import settings
+# from django.conf import settings
 from django.contrib.gis.db import models
-# eller
-# from django.db import models, but maybe geodjango models api inherits normal django api? 
-# https://docs.djangoproject.com/en/4.2/ref/models/
-# https://docs.djangoproject.com/en/4.2/ref/contrib/gis/model-api/
 
-from django.db.models import Sum
+# from django.db.models import Sum
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from etk.edb.const import CHAR_FIELD_LENGTH, WGS84_SRID
 from etk.edb.copy import copy_codeset, copy_model_instance
 from etk.edb.ltreefield import LtreeField
 
-#TODO is a locid necessary when starting inventories from scratch, instead of importing existing gadget databases?
+# eller
+# from django.db import models, but maybe geodjango models api
+# inherits normal django api?
+# https://docs.djangoproject.com/en/4.2/ref/models/
+# https://docs.djangoproject.com/en/4.2/ref/contrib/gis/model-api/
+
+
+# TODO is a locid necessary when starting inventories from scratch, instead of importing
+# existing gadget databases?
 # locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
 SRID = WGS84_SRID
+
 
 class BaseNamedModel(models.Model):
     """Base class for models with a name and a slug field."""
@@ -32,9 +41,10 @@ class BaseNamedModel(models.Model):
     def clean(self):
         if not self.slug and self.name:
             self.slug = slugify(self.name)
-    
+
     def __str__(self):
         return self.name
+
 
 class NamedModelManager(models.Manager):
     """Database manager for named models."""
@@ -43,6 +53,7 @@ class NamedModelManager(models.Manager):
         """Return a model instance given its slug."""
         return self.get(slug=slug)
 
+
 class NaturalKeyManager(models.Manager):
 
     """Database manager for models with natural key."""
@@ -50,6 +61,7 @@ class NaturalKeyManager(models.Manager):
     def get_by_natural_key(self, *key):
         """Return a model instance given its natural key."""
         return self.get(**dict(zip(self.model.natural_key_fields, key)))
+
 
 class NamedModel(BaseNamedModel):
     """A model with a unique name and slug."""
@@ -66,6 +78,7 @@ class NamedModel(BaseNamedModel):
         """Return the natural key (the slug) for this model instance."""
         return (self.slug,)
 
+
 class Substance(NamedModel):
     """A chemical substance."""
 
@@ -74,6 +87,7 @@ class Substance(NamedModel):
     class Meta:
         db_table = "substances"
         default_related_name = "substances"
+
 
 class SourceSubstance(models.Model):
     """An abstract models for source substance emissions."""
@@ -91,6 +105,7 @@ class SourceSubstance(models.Model):
 
     def __str__(self):
         return self.substance.name
+
 
 class Domain(NamedModel):
     """A spatial domain."""
@@ -114,6 +129,7 @@ class Domain(NamedModel):
         dst_jan = tz.dst(datetime.datetime(2012, 1, 1))
         return offset_1jan if dst_jan == datetime.timedelta(0) else offset_1jul
 
+
 def default_vertical_dist():
     return "[[5.0, 1.0]]"
 
@@ -128,9 +144,11 @@ class VerticalDist(BaseNamedModel):
     domain = models.ForeignKey(
         "Domain", on_delete=models.CASCADE, related_name="vertical_dists"
     )
-    #TODO ArrayField in Gadget, need for compatability, how to convert? 
-    #ArrayField not supported in SQLite
-    weights = models.CharField(max_length=CHAR_FIELD_LENGTH, default=default_vertical_dist)
+    # TODO ArrayField in Gadget, need for compatability, how to convert?
+    # ArrayField not supported in SQLite
+    weights = models.CharField(
+        max_length=CHAR_FIELD_LENGTH, default=default_vertical_dist
+    )
 
     class Meta:
         unique_together = (("domain", "name"), ("domain", "slug"))
@@ -160,6 +178,7 @@ class Activity(models.Model):
     def __str__(self):
         """Return a unicode representation of this activity."""
         return self.name
+
 
 class CodeSet(BaseNamedModel):
     """A set of activity codes."""
@@ -196,8 +215,10 @@ class CodeSet(BaseNamedModel):
     def __str__(self):
         return self.name
 
+
 class ActivityCode(models.Model):
     """An abstract model for an activity code."""
+
     objects = NaturalKeyManager()
     code = LtreeField(verbose_name="activity code")
     label = models.CharField(verbose_name="activity code label", max_length=100)
@@ -208,19 +229,24 @@ class ActivityCode(models.Model):
         VerticalDist, on_delete=models.SET_NULL, related_name="+", null=True, blank=True
     )
     natural_key_fields = ("code_set__domain__slug", "code_set__slug", "code")
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["code_set", "code"], name="unique code in codeset"
             )
         ]
+
     def natural_key(self):
         return (self.code_set.domain.slug, self.code_set.slug, self.code)
+
     def __lt__(self, other):
         return self.code < other.code
+
     def __str__(self):
         """Return a unicode representation of this activity code."""
         return self.code
+
     def matches(self, filters):
         """Compare with a (list of) filter code(s).
         args
@@ -245,18 +271,23 @@ class ActivityCode(models.Model):
             if matches:
                 return matches
         return matches
+
     def get_decendents(self):
         return self.get_decendents_and_self().exclude(pk=self.pk)
+
     def get_decendents_and_self(self):
         return ActivityCode.objects.filter(code__dore=self.code).filter(
             code_set=self.code_set
         )
+
     def get_ancestors(self):
         return self.get_ancestors_and_self().exclude(pk=self.pk)
+
     def get_ancestors_and_self(self):
         return ActivityCode.objects.filter(code__aore=self.code).filter(
             code_set=self.code_set
         )
+
     def get_parent(self):
         if "." not in self.code:
             raise RuntimeError(
@@ -265,18 +296,23 @@ class ActivityCode(models.Model):
         return ActivityCode.objects.get(
             code__match=".".join(self.code.split(".")[:-1]), code_set=self.code_set
         )
+
     def get_siblings_and_self(self):
         return ActivityCode.objects.filter(
             code__match=".".join(self.code.split(".")[:-1]) + ".*{1}",
             code_set=self.code_set,
         )
+
     def get_siblings(self):
         return self.get_siblings_and_self().exclude(pk=self.pk)
+
     def get_children(self):
         return self.code_set.codes.filter(code__match=self.code + ".*{1}")
+
     def is_leaf(self):
         """Return True if code is a leaf (i.e. has no sub-codes)."""
         return not self.get_decendents().exists()
+
 
 def default_timevar_typeday():
     return str(24 * [7 * [100.0]])
@@ -304,22 +340,20 @@ def normalize(timevar, timezone=None):
     )
     return timevar
 
+
 class TimevarBase(models.Model):
-    name = models.CharField(max_length=CHAR_FIELD_LENGTH, unique = True)
-    domain = models.ForeignKey(
-        "Domain", on_delete=models.CASCADE
-    )
-    
+    name = models.CharField(max_length=CHAR_FIELD_LENGTH, unique=True)
+    domain = models.ForeignKey("Domain", on_delete=models.CASCADE)
+
     # typeday should be a 2d-field with hours as rows and weekdays as columns
-    #ArrayField not supported in SQLite
+    # ArrayField not supported in SQLite
     typeday = models.CharField(
-        max_length=10 * len(default_timevar_typeday()), 
-        default=default_timevar_typeday()
+        max_length=10 * len(default_timevar_typeday()),
+        default=default_timevar_typeday(),
     )
     # month should be a 1d field with 12 values
     month = models.CharField(
-        max_length=10 * len(default_timevar_month()), 
-        default=default_timevar_month()
+        max_length=10 * len(default_timevar_month()), default=default_timevar_month()
     )
 
     # pre-calculated normalization constants
@@ -344,11 +378,13 @@ class TimevarBase(models.Model):
         normalize(self)
         super(TimevarBase, self).save(*args, **kwargs)
 
+
 class Timevar(TimevarBase):
     """A source time-variation profile."""
 
     class Meta(TimevarBase.Meta):
         default_related_name = "timevars"
+
 
 class SourceBase(models.Model):
     """Abstract base model for an emission source."""
@@ -356,6 +392,7 @@ class SourceBase(models.Model):
     name = models.CharField("name", max_length=CHAR_FIELD_LENGTH, blank=False)
     created = models.DateTimeField(verbose_name="time of creation", auto_now_add=True)
     updated = models.DateTimeField(verbose_name="time of last update", auto_now=True)
+    # TODO: do such tags work for Spatialite? Best to keep for CLAIR compatability?
     tags = models.JSONField(
         verbose_name="user-defined key-value pairs", blank=True, null=True
     )
@@ -366,6 +403,7 @@ class SourceBase(models.Model):
     def __str__(self):
         """Return a unicode representation of this source."""
         return self.name
+
 
 class PointAreaGridSourceBase(SourceBase):
     """Abstract base model for point, area and grid sources"""
@@ -399,17 +437,24 @@ class PointAreaGridSourceBase(SourceBase):
         abstract = True
         index_together = ["activitycode1", "activitycode2", "activitycode3"]
 
+
 class Facility(SourceBase):
     """A facility."""
 
     official_id = models.CharField(
-        "official_id", max_length=CHAR_FIELD_LENGTH, blank=False, db_index=True, unique=True
+        "official_id",
+        max_length=CHAR_FIELD_LENGTH,
+        blank=False,
+        db_index=True,
+        unique=True,
     )
-    
+
     class Meta:
         default_related_name = "facilities"
         # unique_together = (("inventory", "official_id"), ("inventory", "name"))
-        #TODO not sure if the unique = true in official id is sufficient to replace line above?
+        # TODO not sure if the unique = true in official id is sufficient
+        # to replace line above?
+
     def __str__(self):
         return str(self.official_id)
 
@@ -448,7 +493,7 @@ class PointSource(PointAreaGridSourceBase):
     facility = models.ForeignKey(
         "Facility", on_delete=models.SET_NULL, null=True, blank=True
     )
-    
+
     class Meta(PointAreaGridSourceBase.Meta):
         default_related_name = "pointsources"
         unique_together = ("facility", "name")

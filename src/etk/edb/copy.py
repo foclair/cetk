@@ -1,5 +1,7 @@
 from django.db import transaction
+
 from etk.edb import models
+
 
 def copy_model_instance(instance, **updated_fields):
     """Create a copy of a model instance in the database."""
@@ -15,7 +17,8 @@ def copy_model_instance(instance, **updated_fields):
     copy.save()
     return copy
 
-@transaction.atomic #TODO is this line necessary?
+
+@transaction.atomic  # TODO is this line necessary?
 def copy_codeset(src, tgt):
     """Copy activitycodes from one codeset to another."""
     vertical_dists = {dist.name: dist for dist in tgt.domain.vertical_dists.all()}
@@ -27,7 +30,7 @@ def copy_codeset(src, tgt):
             try:
                 instance.vertical_dist = vertical_dists[instance.vertical_dist.name]
             except KeyError:
-                raise KeyError( # or import incompatible baseset??
+                raise KeyError(  # or import incompatible baseset??
                     f"Vertical distribution '{instance.vertical_dist.name}' not found "
                     f"in domain '{tgt.domain.slug}' of target code-set, use "
                     "'copy_vertical_distributions' to ensure they are available"
@@ -36,5 +39,3 @@ def copy_codeset(src, tgt):
 
     codes = [update_and_drop_id(code) for code in src.codes.all()]
     models.ActivityCode.objects.bulk_create(codes)
-
-
