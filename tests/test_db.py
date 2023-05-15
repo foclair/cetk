@@ -3,6 +3,7 @@
 import os
 import subprocess
 
+# TODO change to pointsources
 from etk.edb.models import Vehicle
 from etk.tools import Editor
 

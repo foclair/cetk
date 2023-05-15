@@ -9,14 +9,14 @@ from django.db.models import Lookup
 
 
 class LtreeField(models.CharField):
-    description = "ltree (up to %(max_length)s)"
+    description = "SQLite alternative to ltree (up to %(max_length)s)"
 
     def __init__(self, *args, **kwargs):
         kwargs["max_length"] = 256
         super().__init__(*args, **kwargs)
 
-    def db_type(self, connection):
-        return "ltree"
+    # def db_type(self, connection):
+    #    return "ltree"
 
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
@@ -31,7 +31,16 @@ class AncestorOrEqual(Lookup):
         lhs, lhs_params = self.process_lhs(qn, connection)
         rhs, rhs_params = self.process_rhs(qn, connection)
         params = lhs_params + rhs_params
-        return "%s @> %s" % (lhs, rhs), params
+        if len(rhs_params) > 1:
+            raise ValueError("This alternative for LTree is not implemented")
+        elif len(rhs_params[0]) > 2:
+            return (
+                '%s like %s or %s like %s or %s like ""  '
+                % (lhs, rhs, lhs, rhs_params[0][:-2], lhs),
+                params,
+            )
+        else:
+            return '%s like %s or %s like "" ' % (lhs, rhs, lhs), params
 
 
 LtreeField.register_lookup(AncestorOrEqual)
@@ -44,7 +53,11 @@ class DescendantOrEqual(Lookup):
         lhs, lhs_params = self.process_lhs(qn, connection)
         rhs, rhs_params = self.process_rhs(qn, connection)
         params = lhs_params + rhs_params
-        return "%s <@ %s" % (lhs, rhs), params
+        if len(params) > 1:
+            raise ValueError("This alternative for LTree is not implemented")
+        else:
+            params = [params[0] + "%"]
+            return "%s like %s" % (lhs, rhs), params
 
 
 LtreeField.register_lookup(DescendantOrEqual)
@@ -57,7 +70,7 @@ class Match(Lookup):
         lhs, lhs_params = self.process_lhs(qn, connection)
         rhs, rhs_params = self.process_rhs(qn, connection)
         params = lhs_params + rhs_params
-        return "%s ~ %s" % (lhs, rhs), params
+        return "%s like %s" % (lhs, rhs), params
 
 
 LtreeField.register_lookup(Match)

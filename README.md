@@ -27,5 +27,9 @@ If you did not change the default path, then the migrate command should create
 Run tests by
 ```
 python -m pip install pytest-django
+python -m pip install pytest-django-ifactory
+. .venv/bin/activate
 pytest ./tests/edb/test_models.py
 ```
+Note that the venv has to be (re-)activated *after* pytest is installed, otherwise
+pytest does not use the venv-python version but the default python of your system.
