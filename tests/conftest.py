@@ -3,7 +3,7 @@
 # import numpy as np
 import pytest
 
-# from etk.edb import models
+from etk.edb import models
 from etk.edb.models import Domain  # , Substance
 
 # from django.contrib.auth import get_user_model
@@ -148,31 +148,29 @@ def vertical_dist(domains):
 #     return source_ef_set1, source_ef_set2, source_ef_set3
 
 
-# @pytest.fixture()
-# def code_sets(domains, vertical_dist):
-#     domain = domains[0]
-#     cs1 = models.CodeSet.objects.create(name="codeset1", slug="codeset1",
-#       domain=domain)
-#     cs1.codes.create(code="1", label="Energy")
-#     cs1.codes.create(
-#         code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
-#     )
-#     cs1.codes.create(
-#         code="1.2", label="Fugitive emissions", vertical_dist=vertical_dist
-#     )
-#     cs1.codes.create(code="1.3", label="Road traffic")
-#     cs1.codes.create(code="1.3.1", label="Light vehicles")
-#     cs1.codes.create(code="1.3.2", label="Heavy vehicles")
-#     cs1.codes.create(code="2", label="Industrial processes")
-#     cs1.codes.create(code="2.1", label="Mobile combustion")
-#     cs1.codes.create(code="2.2", label="Other")
-#     cs1.codes.create(code="3", label="Diffuse sources")
+@pytest.fixture()
+def code_sets(domains, vertical_dist):
+    domain = domains[0]
+    cs1 = models.CodeSet.objects.create(name="codeset1", slug="codeset1", domain=domain)
+    cs1.codes.create(code="1", label="Energy")
+    cs1.codes.create(
+        code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
+    )
+    cs1.codes.create(
+        code="1.2", label="Fugitive emissions", vertical_dist=vertical_dist
+    )
+    cs1.codes.create(code="1.3", label="Road traffic")
+    cs1.codes.create(code="1.3.1", label="Light vehicles")
+    cs1.codes.create(code="1.3.2", label="Heavy vehicles")
+    cs1.codes.create(code="2", label="Industrial processes")
+    cs1.codes.create(code="2.1", label="Mobile combustion")
+    cs1.codes.create(code="2.2", label="Other")
+    cs1.codes.create(code="3", label="Diffuse sources")
 
-#     cs2 = models.CodeSet.objects.create(name="codeset2", slug="codeset2",
-# domain=domain)
-#     cs2.codes.create(code="A", label="Bla bla")
+    cs2 = models.CodeSet.objects.create(name="codeset2", slug="codeset2", domain=domain)
+    cs2.codes.create(code="A", label="Bla bla")
 
-#     return (cs1, cs2)
+    return (cs1, cs2)
 
 
 # @pytest.fixture()

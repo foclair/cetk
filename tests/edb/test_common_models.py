@@ -3,56 +3,60 @@
 # from collections import OrderedDict
 
 # import numpy
-# import pytest
+import pytest
+
+from etk.edb import models
+
 # from django.contrib.gis.gdal import GDALRaster
 # from django.contrib.gis.geos import Polygon
 # from pytest_django.asserts import assertNumQueries
 
-# from etk.edb import models
+
 # from etk.edb.const import DUMMY_SRID
 # from etk.edb.models import Substance
 # from etk.edb.units import activity_rate_unit_to_si, emission_unit_to_si
 
 
-# class TestActivityCodes:
-#     def test_activitycode1_manager_create(self, code_sets):
-#         """Test creating a new activitycode with reference to a code-set."""
-#         # TODO maybe can find fixtures in edb/fixtures now?
-#         # if not can change to ifactory.edb.codeset() but then no preset data?
-#         code_set = code_sets[0]
-#         ac1 = models.ActivityCode.objects.create(
-#             code="actcode1", label="label1", code_set=code_set
-#         )
-#         ac1_ref = code_set.codes.get(code="actcode1", code_set=code_set)
-#         assert ac1 == ac1_ref
+class TestActivityCodes:
+    def test_activitycode1_manager_create(self, code_sets):
+        """Test creating a new activitycode with reference to a code-set."""
+        # TODO maybe can find fixtures in edb/fixtures now?
+        # if not can change to ifactory.edb.codeset() but then no preset data?
+        code_set = code_sets[0]
+        ac1 = models.ActivityCode.objects.create(
+            code="actcode1", label="label1", code_set=code_set
+        )
+        ac1_ref = code_set.codes.get(code="actcode1", code_set=code_set)
+        assert ac1 == ac1_ref
 
-#         ac1, created = code_set.codes.get_or_create(code="actcode1", label="label1")
-#         assert not created
-#         assert ac1 == ac1_ref
+        ac1, created = code_set.codes.get_or_create(code="actcode1", label="label1")
+        assert not created
+        assert ac1 == ac1_ref
 
-#         ac2, created = code_set.codes.get_or_create(code="actcode2", label="label2")
-#         assert created
+        ac2, created = code_set.codes.get_or_create(code="actcode2", label="label2")
+        assert created
 
-#     def test_get_children(self, code_sets):
-#         code_set = code_sets[0]
-#         ac1 = code_set.codes.get(code="1")
-#         ac13 = code_set.codes.get(code="1.3")
-#         ac131 = code_set.codes.get(code="1.3.1")
-#         # breakpoint()
-#         assert ac13 in list(ac1.get_children())
-#         assert ac131 not in list(ac1.get_children())
-#         assert ac131 in list(ac13.get_children())
+    def test_get_children(self, code_sets):
+        code_set = code_sets[0]
+        ac1 = code_set.codes.get(code="1")
+        ac13 = code_set.codes.get(code="1.3")
+        ac131 = code_set.codes.get(code="1.3.1")
+        # breakpoint()
+        assert ac13 in list(ac1.get_children())
+        assert ac131 not in list(ac1.get_children())
+        assert ac131 in list(ac13.get_children())
 
-#     def test_get_parent(self, code_sets):
-#         code_set = code_sets[0]
-#         ac1 = code_set.codes.get(code="1")
-#         ac13 = code_set.codes.get(code="1.3")
-#         ac131 = code_set.codes.get(code="1.3.1")
-#         # breakpoint()
-#         assert ac1 == ac13.get_parent()
-#         assert ac13 == ac131.get_parent()
-#         with pytest.raises(RuntimeError):
-#             ac1.get_parent()
+    def test_get_parent(self, code_sets):
+        code_set = code_sets[0]
+        ac1 = code_set.codes.get(code="1")
+        ac13 = code_set.codes.get(code="1.3")
+        ac131 = code_set.codes.get(code="1.3.1")
+        # breakpoint()
+        assert ac1 == ac13.get_parent()
+        assert ac13 == ac131.get_parent()
+        with pytest.raises(RuntimeError):
+            ac1.get_parent()
+
 
 # TODO start fixing tests above here
 

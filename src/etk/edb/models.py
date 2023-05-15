@@ -299,7 +299,7 @@ class ActivityCode(models.Model):
 
     def get_siblings_and_self(self):
         return ActivityCode.objects.filter(
-            code__match=".".join(self.code.split(".")[:-1]) + ".*{1}",
+            code__match=".".join(self.code.split(".")[:-1]) + "._",
             code_set=self.code_set,
         )
 
@@ -307,7 +307,7 @@ class ActivityCode(models.Model):
         return self.get_siblings_and_self().exclude(pk=self.pk)
 
     def get_children(self):
-        return self.code_set.codes.filter(code__match=self.code + ".*{1}")
+        return self.code_set.codes.filter(code__match=self.code + "._")
 
     def is_leaf(self):
         """Return True if code is a leaf (i.e. has no sub-codes)."""
