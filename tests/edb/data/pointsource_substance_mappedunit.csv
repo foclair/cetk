@@ -1,0 +1,10 @@
+q	hc	h	dv	component	unit	source	facility	chimney	od	id	x	y
+0.001522	0.491	18	1	NOx	g/s	10621_10Smeltoven740	10621	1	2.5	1	94896	435836
+0.01624	0.086	8	1	NOx	g	10621_11stoomketel	10621	1			94840	436000
+0.001268	0.002	25	2	NOx	kg	10621_12Verwarmingsinstallatie	10621	1			94850	436030
+0.001	0.072	8	0	SOx	g	10621_3Anorcoatoven383_22	10621	3			94820	436104
+0.0002	0	12	1	SOx	g	10621_6Gloeiovens	10621	6	3.5	1.5	94850	436030
+1.2	0.375			SOx	g	AWZIKralingseveer(HoogheemraadschapvanSchieland)	AWZIKralingseveer(HoogheemraadschapvanSchieland)	1	2.5	1	96837	435900
+0.0005	0	12	1	NOx	g	10621_6Gloeiovens	10621	6	3.5	1.5	94850	436030
+0.002	0.072	8	0	NOx	g	10621_3Anorcoatoven383_22	10621	3			94820	436104
+2.5	0.375			NOx	g/s	AWZIKralingseveer(HoogheemraadschapvanSchieland)	AWZIKralingseveer(HoogheemraadschapvanSchieland)	1	2.5	1	96837	435900

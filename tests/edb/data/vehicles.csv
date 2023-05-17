@@ -1,0 +1,9 @@
+year;vehicle;fuel;traffic_situation;substance;freeflow;heavy;saturated;stopngo;coldstart
+2019;car;diesel;1a;NOx;1;2;3;4;5
+2019;car;petrol;1a;NOx;1;2;3;4;5
+2019;lorry;diesel;1a;NOx;1;2;3;4;5
+2019;lorry;diesel;1b;NOx;1;2;3;4;5
+2019;car;diesel;1a;SOx;1;2;3;4;5
+2019;car;petrol;1a;SOx;1;2;3;4;5
+2019;lorry;diesel;1a;SOx;1;2;3;4;5
+2019;lorry;diesel;1b;SOx;1;2;3;4;5

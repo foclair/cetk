@@ -1,0 +1,34 @@
+coordinates: [x, y]
+srid: 28992
+parameters: {
+  chimney_height: h,
+  chimney_inner_diameter: id,
+  chimney_outer_diameter: od,
+  facility_id: facility,
+  name: source,
+  timevar: dv,
+}
+mappings: {
+  timevar: {
+    industry0: [0],
+    industry1: [1],
+  },
+  defaults: {
+    timevar: industry0,
+  }
+}
+defaults: {
+  chimney_height: 10.0,
+  chimney_gas_temperature: 100,
+  chimney_inner_diameter: 1,
+  chimney_outer_diameter: 5,
+  unit: g/s,
+}
+emissions: {
+  NOx: {
+    emission: Nitrogen,
+  },
+  SOx: {
+    emission: Sulfur,
+  },
+}

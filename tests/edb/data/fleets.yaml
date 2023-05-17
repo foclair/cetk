@@ -1,0 +1,34 @@
+
+"europavägar tätort":
+  is_template: true
+  default_heavy_vehicle_share: 0.1
+  vehicles:
+    car:
+      fraction: 1.0
+      coldstart_fraction: 0.27
+      timevar: constant
+      coldstart_timevar: constant
+      fuels:
+        petrol: 0.7
+        diesel: 0.3
+
+    lorry:
+      fraction: 1.0
+      coldstart_fraction: 0
+      timevar: constant
+      coldstart_timevar: constant
+      fuels:
+        diesel: 1.0
+
+"europavägar landsbygd":
+  is_template: true
+  default_heavy_vehicle_share: 0.0
+  vehicles:
+    car:
+      fraction: 1.0
+      coldstart_fraction: 0.07
+      timevar: constant
+      coldstart_timevar: constant
+      fuels:
+        petrol: 0.7
+        diesel: 0.3

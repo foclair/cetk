@@ -1,0 +1,10 @@
+---
+defaults: {
+  timevar: vedpanna,
+}
+emissions: {
+  BaP: {
+    emission: Emission,
+    unitval: mg/year
+  }
+}

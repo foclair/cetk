@@ -17,6 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from etk.edb.const import CHAR_FIELD_LENGTH, WGS84_SRID
 from etk.edb.copy import copy_codeset, copy_model_instance
 from etk.edb.ltreefield import LtreeField
+from etk.settings import TIME_ZONE
 
 # eller
 # from django.db import models, but maybe geodjango models api
@@ -331,7 +332,7 @@ def get_normalization_constant(typeday, month, timezone):
 def normalize(timevar, timezone=None):
     """Set the normalization constants on a timevar instance."""
     if timezone is None:
-        timezone = timevar.domain.timezone
+        timezone = TIME_ZONE
     typeday = np.array(ast.literal_eval(timevar.typeday))
     month = np.array(ast.literal_eval(timevar.month))
     timevar.typeday_sum = typeday.sum()
@@ -343,7 +344,8 @@ def normalize(timevar, timezone=None):
 
 class TimevarBase(models.Model):
     name = models.CharField(max_length=CHAR_FIELD_LENGTH, unique=True)
-    domain = models.ForeignKey("Domain", on_delete=models.CASCADE)
+    # same domain for all data
+    # domain = models.ForeignKey("Domain", on_delete=models.CASCADE)
 
     # typeday should be a 2d-field with hours as rows and weekdays as columns
     # ArrayField not supported in SQLite
@@ -497,3 +499,9 @@ class PointSource(PointAreaGridSourceBase):
     class Meta(PointAreaGridSourceBase.Meta):
         default_related_name = "pointsources"
         unique_together = ("facility", "name")
+
+
+class PointSourceSubstance(SourceSubstance):
+    """A point-source substance emission."""
+
+    source = models.ForeignKey("PointSource", on_delete=models.CASCADE)
