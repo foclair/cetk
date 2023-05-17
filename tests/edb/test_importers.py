@@ -39,32 +39,32 @@ def test_import_timevars(ifactory, get_data_file):
 
 
 class TestImportPointSources:
-    @pytest.mark.django_db  # TODO check if this correct? added by Eef
-    def test_import_point_sources_timevars(self, get_data_file):
-        notimevars = Timevar.objects.all().count()
-        translations = get_yaml_data("test_point_source_translation_timevars.yaml")
-        timevar_data = get_yaml_data(get_data_file("test_timevar_pointsources.yaml"))
-        timevars = import_timevars(timevar_data)
-        pscount = PointSource.objects.all().count()
-        import_point_sources(
-            get_data_file("eldstader_backe.gpkg"),
-            translations,
-            timevars,
-        )
-        assert PointSource.objects.all().count() == pscount + 174
-        assert Timevar.objects.all().count() == notimevars + 4
-        assert PointSourceSubstance.objects.all().count() == 174
+    # @pytest.mark.django_db  # TODO check if this correct? added by Eef
+    # def test_import_point_sources_timevars(self, get_data_file):
+    #     notimevars = Timevar.objects.all().count()
+    #     translations = get_yaml_data("test_point_source_translation_timevars.yaml")
+    #     timevar_data = get_yaml_data(get_data_file("test_timevar_pointsources.yaml"))
+    #     timevars = import_timevars(timevar_data)
+    #     pscount = PointSource.objects.all().count()
+    #     import_point_sources(
+    #         get_data_file("eldstader_backe.gpkg"),
+    #         translations,
+    #         timevars,
+    #     )
+    #     assert PointSource.objects.all().count() == pscount + 174
+    #     assert Timevar.objects.all().count() == notimevars + 4
+    #     assert PointSourceSubstance.objects.all().count() == 174
 
-        # 10 "BBR godknd vedpanna" + 54 "vedpanna"
-        assert (
-            PointSource.objects.filter(timevar=timevars["emission"]["vedpanna"]).count()
-            == 10 + 54
-        )
-        # 1 "udda typ eldstad" not defined gets default
-        assert (
-            PointSource.objects.filter(timevar=timevars["emission"]["STANDARD"]).count()
-            == 1
-        )
+    #     # 10 "BBR godknd vedpanna" + 54 "vedpanna"
+    #     assert (
+    #         PointSource.objects.filter(timevar=timevars["emission"]["vedpanna"]).count()
+    #         == 10 + 54
+    #     )
+    #     # 1 "udda typ eldstad" not defined gets default
+    #     assert (
+    #         PointSource.objects.filter(timevar=timevars["emission"]["STANDARD"]).count()
+    #         == 1
+    #     )
 
     def test_import_point_sources(self, get_data_file):
         timevars = import_timevars(

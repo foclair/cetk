@@ -9,6 +9,7 @@ import pytz
 
 # from django.conf import settings
 from django.contrib.gis.db import models
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 
 # from django.db.models import Sum
 from django.utils.text import slugify
@@ -88,6 +89,60 @@ class Substance(NamedModel):
     class Meta:
         db_table = "substances"
         default_related_name = "substances"
+
+
+class Parameter(NamedModel):
+    """A parameter."""
+
+    quantity = models.CharField(_("physical quantity"), max_length=30)
+    substance = models.ForeignKey(
+        Substance, on_delete=models.CASCADE, null=True, verbose_name=_("substance")
+    )
+
+    class Meta:
+        db_table = "parameters"
+        default_related_name = "parameters"
+
+    def validate_unique(self, *args, **kwargs):
+        """Avoid duplicate emission or conc. parameters for a substance."""
+        super().validate_unique(*args, **kwargs)
+        if self.quantity in ("emission", "concentration"):
+            duplicates = type(self).objects.filter(
+                quantity=self.quantity, substance=self.substance
+            )
+            if duplicates.exists():
+                raise ValidationError(
+                    {
+                        NON_FIELD_ERRORS: [
+                            f"A parameter for {self.quantity} of {self.substance} "
+                            f"already exist"
+                        ]
+                    }
+                )
+
+    def _auto_name(self):
+        """Auto-generate a name."""
+        quantity = self.quantity.capitalize()
+        if self.substance is not None:
+            self.name = f"{quantity} {self.substance.name}"
+        else:
+            self.name = quantity
+
+    def _auto_slug(self):
+        """Auto-generate a slug."""
+        if self.substance is not None:
+            quantity = slugify(self.quantity)
+            self.slug = f"{quantity}_{self.substance.slug}"
+        else:
+            self.slug = slugify(self.name)
+
+    def save(self, *args, **kwargs):
+        """Overloads save to auto-generate name and slug if missing."""
+        if self.name is None:
+            self._auto_name()
+        if self.slug is None:
+            self._auto_slug()
+        super().save(*args, **kwargs)
 
 
 class SourceSubstance(models.Model):
