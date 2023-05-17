@@ -39,33 +39,34 @@ def test_import_timevars(ifactory, get_data_file):
 
 
 class TestImportPointSources:
-    # @pytest.mark.django_db  # TODO check if this correct? added by Eef
-    # def test_import_point_sources_timevars(self, get_data_file):
-    #     notimevars = Timevar.objects.all().count()
-    #     translations = get_yaml_data("test_point_source_translation_timevars.yaml")
-    #     timevar_data = get_yaml_data(get_data_file("test_timevar_pointsources.yaml"))
-    #     timevars = import_timevars(timevar_data)
-    #     pscount = PointSource.objects.all().count()
-    #     import_point_sources(
-    #         get_data_file("eldstader_backe.gpkg"),
-    #         translations,
-    #         timevars,
-    #     )
-    #     assert PointSource.objects.all().count() == pscount + 174
-    #     assert Timevar.objects.all().count() == notimevars + 4
-    #     assert PointSourceSubstance.objects.all().count() == 174
+    @pytest.fixture()  # NB: had to be added because not using inventories fixture
+    def test_import_point_sources_timevars(self, get_data_file):
+        notimevars = Timevar.objects.all().count()
+        translations = get_yaml_data("test_point_source_translation_timevars.yaml")
+        timevar_data = get_yaml_data(get_data_file("test_timevar_pointsources.yaml"))
+        timevars = import_timevars(timevar_data)
+        pscount = PointSource.objects.all().count()
+        import_point_sources(
+            get_data_file("eldstader_backe.gpkg"),
+            translations,
+            timevars,
+        )
+        assert PointSource.objects.all().count() == pscount + 174
+        assert Timevar.objects.all().count() == notimevars + 4
+        assert PointSourceSubstance.objects.all().count() == 174
 
-    #     # 10 "BBR godknd vedpanna" + 54 "vedpanna"
-    #     assert (
-    #         PointSource.objects.filter(timevar=timevars["emission"]["vedpanna"]).count()
-    #         == 10 + 54
-    #     )
-    #     # 1 "udda typ eldstad" not defined gets default
-    #     assert (
-    #         PointSource.objects.filter(timevar=timevars["emission"]["STANDARD"]).count()
-    #         == 1
-    #     )
+        # 10 "BBR godknd vedpanna" + 54 "vedpanna"
+        assert (
+            PointSource.objects.filter(timevar=timevars["emission"]["vedpanna"]).count()
+            == 10 + 54
+        )
+        # 1 "udda typ eldstad" not defined gets default
+        assert (
+            PointSource.objects.filter(timevar=timevars["emission"]["STANDARD"]).count()
+            == 1
+        )
 
+    @pytest.fixture()
     def test_import_point_sources(self, get_data_file):
         timevars = import_timevars(
             get_yaml_data(get_data_file("test_timevar_pointsources.yaml")),
@@ -83,6 +84,7 @@ class TestImportPointSources:
             == pscount + 174
         )
 
+    @pytest.fixture()
     def test_import_pointsources_substance_attributes(self, get_data_file):
         translations = get_yaml_data(
             "pointsource_substance_attributes_translation.yaml"
@@ -120,6 +122,7 @@ class TestImportPointSources:
         assert ps3.timevar.name == "industry1"
         assert ps2.facility == ps3.facility
 
+    @pytest.fixture()
     def test_import_pointsources_substance_attributes_filter(self, get_data_file):
         translations = get_yaml_data(
             "pointsource_substance_attributes_translation.yaml"
@@ -137,6 +140,7 @@ class TestImportPointSources:
         assert PointSource.objects.all().count() == pscount + 1
         PointSource.objects.get(name="AWZIKralingseveer(HoogheemraadschapvanSchieland)")
 
+    @pytest.fixture()
     def test_import_pointsources_substance_attributes_only(self, get_data_file):
         translations = get_yaml_data(
             "pointsource_substance_attributes_translation.yaml"
@@ -157,6 +161,7 @@ class TestImportPointSources:
                 name="AWZIKralingseveer(HoogheemraadschapvanSchieland)"
             )
 
+    @pytest.fixture()
     def test_import_pointsources_substance_parameter(self, get_data_file):
         translations = get_yaml_data("pointsource_substance_parameter_translation.yaml")
         timevar_data = get_yaml_data(get_data_file("timevar_pointsources.yaml"))
@@ -190,6 +195,7 @@ class TestImportPointSources:
         assert ps3.timevar.name == "industry1"
         assert ps2.facility == ps3.facility
 
+    @pytest.fixture()
     def test_import_pointsources_substance_rows(self, get_data_file):
         translations = get_yaml_data("pointsource_substance_parameter_translation.yaml")
         timevar_data = get_yaml_data(get_data_file("timevar_pointsources.yaml"))
@@ -223,6 +229,7 @@ class TestImportPointSources:
         assert ps3.timevar.name == "industry1"
         assert ps2.facility == ps3.facility
 
+    @pytest.fixture()
     def test_import_pointsources_substance_mappedsubst(self, get_data_file):
         translations = get_yaml_data(
             "pointsource_substance_mappedsubst_translation.yaml"
@@ -243,6 +250,7 @@ class TestImportPointSources:
         ps2 = PointSource.objects.get(name="10621_12Verwarmingsinstallatie")
         assert ps2.substances.get(substance__name="NOx").value == approx(0.000001268)
 
+    @pytest.fixture()
     def test_import_pointsources_substance_rows_no_timevars(self, get_data_file):
         translations = get_yaml_data("pointsource_substance_parameter_translation.yaml")
 
@@ -257,6 +265,7 @@ class TestImportPointSources:
         )
         assert ps.timevar is None
 
+    @pytest.fixture()
     def test_import_pointsources_substance_rows_filter(self, get_data_file):
         config = get_yaml_data("pointsource_substance_parameter_translation.yaml")
 
@@ -272,6 +281,7 @@ class TestImportPointSources:
         )
         assert ps.timevar is None
 
+    @pytest.fixture()
     def test_import_pointsources_substance_rows_only(self, get_data_file):
         config = get_yaml_data("pointsource_substance_parameter_translation.yaml")
 
@@ -287,6 +297,7 @@ class TestImportPointSources:
                 name="AWZIKralingseveer(HoogheemraadschapvanSchieland)"
             )
 
+    @pytest.fixture()
     def test_import_pointsources_mappedunits(self, get_data_file):
         config = get_yaml_data("pointsource_substance_mappedunit.yaml")
 
@@ -314,6 +325,7 @@ class TestImportPointSources:
         ps3 = PointSource.objects.get(name="10621_6Gloeiovens")
         assert ps2.facility == ps3.facility
 
+    @pytest.fixture()
     def test_import_pointsources_substance_colums(self, get_data_file):
         config = get_yaml_data("pointsource_substance_attributes_translation.yaml")
         timevar_data = get_yaml_data(get_data_file("timevar_pointsources.yaml"))
