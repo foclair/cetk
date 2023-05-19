@@ -4,7 +4,7 @@ import os
 import subprocess
 
 # TODO change to pointsources
-from etk.edb.models import Vehicle
+from etk.edb.models import Activity
 from etk.tools import Editor
 
 
@@ -18,8 +18,8 @@ def test_init_db(tmpdir):
 
 
 def test_edit_test_db(db):
-    Vehicle.objects.create(name="car")
-    assert Vehicle.objects.filter(name="car").exists(), "no record created"
+    Activity.objects.create(name="activity1", unit="m3")
+    assert Activity.objects.filter(name="activity1").exists(), "no record created"
 
 
 def test_eclair_cli(tmpdir):
