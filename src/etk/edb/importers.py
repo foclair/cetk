@@ -2,6 +2,7 @@
 
 # import copy
 import logging
+from itertools import islice
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ from django.contrib.gis.geos import Point, Polygon
 # from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.management.base import CommandError
 from django.db import IntegrityError
+from openpyxl import load_workbook
 
 from etk.edb.const import WGS84_SRID
 from etk.edb.models import (  # CodeSet,
@@ -187,8 +189,12 @@ class PointSourceParser:
     def parsefile(self):
         if self.sourcefile.endswith(".csv"):
             self.parse_csv_file()
-        else:
+        elif self.sourcefile.endswith(".shp"):
             self.parse_shape_file()
+        elif self.sourcefile.endswith(".xlsx"):
+            self.parse_spreadsheet()
+        else:
+            raise ImportError("Input file can only have extension .csv, .shp or .xlsx")
 
     def parse_csv_file(self):
         if "delimiter" in self.config:
@@ -208,7 +214,6 @@ class PointSourceParser:
             raise RuntimeError(
                 "No coordinate system provided. " "Set srid parameter in config file."
             )
-        # breakpoint()
         if len(self.config["coordinates"]) == 2:
             self.sourcemodel = PointSource
             self.substancemodel = PointSourceSubstance
@@ -298,6 +303,23 @@ class PointSourceParser:
             geom = feature.geom
             geom.transform(self.trans)
             self.update_psdict(psvals, substvals, geom.geos)
+
+    def parse_spreadsheet(self):
+        try:
+            workbook = load_workbook(filename=self.sourcefile)
+        except Exception as exc:
+            raise CommandError(str(exc))
+        worksheet = workbook.worksheets[0]
+        if len(workbook.worksheets) > 1:
+            log.debug("debug: multiple sheets in spreadsheet, only importing 1st.")
+        data = worksheet.values
+        cols = next(data)[1:]
+        data = list(data)
+        idx = [r[0] for r in data]
+        data = (islice(r, 1, None) for r in data)
+        df = pd.DataFrame(data, index=idx, columns=cols)
+        print(df)
+        # TODO same here with df as in parse_csv ?
 
     def get_substdict(self):
         self.substdict = dict()
