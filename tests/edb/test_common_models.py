@@ -1,8 +1,9 @@
 """Unit and regression tests for edb models."""
 
 # from collections import OrderedDict
+import ast
 
-# import numpy
+import numpy as np
 import pytest
 
 from etk.edb import models
@@ -834,9 +835,9 @@ class TestVerticalDist:
         # breakpoint()
         domain = ifactory.edb.domain()
         vdist = domain.vertical_dists.create(
-            name="residential heating", weights=[[5, 0], [10, 0.3], [15, 0.7]]
+            name="residential heating", weights="[[5, 0], [10, 0.3], [15, 0.7]]"
         )
-        assert len(vdist.weights) == 3
+        assert len(np.array(ast.literal_eval(vdist.weights))) == 3
 
     def test_str(self, vertical_dist):
         assert str(vertical_dist) == vertical_dist.name

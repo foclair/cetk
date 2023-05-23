@@ -3,7 +3,6 @@
 import os
 import subprocess
 
-# TODO change to pointsources
 from etk.edb.models import Activity
 from etk.tools import Editor
 

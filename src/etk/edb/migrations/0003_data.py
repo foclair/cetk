@@ -22,7 +22,7 @@ SUBSTANCES = (
         "Dioxin",
         "Dioxin",
         "Dioxin",
-    ),  # TODO: Needs a better long name, dioxin have several meanings?
+    ),
     ("HC", "Hydrocarbons", "Hydrocarbons"),
     ("HCB", "HCB", "Hexachlorobenzene"),
     ("HFC", "HFC", "Hydrofluorocarbons"),

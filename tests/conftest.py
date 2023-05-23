@@ -77,7 +77,9 @@ def domains(db):
 @pytest.fixture()
 def vertical_dist(domains):
     dmn1 = domains[0]
-    vdist = dmn1.vertical_dists.create(name="vdist1", weights=[[5.0, 0.4], [10.0, 0.6]])
+    vdist = dmn1.vertical_dists.create(
+        name="vdist1", weights="[[5.0, 0.4], [10.0, 0.6]]"
+    )
     return vdist
 
 

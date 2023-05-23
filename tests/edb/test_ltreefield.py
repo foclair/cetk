@@ -17,14 +17,6 @@ from etk.edb.models import ActivityCode
         # ("1.3.*", {"1.3", "1.3.1", "1.3.1.1", "1.3.2"}),
         # alternative for SQLite and 'like'
         ("1.3%", {"1.3", "1.3.1", "1.3.1.1", "1.3.2"}),
-        # lquery expressions to select all ltree codes in a specific level.
-        # TODO no alternative SQLite, need to adapt ActivityCode.get_children
-        # ("*{0}", {""}), # can only be empty activity code, but how relevant is that?
-        # ("*{1}", {"1", "2", "3"}), # without point
-        # ("*{2}", {"1.1", "1.2", "1.3", "2.1"}), # one point
-        # ("*{3}", {"1.3.1", "1.3.2", "2.1.1"}), # two points
-        # ("*{4}", {"1.3.1.1"}), # three points
-        # ("*{5}", set()), # four points
     ],
 )
 def test_match(ifactory, activity_codes, ltreecode, expected):

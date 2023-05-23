@@ -319,7 +319,7 @@ class PointSourceParser:
         data = (islice(r, 1, None) for r in data)
         df = pd.DataFrame(data, index=idx, columns=cols)
         print(df)
-        # TODO same here with df as in parse_csv ?
+        # TODO same here with df as in parse_csv ? add to test_importers as well
 
     def get_substdict(self):
         self.substdict = dict()
