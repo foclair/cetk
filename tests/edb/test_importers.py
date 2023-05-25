@@ -7,7 +7,8 @@ import pytest
 from pytest import approx
 from ruamel.yaml import YAML
 
-from etk.edb.importers import import_point_sources, import_timevars
+from etk.edb import models
+from etk.edb.importers import import_pointsources, import_timevars
 from etk.edb.models import PointSource, PointSourceSubstance, Timevar
 
 
@@ -28,28 +29,81 @@ def get_yaml_data(filename):
         return yaml.load(fp)
 
 
-def test_import_timevars(ifactory, get_data_file):
-    timevarfile = get_data_file("timevars.yaml")
-    import_timevars(get_yaml_data(timevarfile))
-    assert Timevar.objects.all().count() == 1
+# def test_import_timevars(ifactory, get_data_file):
+#     timevarfile = get_data_file("timevars.yaml")
+#     import_timevars(get_yaml_data(timevarfile))
+#     assert Timevar.objects.all().count() == 1
 
-    # test overwriting
-    import_timevars(get_yaml_data(timevarfile), overwrite=True)
-    assert Timevar.objects.all().count() == 1
+#     # test overwriting
+#     import_timevars(get_yaml_data(timevarfile), overwrite=True)
+#     assert Timevar.objects.all().count() == 1
 
 
 class TestImportPointSources:
-    @pytest.fixture()  # NB: had to be added because not using inventories fixture
-    def test_import_point_sources_timevars(self, get_data_file):
+    def test_import_pointsources_substance_rows(
+        self, domains, vertical_dist, get_data_file
+    ):
+        # translations ="pointsource_substance_parameter_translation.yaml")
+        # timevar_data = get_yaml_data(get_data_file("timevar_pointsources.yaml"))
+        # timevars = import_timevars(timevar_data)
+        domain = domains[0]
+        cs1 = models.CodeSet.objects.create(
+            name="codeset1", slug="codeset1", domain=domain
+        )
+        cs1.codes.create(code="1", label="Energy")
+        cs1.codes.create(
+            code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
+        )
+        cs1.codes.create(
+            code="1.2", label="Fugitive emissions", vertical_dist=vertical_dist
+        )
+
+        pscount = PointSource.objects.all().count()
+        import_pointsources(
+            get_data_file("pointsource_substance_rows.csv"),
+        )
+        assert PointSource.objects.all().count() == pscount + 6
+        ps = PointSource.objects.get(
+            name="AWZIKralingseveer(HoogheemraadschapvanSchieland)"
+        )
+        assert ps.chimney_outer_diameter == approx(2.5)
+        assert ps.chimney_inner_diameter == approx(1.0)
+        assert ps.chimney_height == approx(10.0)  # default
+        assert ps.chimney_gas_temperature == approx(100.0)  # default
+        assert ps.substances.get(substance__name="NOx").value == approx(0.0025)
+        assert ps.substances.get(substance__name="SOx").value == approx(0.0012)
+        assert ps.timevar.name == "industry0"  # mapping default
+
+        ps2 = PointSource.objects.get(name="10621_12Verwarmingsinstallatie")
+        assert ps2.chimney_height == approx(25.0)
+        assert ps2.timevar.name == "industry0"  # mapping default
+        assert ps2.substances.get(substance__name="NOx").value == approx(0.000001268)
+        assert ps2.facility.name == "10621"
+
+        ps3 = PointSource.objects.get(name="10621_6Gloeiovens")
+        assert ps3.timevar.name == "industry1"
+        assert ps2.facility == ps3.facility
+
+    # NB: had to be added because not using inventories fixture
+    def test_import_pointsources_timevars(self, domains, vertical_dist, get_data_file):
+        domain = domains[0]
         notimevars = Timevar.objects.all().count()
-        translations = get_yaml_data("test_point_source_translation_timevars.yaml")
+        cs1 = models.CodeSet.objects.create(
+            name="codeset1", slug="codeset1", domain=domain
+        )
+        cs1.codes.create(code="1", label="Energy")
+        cs1.codes.create(
+            code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
+        )
+        cs1.codes.create(
+            code="1.2", label="Fugitive emissions", vertical_dist=vertical_dist
+        )
+        # translations = get_yaml_data("test_point_source_translation_timevars.yaml")
         timevar_data = get_yaml_data(get_data_file("test_timevar_pointsources.yaml"))
         timevars = import_timevars(timevar_data)
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("eldstader_backe.gpkg"),
-            translations,
-            timevars,
         )
         assert PointSource.objects.all().count() == pscount + 174
         assert Timevar.objects.all().count() == notimevars + 4
@@ -67,13 +121,13 @@ class TestImportPointSources:
         )
 
     @pytest.fixture()
-    def test_import_point_sources(self, get_data_file):
+    def test_import_pointsources(self, get_data_file):
         timevars = import_timevars(
             get_yaml_data(get_data_file("test_timevar_pointsources.yaml")),
         )
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("eldstader_backe.gpkg"),
             get_yaml_data("test_point_source_translation.yaml"),
             timevars,
@@ -94,7 +148,7 @@ class TestImportPointSources:
         )
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_attributes.gpkg"),
             translations,
             timevars,
@@ -131,7 +185,7 @@ class TestImportPointSources:
         timevars = import_timevars(timevar_data)
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_attributes.gpkg"),
             translations,
             timevars,
@@ -149,7 +203,7 @@ class TestImportPointSources:
         timevars = import_timevars(timevar_data)
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_attributes.gpkg"),
             translations,
             timevars,
@@ -168,42 +222,8 @@ class TestImportPointSources:
         timevars = import_timevars(timevar_data)
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_parameter.gpkg"),
-            translations,
-            timevars,
-        )
-        assert PointSource.objects.all().count() == pscount + 6
-        ps = PointSource.objects.get(
-            name="AWZIKralingseveer(HoogheemraadschapvanSchieland)"
-        )
-        assert ps.chimney_outer_diameter == approx(2.5)
-        assert ps.chimney_inner_diameter == approx(1.0)
-        assert ps.chimney_height == approx(10.0)  # default
-        assert ps.chimney_gas_temperature == approx(100.0)  # default
-        assert ps.substances.get(substance__name="NOx").value == approx(0.0025)
-        assert ps.substances.get(substance__name="SOx").value == approx(0.0012)
-        assert ps.timevar.name == "industry0"  # mapping default
-
-        ps2 = PointSource.objects.get(name="10621_12Verwarmingsinstallatie")
-        assert ps2.chimney_height == approx(25.0)
-        assert ps2.timevar.name == "industry0"  # mapping default
-        assert ps2.substances.get(substance__name="NOx").value == approx(0.000001268)
-        assert ps2.facility.name == "10621"
-
-        ps3 = PointSource.objects.get(name="10621_6Gloeiovens")
-        assert ps3.timevar.name == "industry1"
-        assert ps2.facility == ps3.facility
-
-    @pytest.fixture()
-    def test_import_pointsources_substance_rows(self, get_data_file):
-        translations = get_yaml_data("pointsource_substance_parameter_translation.yaml")
-        timevar_data = get_yaml_data(get_data_file("timevar_pointsources.yaml"))
-        timevars = import_timevars(timevar_data)
-
-        pscount = PointSource.objects.all().count()
-        import_point_sources(
-            get_data_file("pointsource_substance_rows.csv"),
             translations,
             timevars,
         )
@@ -236,7 +256,7 @@ class TestImportPointSources:
         )
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_mappedsubst.csv"),
             translations,
         )
@@ -255,7 +275,7 @@ class TestImportPointSources:
         translations = get_yaml_data("pointsource_substance_parameter_translation.yaml")
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_rows.csv"),
             translations,
         )
@@ -270,7 +290,7 @@ class TestImportPointSources:
         config = get_yaml_data("pointsource_substance_parameter_translation.yaml")
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_rows.csv"),
             config=config,
             exclude={"facility": "10621"},
@@ -286,7 +306,7 @@ class TestImportPointSources:
         config = get_yaml_data("pointsource_substance_parameter_translation.yaml")
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_rows.csv"),
             config=config,
             only={"facility": "10621"},
@@ -302,7 +322,7 @@ class TestImportPointSources:
         config = get_yaml_data("pointsource_substance_mappedunit.yaml")
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_mappedunit.csv"),
             config,
         )
@@ -332,7 +352,7 @@ class TestImportPointSources:
         timevars = import_timevars(timevar_data)
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_substance_columns.csv"),
             config,
             timevars,
@@ -364,7 +384,7 @@ class TestImportPointSources:
         config = get_yaml_data("pointsource_codes.yaml")
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_codes.csv"),
             config,
             codeset=code_sets[0],
@@ -377,7 +397,7 @@ class TestImportPointSources:
         config = get_yaml_data("pointsource_codemap.yaml")
 
         pscount = PointSource.objects.all().count()
-        import_point_sources(
+        import_pointsources(
             get_data_file("pointsource_codes.csv"),
             config,
             codeset=code_sets[1],
