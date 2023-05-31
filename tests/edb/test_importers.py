@@ -14,11 +14,18 @@ def pointsource_csv(tmpdir, settings):
     return pkg_resources.resource_filename(__name__, "data/pointsources.csv")
 
 
+@pytest.fixture
+def pointsource_xlsx(tmpdir, settings):
+    return pkg_resources.resource_filename(__name__, "data/pointsources.xlsx")
+
+
 class TestImportPointSources:
 
     """Test importing point-sources from csv."""
 
-    def test_import_pointsources(self, domains, vertical_dist, pointsource_csv):
+    def test_import_pointsources(
+        self, domains, vertical_dist, pointsource_csv, pointsource_xlsx
+    ):
         domain = domains[0]
         # similar to base_set in gadget
         cs1 = models.CodeSet.objects.create(
@@ -57,9 +64,9 @@ class TestImportPointSources:
         source1.tags["test_tag"] = "test"
         source1.save()
 
-        # update pointsources
+        # update pointsources from xlsx
         import_pointsources(
-            pointsource_csv,
+            pointsource_xlsx,
             unit="ton/year",
         )
 

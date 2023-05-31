@@ -1,11 +1,13 @@
 """Data importers for the edb application."""
 
 import logging
+from itertools import islice
 
 import numpy as np
 import pandas as pd
 from django.contrib.gis.geos import Point
 from django.db import IntegrityError
+from openpyxl import load_workbook
 
 from etk.edb.const import WGS84_SRID
 from etk.edb.models import (
@@ -65,15 +67,15 @@ def cache_codeset(code_set):
     return cache_queryset(code_set.codes.all(), "code")
 
 
-def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
-    """Import point-sources from csv-file.
+def import_pointsources(filepath, encoding=None, srid=None, unit=None):
+    """Import point-sources from xlsx or csv-file.
 
     args
-        csvfile: path to csvfile
+        filepath: path to file
 
     options
-        encoding: encoding of csvfile (default is utf-8)
-        srid: srid of csvfile, default is same srid as domain
+        encoding: encoding of file (default is utf-8)
+        srid: srid of file, default is same srid as domain
         unit: unit of emissions, default is SI-units (kg/s)
     """
     # or change to user defined SRID?
@@ -92,12 +94,39 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
         cache_codeset(CodeSet.objects.filter(slug=f"code_set{i}").first())
         for i in range(1, 4)
     ]
-    # read csv-file
-    with open(csvfile, encoding=encoding or "utf-8") as csvfile:
-        log.debug("reading point-sources from csv-file")
-        df = pd.read_csv(
-            csvfile, sep=";", skip_blank_lines=True, comment="#", dtype=REQUIRED_COLUMNS
-        )
+    extension = filepath.split(".")[-1]
+    if extension == "csv":
+        # read csv-file
+        with open(filepath, encoding=encoding or "utf-8") as csvfile:
+            log.debug("reading point-sources from csv-file")
+            df = pd.read_csv(
+                csvfile,
+                sep=";",
+                skip_blank_lines=True,
+                comment="#",
+                dtype=REQUIRED_COLUMNS,
+            )
+    elif extension == "xlsx":
+        # TODO add dtype for required columns as done above for csv.
+        # read spreadsheet
+        try:
+            workbook = load_workbook(filename=filepath)
+        except Exception as exc:
+            raise ImportError(str(exc))
+        worksheet = workbook.worksheets[0]
+        if len(workbook.worksheets) > 1:
+            log.debug("debug: multiple sheets in spreadsheet, only importing 1st.")
+        data = worksheet.values
+        cols = next(data)
+        data = list(data)
+        data = (islice(r, 0, None) for r in data)
+        df = pd.DataFrame(data, columns=cols)
+        # TODO not sure if this below is sufficient
+        df = df.astype(dtype=REQUIRED_COLUMNS)
+        # below is necessary not to create facilities with name 'None'
+        df = df.replace(to_replace="None", value=None)
+    else:
+        raise ImportError("Only xlsx and csv files are supported for import")
     for col in REQUIRED_COLUMNS.keys():
         if col not in df.columns:
             raise ImportError(f"Missing required column '{col}'")
@@ -275,6 +304,7 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
                     f"multiple rows for the same point-source '{source_name}'"
                 )
         row_nr += 1
+
     existing_facility_names = set([f.name for f in facilities.values()])
     duplicate_facility_names = []
     for official_id, f in create_facilities.items():
@@ -341,7 +371,6 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
     for emis in create_substances:
         emis.source_id = PointSource.objects.filter(name=emis.source).first().id
     PointSourceSubstance.objects.bulk_create(create_substances)
-
     return {
         "facility": {
             "updated": len(update_facilities),
@@ -393,22 +422,3 @@ def import_timevars(timevar_data, overwrite=False):
         else:
             raise ImportError(f"invalid time-variation type '{vartype}' specified")
     return timevars
-
-
-# code for spreadsheet
-
-# try:
-#     workbook = load_workbook(filename=self.sourcefile)
-# except Exception as exc:
-#     raise CommandError(str(exc))
-# worksheet = workbook.worksheets[0]
-# if len(workbook.worksheets) > 1:
-#     log.debug("debug: multiple sheets in spreadsheet, only importing 1st.")
-# data = worksheet.values
-# cols = next(data)[1:]
-# data = list(data)
-# idx = [r[0] for r in data]
-# data = (islice(r, 1, None) for r in data)
-# df = pd.DataFrame(data, index=idx, columns=cols)
-# print(df)
-# # TODO same here with df as in parse_csv ? add to test_importers as well
