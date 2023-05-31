@@ -1,6 +1,0 @@
-coordinates: [x, y]
-srid: 3006
-parameters: {
-  activitycode1: kod,
-  name: namn,
-}

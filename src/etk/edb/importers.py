@@ -5,9 +5,7 @@ import logging
 import numpy as np
 import pandas as pd
 from django.contrib.gis.geos import Point
-
-# from django.core.exceptions import ObjectDoesNotExist
-from django.db import IntegrityError  # , transaction
+from django.db import IntegrityError
 
 from etk.edb.const import WGS84_SRID
 from etk.edb.models import (
@@ -20,13 +18,6 @@ from etk.edb.models import (
 )
 from etk.edb.units import emission_unit_to_si  # , vehicle_ef_unit_to_si
 from etk.tools.utils import cache_queryset
-
-# import sys
-# from os import path
-
-
-# from django.db import transaction
-
 
 # column facility and name are used as index and is therefore not included here
 REQUIRED_COLUMNS = {
@@ -402,111 +393,6 @@ def import_timevars(timevar_data, overwrite=False):
         else:
             raise ImportError(f"invalid time-variation type '{vartype}' specified")
     return timevars
-
-
-# class Command(InspectorCommand):
-#     help = f"""Import point sources from csv-file
-
-#     The csv-file should be ";"-separated.
-
-#     Required column headers are:
-#     {REQUIRED_COLUMNS}
-
-#     For each substance to be imported, a column named 'subst:<slug>' should be added.
-#     Where 'slug' refers to the substance slug.
-
-#     For each tag to be added, a column named 'tag:<key>' should be added, where 'key'
-#     refers to the tag key.
-
-#     For each point-source to be imported, one row is added to the table. The emissions
-#     for each source are specified in the "subst:<slug>" columns. All emissions should
-#     be in the same unit (can be any units supported by Clair, the emissions and will
-#     be converted to SI-units at import).
-
-#     If a point-source with the same facility and name already exist in the inventory,
-#     it will be updated and any emissions will be replaced by emissions specified in
-#     the csv-table.
-#     """
-
-#     def add_arguments(self, parser):
-#         parser.add_argument(
-#             "csvfile",
-#             metavar="FILENAME",
-#             help="path to csv file with grid source specifications",
-#         )
-#         parser.add_argument(
-#             "-u",
-#             "--unit",
-#             dest="unit",
-#             metavar="UNIT",
-#             required=True,
-#             help="Unit for emissions to import",
-#         )
-#         parser.add_argument(
-#             "--srid",
-#             dest="srid",
-#             metavar="SRID",
-#             type=int,
-#             help="srid of input rasters (default is domain srid)",
-#         )
-#         parser.add_argument(
-#             "-m",
-#             "--manager",
-#             dest="manager",
-#             metavar="USERNAME",
-#             help="project manager",
-#             required=True,
-#         )
-#         parser.add_argument(
-#             "-p",
-#             "--project",
-#             dest="project",
-#             metavar="SLUG",
-#             help="project of target dataset",
-#             required=True,
-#         )
-#         parser.add_argument(
-#             "-i", "--inventory", metavar="SLUG", help="inventory slug", required=True
-#         )
-#         parser.add_argument(
-#             "--encoding",
-#             metavar="ENCODING",
-#             help="encoding used in csv-file (default=utf-8)",
-#             default="utf-8",
-#         )
-
-#     @transaction.atomic
-#     def handle(self, *args, **options):
-#         self.options = options
-
-#         inventory = Inventory.objects.get(
-#             slug=options["inventory"],
-#             project__slug=options["project"],
-#             project__manager__username=options["manager"],
-#         )
-
-#         csvfile = self.options["csvfile"]
-#         srid = self.options["srid"]
-#         unit = self.options["unit"]
-#         encoding = self.options["encoding"]
-
-#         if not path.exists(csvfile):
-#             self.stderr.write(f"Import file {csvfile} does not exist")
-#             sys.exit(1)
-#         try:
-#             done = import_pointsources(inventory, csvfile, encoding, srid, unit)
-#         except ImportError as err:
-#             self.stderr.write(f"Error during import: {err}")
-#             sys.exit(1)
-
-#         self.stdout.write(
-#             f"created {done['facility']['created']} facilities,"
-#             f" updated {done['facility']['updated']}"
-#         )
-#         self.stdout.write(
-#             f"created {done['source']['created']} sources, "
-#             f"   updated {done['source']['updated']}"
-#         )
 
 
 # code for spreadsheet
