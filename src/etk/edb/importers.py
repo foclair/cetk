@@ -5,7 +5,9 @@ import logging
 import numpy as np
 import pandas as pd
 from django.contrib.gis.geos import Point
-from django.core.exceptions import IntegrityError  # ObjectDoesNotExist
+
+# from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError  # , transaction
 
 from etk.edb.const import WGS84_SRID
 from etk.edb.models import (
@@ -35,15 +37,15 @@ REQUIRED_COLUMNS = {
     "source_name": np.str_,
     "timevar": np.str_,
     "activitycode1": np.str_,
-    # "activitycode2": np.str_,
-    # "activitycode3": np.str_,
+    "activitycode2": np.str_,
+    "activitycode3": np.str_,
     "height": float,
     "outer_diameter": float,
     "inner_diameter": float,
     "gas_speed": float,
-    # "gas_temperature": float,
-    # "house_width": float,
-    # "house_height": float,
+    "gas_temperature": float,
+    "house_width": float,
+    "house_height": float,
 }
 
 log = logging.getLogger(__name__)
@@ -64,6 +66,12 @@ def cache_pointsources(queryset):
         else:
             sources[None, source.name] = source
     return sources
+
+
+def cache_codeset(code_set):
+    if code_set is None:
+        return {}
+    return cache_queryset(code_set.codes.all(), "code")
 
 
 def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
@@ -88,11 +96,12 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
         .prefetch_related("substances")
         .all()
     )
-    code_sets = CodeSet.objects.all()
-    if len(code_sets) == 0:
-        raise ImportError("At least one CodeSet needs to be defined before importing.")
-    elif len(code_sets) > 3:
-        raise ImportError("No more than 3 CodeSets should exist.")
+
+    code_sets = [
+        cache_codeset(CodeSet.objects.filter(slug=f"code_set{i}").first())
+        for i in range(1, 4)
+    ]
+    # read csv-file
     with open(csvfile, encoding=encoding or "utf-8") as csvfile:
         log.debug("reading point-sources from csv-file")
         df = pd.read_csv(
@@ -104,9 +113,13 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
 
     # set dataframe index
     try:
-        df.set_index(["source_name", "substance"], verify_integrity=True, inplace=True)
+        df.set_index(
+            ["facility_id", "source_name"], verify_integrity=True, inplace=True
+        )
     except ValueError as err:
-        raise ImportError(f"Non-unique combination of facility_id and substance: {err}")
+        raise ImportError(
+            f"Non-unique combination of facility_id and source_name: {err}"
+        )
     update_facilities = []
     create_facilities = {}
     drop_substances = []
@@ -124,7 +137,7 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
             "activitycode3": None,
         }
 
-        # get poin-source coordinates
+        # get pointsource coordinates
         try:
             if pd.isnull(row_dict["x"]) or pd.isnull(row_dict["y"]):
                 raise ImportError(f"missing coordinates for source '{row_key}'")
@@ -137,15 +150,6 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
         source_data["geom"] = Point(x, y, srid=srid or project_srid).transform(
             4326, clone=True
         )
-        # TODO should defaults be given as variable to function instead?
-        # should be allowed as user-defined
-        defaults = {
-            "height": 10.0,
-            "outer_diameter": 5,
-            "inner_diameter": 1,
-            "gas_temperature": 100,
-            "unit": "g/s",
-        }
 
         # get chimney properties
         for attr, key in {
@@ -153,41 +157,39 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
             "chimney_inner_diameter": "inner_diameter",
             "chimney_outer_diameter": "outer_diameter",
             "chimney_gas_speed": "gas_speed",
-            # "chimney_gas_temperature": "gas_temperature",
+            "chimney_gas_temperature": "gas_temperature",
         }.items():
             if pd.isna(row_dict[key]):
-                source_data[attr] = defaults[key]  # TODO set default for now
-                # raise ImportError(f"Missing value for {key} on row {row_nr}")
+                raise ImportError(f"Missing value for {key} on row {row_nr}")
             else:
                 source_data[attr] = row_dict[key]
-        # TODO add setting default or assuming empty columns always included in input?
-        # # get downdraft parameters
-        # if not pd.isnull(row_dict["house_width"]):
-        #     source_data["house_width"] = row_dict["house_width"]
-        # if not pd.isnull(row_dict["house_height"]):
-        #     source_data["house_height"] = row_dict["house_height"]
+
+        # get downdraft parameters
+        if not pd.isnull(row_dict["house_width"]):
+            source_data["house_width"] = row_dict["house_width"]
+        if not pd.isnull(row_dict["house_height"]):
+            source_data["house_height"] = row_dict["house_height"]
 
         # get activitycodes
         for code_ind, code_set in enumerate(code_sets, 1):
-            pass
-            # TODO does not work yet, can somehow not access item where
-            # code_sets.code = code
-            # code_attribute = f"activitycode{code_ind}"
-            # code = row_dict[code_attribute]
-            # try:
-            #     # need to get code_set where code_set.code = code.
-            #     source_data[code_attribute] = code_set[code]
-            # except KeyError:
-            #     raise ImportError(
-            #         f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
-            #     )
+            code_attribute = f"activitycode{code_ind}"
+            if len(code_set) == 0:
+                break
+            code = row_dict[code_attribute]
 
-        # # get columns with tag values for the current row
-        # tag_keys = [key for key in row_dict.keys() if key.startswith("tag:")]
-        # # set tags dict for source
-        # source_data["tags"] = {
-        #     key[4:]: row_dict[key] for key in tag_keys if pd.notna(row_dict[key])
-        # }
+            try:
+                source_data[code_attribute] = code_set[code]
+            except KeyError:
+                raise ImportError(
+                    f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
+                )
+
+        # get columns with tag values for the current row
+        tag_keys = [key for key in row_dict.keys() if key.startswith("tag:")]
+        # set tags dict for source
+        source_data["tags"] = {
+            key[4:]: row_dict[key] for key in tag_keys if pd.notna(row_dict[key])
+        }
 
         # get timevar name and corresponding timevar
         timevar_name = row_dict["timevar"]
@@ -293,7 +295,6 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
             f"for facilities with different official_id: {duplicate_facility_names}"
         )
     duplicate_facility_names = {}
-
     for f in create_facilities.values():
         if f.name in duplicate_facility_names:
             duplicate_facility_names[f.name] += 1
@@ -307,20 +308,21 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
             "The same facility name is used on multiple rows but "
             f"with different facility_id: {duplicate_facility_names}"
         )
+
+    # adjusted by Eef because no inentory
     Facility.objects.bulk_create(create_facilities.values())
     Facility.objects.bulk_update(update_facilities, ["name"])
-    # Facility.save #TODO check whether ok, added by Eef
-    # breakpoint()
 
     # ensure PointSource.facility_id is not None
     for source in create_sources.values():
         if source.facility is not None:
-            source.facility_id = source.facility.id
+            # changed by Eef, because IDs were None
+            source.facility_id = (
+                Facility.objects.filter(official_id=source.facility).first().id
+            )
 
-    # breakpoint()
-    PointSource._prepare_related_fields_for_save
     PointSource.objects.bulk_create(create_sources.values())
-    PointSource.bulk_update(
+    PointSource.objects.bulk_update(
         update_sources,
         [
             "name",
@@ -346,7 +348,7 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
 
     # ensure PointSourceSubstance.source_id is not None
     for emis in create_substances:
-        emis.source_id = emis.source.id
+        emis.source_id = PointSource.objects.filter(name=emis.source).first().id
     PointSourceSubstance.objects.bulk_create(create_substances)
 
     return {
