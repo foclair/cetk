@@ -193,9 +193,16 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
         # get activitycodes
         for code_ind, code_set in enumerate(code_sets, 1):
             code_attribute = f"activitycode{code_ind}"
-            if len(code_set) == 0:
-                break
             code = row_dict[code_attribute]
+            if len(code_set) == 0:
+                if code is not None:
+                    raise ImportError(
+                        f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
+                    )
+                else:
+                    # TODO check whether it is ok to stop entire loop when codeset1
+                    # is empty, can codeset2 be non empty?
+                    break
 
             try:
                 source_data[code_attribute] = code_set[code]
