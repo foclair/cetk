@@ -21,8 +21,6 @@ from etk.edb import models
 class TestActivityCodes:
     def test_activitycode1_manager_create(self, code_sets):
         """Test creating a new activitycode with reference to a code-set."""
-        # TODO maybe can find fixtures in edb/fixtures now?
-        # if not can change to ifactory.edb.codeset() but then no preset data?
         code_set = code_sets[0]
         ac1 = models.ActivityCode.objects.create(
             code="actcode1", label="label1", code_set=code_set
@@ -58,8 +56,6 @@ class TestActivityCodes:
         with pytest.raises(RuntimeError):
             ac1.get_parent()
 
-
-# TODO start fixing tests above here
 
 # class TestRoadEFSet:
 #     @pytest.fixture

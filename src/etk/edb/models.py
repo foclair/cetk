@@ -20,13 +20,6 @@ from etk.edb.copy import copy_codeset, copy_model_instance
 from etk.edb.ltreefield import LtreeField
 from etk.settings import TIME_ZONE
 
-# eller
-# from django.db import models, but maybe geodjango models api
-# inherits normal django api?
-# https://docs.djangoproject.com/en/4.2/ref/models/
-# https://docs.djangoproject.com/en/4.2/ref/contrib/gis/model-api/
-
-
 # TODO is a locid necessary when starting inventories from scratch, instead of importing
 # existing gadget databases?
 # locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
@@ -200,8 +193,8 @@ class VerticalDist(BaseNamedModel):
     domain = models.ForeignKey(
         "Domain", on_delete=models.CASCADE, related_name="vertical_dists"
     )
-    # TODO ArrayField in Gadget, need for compatability, how to convert?
-    # ArrayField not supported in SQLite
+    # TODO weights as ArrayField in Gadget, are all functions updated to fun on
+    # CharField instead?
     weights = models.CharField(
         max_length=CHAR_FIELD_LENGTH, default=default_vertical_dist
     )

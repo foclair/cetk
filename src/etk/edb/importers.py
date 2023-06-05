@@ -107,7 +107,6 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
                 dtype=REQUIRED_COLUMNS,
             )
     elif extension == "xlsx":
-        # TODO add dtype for required columns as done above for csv.
         # read spreadsheet
         try:
             workbook = load_workbook(filename=filepath)
@@ -121,7 +120,6 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
         data = list(data)
         data = (islice(r, 0, None) for r in data)
         df = pd.DataFrame(data, columns=cols)
-        # TODO not sure if this below is sufficient
         df = df.astype(dtype=REQUIRED_COLUMNS)
         # below is necessary not to create facilities with name 'None'
         df = df.replace(to_replace="None", value=None)
@@ -195,13 +193,15 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
             code_attribute = f"activitycode{code_ind}"
             code = row_dict[code_attribute]
             if len(code_set) == 0:
-                if code is not None:
+                if code is not None and code is not np.nan:
                     raise ImportError(
                         f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
                     )
                 else:
                     # TODO check whether it is ok to stop entire loop when codeset1
                     # is empty, can codeset2 be non empty?
+                    # and how to make sure that activitycode1 always refers to codeset1?
+                    # or should we for ETK support only one codeset per inventory?
                     break
 
             try:
