@@ -553,3 +553,48 @@ class PointSourceSubstance(SourceSubstance):
     """A point-source substance emission."""
 
     source = models.ForeignKey("PointSource", on_delete=models.CASCADE)
+
+
+class SourceActivity(models.Model):
+    """Base class for an emitting activity."""
+
+    rate = models.FloatField(verbose_name="activity rate")
+    activity = models.ForeignKey("Activity", on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        abstract = True
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source", "activity"),
+                name="%(class)s_unique_activity_in_source",
+            ),
+        ]
+        default_related_name = "activities"
+
+
+class PointSourceActivity(SourceActivity):
+    """An emitting activity of a point source."""
+
+    source = models.ForeignKey("PointSource", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "{}".format(self.activity.name)
+
+
+class EmissionFactor(models.Model):
+    """An emission factor."""
+
+    factor = models.FloatField(default=0)
+    activity = models.ForeignKey("Activity", on_delete=models.PROTECT)
+    substance = models.ForeignKey(
+        "Substance", on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("activity", "substance"),
+                name="emissionfactor_activity_substance_unique_together",
+            ),
+        ]
+        default_related_name = "emissionfactors"
