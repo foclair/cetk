@@ -485,7 +485,12 @@ class PointAreaGridSourceBase(SourceBase):
 
     class Meta:
         abstract = True
-        index_together = ["activitycode1", "activitycode2", "activitycode3"]
+        indexes = [
+            models.Index(
+                fields=("activitycode1", "activitycode2", "activitycode3"),
+                name="%(class)s_activities_idx",
+            ),
+        ]
 
 
 class Facility(SourceBase):
