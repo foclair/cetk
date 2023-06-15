@@ -141,6 +141,6 @@ def create_parameters(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("edb", "0002_parameter")]
+    dependencies = [("edb", "0001_initial")]
 
     operations = [migrations.RunPython(create_parameters)]
