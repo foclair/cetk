@@ -49,7 +49,7 @@ class TestImportPointSources:
         import_pointsources(pointsource_csv, unit="ton/year")
 
         assert PointSource.objects.all().count()
-        source1 = PointSource.objects.filter(name="source1").first()
+        source1 = PointSource.objects.get(name="source1")
 
         assert source1.name == "source1"
         assert source1.tags["tag1"] == "val1"
@@ -71,5 +71,5 @@ class TestImportPointSources:
         )
 
         # check that source has been overwritten
-        source1 = PointSource.objects.filter(name="source1").first()
+        source1 = PointSource.objects.get(name="source1")
         assert "test_tag" not in source1.tags

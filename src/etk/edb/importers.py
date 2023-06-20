@@ -90,6 +90,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
         .all()
     )
 
+    # using filter.first() here, not get() because code_set{i} does not have to exist
     code_sets = [
         cache_codeset(CodeSet.objects.filter(slug=f"code_set{i}").first())
         for i in range(1, 4)
@@ -345,9 +346,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
     for source in create_sources.values():
         if source.facility is not None:
             # changed by Eef, because IDs were None
-            source.facility_id = (
-                Facility.objects.filter(official_id=source.facility).first().id
-            )
+            source.facility_id = Facility.objects.get(official_id=source.facility).id
 
     PointSource.objects.bulk_create(create_sources.values())
     PointSource.objects.bulk_update(
@@ -376,7 +375,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
 
     # ensure PointSourceSubstance.source_id is not None
     for emis in create_substances:
-        emis.source_id = PointSource.objects.filter(name=emis.source).first().id
+        emis.source_id = PointSource.objects.get(name=emis.source).id
     PointSourceSubstance.objects.bulk_create(create_substances)
     return {
         "facility": {
