@@ -10,7 +10,7 @@ from django.db import IntegrityError
 from openpyxl import load_workbook
 
 from etk.edb.const import WGS84_SRID
-from etk.edb.models import (
+from etk.edb.models.source_models import (
     CodeSet,
     Facility,
     PointSource,

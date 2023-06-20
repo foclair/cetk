@@ -1,7 +1,7 @@
 """ Unit tests for the ltreefield lookups. """
 import pytest
 
-from etk.edb.models import ActivityCode
+from etk.edb.models.source_models import ActivityCode
 
 
 # See https://www.postgresql.org/docs/9.1/ltree.html for more examples of a lquery.

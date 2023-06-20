@@ -5,7 +5,7 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 import etk.edb.ltreefield
-import etk.edb.models
+import etk.edb.models.source_models
 
 
 class Migration(migrations.Migration):
@@ -361,7 +361,8 @@ class Migration(migrations.Migration):
                 (
                     "weights",
                     models.CharField(
-                        default=etk.edb.models.default_vertical_dist, max_length=100
+                        default=etk.edb.models.source_models.default_vertical_dist,
+                        max_length=100,
                     ),
                 ),
                 (

@@ -6,7 +6,7 @@ import ast
 import numpy as np
 import pytest
 
-from etk.edb import models
+from etk.edb.models import source_models
 
 # from django.contrib.gis.gdal import GDALRaster
 # from django.contrib.gis.geos import Polygon
@@ -14,7 +14,7 @@ from etk.edb import models
 
 
 # from etk.edb.const import DUMMY_SRID
-# from etk.edb.models import Substance
+# from etk.edb.models.source_models import Substance
 # from etk.edb.units import activity_rate_unit_to_si, emission_unit_to_si
 
 
@@ -22,7 +22,7 @@ class TestActivityCodes:
     def test_activitycode1_manager_create(self, code_sets):
         """Test creating a new activitycode with reference to a code-set."""
         code_set = code_sets[0]
-        ac1 = models.ActivityCode.objects.create(
+        ac1 = source_models.ActivityCode.objects.create(
             code="actcode1", label="label1", code_set=code_set
         )
         ac1_ref = code_set.codes.get(code="actcode1", code_set=code_set)
@@ -90,12 +90,12 @@ class TestActivityCodes:
 
 #         proj1 = projects[0]
 #         base_set1 = base_sets[0]
-#         refset1 = models.RoadEFSet.objects.create(
+#         refset1 = source_models.RoadEFSet.objects.create(
 #             base_set=base_set1, project=proj1, name="test"
 #         )
 #         assert refset1.project.slug == proj1.slug
 #         assert refset1.name == "test"
-#         refset2, created = models.RoadEFSet.objects.get_or_create(
+#         refset2, created = source_models.RoadEFSet.objects.get_or_create(
 #             base_set=base_set1, name="test"
 #         )
 #         assert not created
@@ -169,12 +169,12 @@ class TestActivityCodes:
 
 #         proj1 = projects[0]
 #         base_set1 = base_sets[0]
-#         refset1 = models.SourceEFSet.objects.create(
+#         refset1 = source_models.SourceEFSet.objects.create(
 #             base_set=base_set1, project=proj1, name="test"
 #         )
 #         assert refset1.project.slug == proj1.slug
 #         assert refset1.name == "test"
-#         refset2, created = models.SourceEFSet.objects.get_or_create(
+#         refset2, created = source_models.SourceEFSet.objects.get_or_create(
 #             base_set=base_set1, project__slug=proj1.slug, name="test"
 #         )
 #         assert not created
@@ -191,12 +191,12 @@ class TestActivityCodes:
 #         base_set = base_sets[0]
 
 #         proj1 = projects[0]
-#         inventory = models.Inventory.objects.create(
+#         inventory = source_models.Inventory.objects.create(
 #             project=proj1, base_set=base_set, name="test"
 #         )
 #         assert inventory.project.slug == proj1.slug
 #         assert inventory.name == "test"
-#         inventory2, created = models.Inventory.objects.get_or_create(
+#         inventory2, created = source_models.Inventory.objects.get_or_create(
 #             project__slug=proj1.slug, base_set=base_set, name="test"
 #         )
 #         assert not created
@@ -231,7 +231,7 @@ class TestActivityCodes:
 #             inventory=inventory, congestion_profile=congestion_profile, fleet=fleet
 #         )
 #         inventory.delete()
-#         assert not models.Inventory.objects.filter(pk=inventory.pk).exists()
+#         assert not source_models.Inventory.objects.filter(pk=inventory.pk).exists()
 
 #     def test_delete_sources(self, ifactory):
 #         inventory = ifactory.edb.inventory()

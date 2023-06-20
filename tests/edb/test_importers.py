@@ -3,9 +3,9 @@
 import pkg_resources
 import pytest
 
-from etk.edb import models
 from etk.edb.importers import import_pointsources  # , import_timevars
-from etk.edb.models import PointSource  # PointSourceSubstance, Timevar
+from etk.edb.models.source_models import PointSource  # PointSourceSubstance, Timevar
+from etk.edb.models.source_models import CodeSet
 from etk.edb.units import emis_conversion_factor_from_si
 
 
@@ -28,9 +28,7 @@ class TestImportPointSources:
     ):
         domain = domains[0]
         # similar to base_set in gadget
-        cs1 = models.CodeSet.objects.create(
-            name="code set 1", slug="code_set1", domain=domain
-        )
+        cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1", domain=domain)
         cs1.codes.create(code="1", label="Energy")
         cs1.codes.create(
             code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
@@ -40,9 +38,7 @@ class TestImportPointSources:
         )
         cs1.codes.create(code="1.3", label="Road traffic", vertical_dist=vertical_dist)
         cs1.save()
-        cs2 = models.CodeSet.objects.create(
-            name="code set 2", slug="code_set2", domain=domain
-        )
+        cs2 = CodeSet.objects.create(name="code set 2", slug="code_set2", domain=domain)
         cs2.codes.create(code="A", label="Bla bla")
         cs2.save()
         # create pointsources
