@@ -3,7 +3,10 @@
 import pkg_resources
 import pytest
 
-from etk.edb.importers import import_pointsources  # , import_timevars
+from etk.edb.importers import (  # , import_timevars
+    import_eea_emfacs,
+    import_pointsources,
+)
 from etk.edb.models.source_models import PointSource  # PointSourceSubstance, Timevar
 from etk.edb.models.source_models import CodeSet
 from etk.edb.units import emis_conversion_factor_from_si
@@ -19,7 +22,7 @@ def pointsource_xlsx(tmpdir, settings):
     return pkg_resources.resource_filename(__name__, "data/pointsources.xlsx")
 
 
-class TestImportPointSources:
+class TestImport:
 
     """Test importing point-sources from csv."""
 
@@ -69,3 +72,15 @@ class TestImportPointSources:
         # check that source has been overwritten
         source1 = PointSource.objects.get(name="source1")
         assert "test_tag" not in source1.tags
+
+    def test_import_eea_emfac(
+        self,
+        domains,
+    ):
+        # using domain just to get fixtures
+        domain = domains[0]  # noqa
+        filename = pkg_resources.resource_filename(
+            __name__, "data/EMEPemissionfactors-short.xlsx"
+        )
+        sd = import_eea_emfacs(filename)
+        assert len(sd) > 0

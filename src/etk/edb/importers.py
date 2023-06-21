@@ -10,6 +10,7 @@ from django.db import IntegrityError
 from openpyxl import load_workbook
 
 from etk.edb.const import WGS84_SRID
+from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     CodeSet,
     Facility,
@@ -338,7 +339,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
             f"with different facility_id: {duplicate_facility_names}"
         )
 
-    # adjusted by Eef because no inentory
+    # adjusted by Eef because no inventory
     Facility.objects.bulk_create(create_facilities.values())
     Facility.objects.bulk_update(update_facilities, ["name"])
 
@@ -428,3 +429,130 @@ def import_timevars(timevar_data, overwrite=False):
         else:
             raise ImportError(f"invalid time-variation type '{vartype}' specified")
     return timevars
+
+
+def import_eea_emfacs(filepath, encoding=None):
+    """Import point-sources from xlsx or csv-file.
+
+    args
+        filepath: path to file
+
+    options
+        encoding: encoding of file (default is utf-8)
+    """
+    substances = cache_queryset(Substance.objects.all(), "slug")
+
+    extension = filepath.split(".")[-1]
+    if extension == "csv":
+        # read csv-file
+        with open(filepath, encoding=encoding or "utf-8") as csvfile:
+            log.debug("reading point-sources from csv-file")
+            df = pd.read_csv(
+                csvfile,
+                sep=";",
+                skip_blank_lines=True,
+                comment="#",
+            )
+    elif extension == "xlsx":
+        # read spreadsheet
+        try:
+            workbook = load_workbook(filename=filepath)
+        except Exception as exc:
+            raise ImportError(str(exc))
+        worksheet = workbook.worksheets[0]
+        if len(workbook.worksheets) > 1:
+            log.debug("debug: multiple sheets in spreadsheet, only importing 1st.")
+        data = worksheet.values
+        cols = next(data)
+        data = list(data)
+        data = (islice(r, 0, None) for r in data)
+        df = pd.DataFrame(data, columns=cols)
+        # TODO could replace NA by None?
+        # df = df.replace(to_replace="NA", value=None)
+    else:
+        raise ImportError("Only xlsx and csv files are supported for import")
+
+    row_nr = 2
+    no_value_count = 0
+    no_unit_count = 0
+    create_eea_emfac = []
+    for row_key, row in df.iterrows():
+        emfac_data = {}
+        row_dict = row.to_dict()
+        for attr, key in {
+            "nfr_code": "NFR",
+            "sector": "Sector",
+            "table": "Table",
+            "tier": "Type",
+            "technology": "Technology",
+            "fuel": "Fuel",
+            "abatement": "Abatement",
+            "region": "Region",
+            "substance": "Pollutant",
+            "value": "Value",
+            "unit": "Unit",
+            "lower": "CI_lower",
+            "upper": "CI_upper",
+            "reference": "Reference",
+        }.items():
+            emfac_data[attr] = row_dict[key]
+        # check if substance known
+        try:
+            subst = emfac_data["substance"]
+        except KeyError:
+            print(f"No pollutant given, ignoring row {row_nr}")
+            row_nr += 1
+            no_value_count += 1
+            continue
+        try:
+            emfac_data["substance"] = substances[subst]
+        except KeyError:
+            # TODO log warning
+            print(f"Undefined substance {subst}")
+            print("Saving pollutant as unknown_substance.")
+            print("Known substances are: ")
+            [
+                print(e.slug)
+                for e in Substance.objects.exclude(
+                    slug__in=["activity", "traffix_work", "PM10resusp", "PM25resusp"]
+                )
+            ]
+            emfac_data["unknown_substance"] = subst
+            emfac_data["substance"] = None
+        if row_dict["Value"] is None:
+            if (row_dict["CI_lower"] is None) and (row_dict["CI_upper"] is None):
+                # TODO log warning
+                print(f"No emission factor given, ignoring row {row_nr}")
+                row_nr += 1
+                no_value_count += 1
+                continue
+            else:
+                # taking mean if both upper and lower not nan, if only one not nan,
+                # take that value.
+                emfac_data["value"] = np.nanmean(
+                    np.array(
+                        [row_dict["CI_lower"], row_dict["CI_upper"]], dtype=np.float64
+                    )
+                )
+        if emfac_data["unit"] is None:
+            # TODO log warning
+            print(f"No unit given, ignoring row {row_nr}")
+            row_nr += 1
+            no_unit_count += 1
+            continue
+        # set data in EEA emfac data model
+        try:
+            float(emfac_data["value"])
+        except ValueError:
+            print(f"Non numerical value, ignoring row {row_nr}")
+            row_nr += 1
+            no_value_count += 1
+            continue
+        eea_emfac = EEAEmissionFactor()
+        for key, val in emfac_data.items():
+            setattr(eea_emfac, key, val)
+        create_eea_emfac.append(eea_emfac)
+        row_nr += 1
+
+    EEAEmissionFactor.objects.bulk_create(create_eea_emfac)
+    return emfac_data
