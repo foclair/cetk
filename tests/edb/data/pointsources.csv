@@ -1,6 +1,6 @@
-facility_id;facility_name;source_name;x;y;timevar;activitycode1;activitycode2;activitycode3;height;outer_diameter;inner_diameter;gas_speed;gas_temperature;house_width;house_height;tag:tag1;tag:tag2;subst:NOx;subst:PM25;subst:PM10
-1-a;facility1;source1;10;20;;1.3;A;;10;2;1;4;200;0;0;val1;;1;;
-1-b;facility2;source2;11;21;;1.3;A;;20;2;1;4;200;0;0;;val2;;1;1
-1-b;facility2;source3;12;22;;1.3;A;;30;2;1;4;200;0;0;;;1;;
-;;source4;13;23;;1.3;A;;40;2;1;4;200;0;0;val3;;1;;
-13;facility3;source5;14;24;;1.3;A;;50;2;1;4;200;0;0;;;1;;1
+facility_id;facility_name;source_name;lat;lon;timevar;activitycode1;activitycode2;activitycode3;chimney_height;outer_diameter;inner_diameter;gas_speed;gas_temperature;house_width;house_height;tag:tag1;tag:tag2;subst:NOx;subst:PM25;subst:PM10;unit
+1-a;facility1;source1;10;20;;1.3;A;;10;2;1;4;200;0;0;val1;;1;;;ton/year
+1-b;facility2;source2;11;21;;1.3;A;;20;2;1;4;200;0;0;;val2;;1;1;ton/year
+1-b;facility2;source3;12;22;;1.3;A;;30;2;1;4;200;0;0;;;1;;;ton/year
+;;source4;13;23;;1.3;A;;40;2;1;4;200;0;0;val3;;1;;;ton/year
+13;facility3;source5;14;24;;1.3;A;;50;2;1;4;200;0;0;;;1;;1;ton/year

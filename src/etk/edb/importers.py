@@ -12,6 +12,7 @@ from openpyxl import load_workbook
 from etk.edb.const import WGS84_SRID
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
+    Activity,
     CodeSet,
     Facility,
     PointSource,
@@ -25,15 +26,15 @@ from etk.tools.utils import cache_queryset
 # column facility and name are used as index and is therefore not included here
 REQUIRED_COLUMNS = {
     "facility_id": np.str_,
-    "x": float,
-    "y": float,
+    "lat": float,
+    "lon": float,
     "facility_name": np.str_,
     "source_name": np.str_,
     "timevar": np.str_,
     "activitycode1": np.str_,
     "activitycode2": np.str_,
     "activitycode3": np.str_,
-    "height": float,
+    "chimney_height": float,
     "outer_diameter": float,
     "inner_diameter": float,
     "gas_speed": float,
@@ -68,7 +69,24 @@ def cache_codeset(code_set):
     return cache_queryset(code_set.codes.all(), "code")
 
 
-def import_pointsources(filepath, encoding=None, srid=None, unit=None):
+def worksheet_to_dataframe(data):
+    cols = next(data)
+    data = list(data)
+    data = (islice(r, 0, None) for r in data)
+    df = pd.DataFrame(data, columns=cols)
+    # remove empty rows
+    empty_count = 0
+    for ind in range(-1, -1 * len(df), -1):
+        if all([pd.isnull(val) for val in df.iloc[ind]]):
+            empty_count += 1
+        else:
+            break
+    # TODO remove the last 'empty_count' lines
+    df = df.head(df.shape[0] - empty_count)
+    return df
+
+
+def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
     """Import point-sources from xlsx or csv-file.
 
     args
@@ -96,6 +114,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
         cache_codeset(CodeSet.objects.filter(slug=f"code_set{i}").first())
         for i in range(1, 4)
     ]
+
     extension = filepath.split(".")[-1]
     if extension == "csv":
         # read csv-file
@@ -111,17 +130,16 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
     elif extension == "xlsx":
         # read spreadsheet
         try:
-            workbook = load_workbook(filename=filepath)
+            workbook = load_workbook(filename=filepath, data_only=True)
         except Exception as exc:
             raise ImportError(str(exc))
         worksheet = workbook.worksheets[0]
         if len(workbook.worksheets) > 1:
-            log.debug("debug: multiple sheets in spreadsheet, only importing 1st.")
-        data = worksheet.values
-        cols = next(data)
-        data = list(data)
-        data = (islice(r, 0, None) for r in data)
-        df = pd.DataFrame(data, columns=cols)
+            log.debug("Multiple sheets in spreadsheet, importing sheet 'PointSource'.")
+            data = workbook["PointSource"].values
+        else:
+            data = worksheet.values
+        df = worksheet_to_dataframe(data)
         df = df.astype(dtype=REQUIRED_COLUMNS)
         # below is necessary not to create facilities with name 'None'
         df = df.replace(to_replace="None", value=None)
@@ -159,10 +177,10 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
 
         # get pointsource coordinates
         try:
-            if pd.isnull(row_dict["x"]) or pd.isnull(row_dict["y"]):
+            if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
                 raise ImportError(f"missing coordinates for source '{row_key}'")
-            x = float(row_dict["x"])
-            y = float(row_dict["y"])
+            x = float(row_dict["lat"])
+            y = float(row_dict["lon"])
         except ValueError:
             raise ImportError(f"Invalid coordinates on row {row_nr}")
 
@@ -173,7 +191,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
 
         # get chimney properties
         for attr, key in {
-            "chimney_height": "height",
+            "chimney_height": "chimney_height",
             "chimney_inner_diameter": "inner_diameter",
             "chimney_outer_diameter": "outer_diameter",
             "chimney_gas_speed": "gas_speed",
@@ -252,6 +270,13 @@ def import_pointsources(filepath, encoding=None, srid=None, unit=None):
                 raise ImportError(f"Undefined substance {subst}")
 
             try:
+                if not pd.isnull(row_dict["unit"]):
+                    if (unit != "kg/s") and (unit != row_dict["unit"]):
+                        raise ImportError(
+                            f"Conflicting unit {row_dict[unit]} on row {row_nr}"
+                        )
+                    else:
+                        unit = row_dict["unit"]
                 emis["value"] = emission_unit_to_si(float(row_dict[subst_key]), unit)
             except ValueError:
                 raise ImportError(
@@ -440,6 +465,15 @@ def import_eea_emfacs(filepath, encoding=None):
     options
         encoding: encoding of file (default is utf-8)
     """
+    existing_eea_emfacs = EEAEmissionFactor.objects.all()
+    if len(existing_eea_emfacs) > 1:
+        log.debug("emfacs have previously been imported")
+        log.debug("for now delete all previous emfacs")
+        # TODO if automatically linking EEA emfacs to applied emfacs,
+        # then cannot remove but can only update, to avoid removing
+        # an emfac which is used for a certain activity.
+        existing_eea_emfacs.delete()
+
     substances = cache_queryset(Substance.objects.all(), "slug")
 
     extension = filepath.split(".")[-1]
@@ -463,10 +497,7 @@ def import_eea_emfacs(filepath, encoding=None):
         if len(workbook.worksheets) > 1:
             log.debug("debug: multiple sheets in spreadsheet, only importing 1st.")
         data = worksheet.values
-        cols = next(data)
-        data = list(data)
-        data = (islice(r, 0, None) for r in data)
-        df = pd.DataFrame(data, columns=cols)
+        df = worksheet_to_dataframe(data)
         # TODO could replace NA by None?
         # df = df.replace(to_replace="NA", value=None)
     else:
@@ -507,18 +538,26 @@ def import_eea_emfacs(filepath, encoding=None):
         try:
             emfac_data["substance"] = substances[subst]
         except KeyError:
-            # TODO log warning
-            print(f"Undefined substance {subst}")
-            print("Saving pollutant as unknown_substance.")
-            print("Known substances are: ")
-            [
-                print(e.slug)
-                for e in Substance.objects.exclude(
-                    slug__in=["activity", "traffix_work", "PM10resusp", "PM25resusp"]
-                )
-            ]
-            emfac_data["unknown_substance"] = subst
-            emfac_data["substance"] = None
+            if subst == "PM2.5":
+                emfac_data["substance"] = substances["PM25"]
+            else:
+                # TODO log warning
+                print(f"Undefined substance {subst}")
+                print("Saving pollutant as unknown_substance.")
+                print("Known substances are: ")
+                [
+                    print(e.slug)
+                    for e in Substance.objects.exclude(
+                        slug__in=[
+                            "activity",
+                            "traffix_work",
+                            "PM10resusp",
+                            "PM25resusp",
+                        ]
+                    )
+                ]
+                emfac_data["unknown_substance"] = subst
+                emfac_data["substance"] = None
         if row_dict["Value"] is None:
             if (row_dict["CI_lower"] is None) and (row_dict["CI_upper"] is None):
                 # TODO log warning
@@ -555,4 +594,39 @@ def import_eea_emfacs(filepath, encoding=None):
         row_nr += 1
 
     EEAEmissionFactor.objects.bulk_create(create_eea_emfac)
-    return emfac_data
+    # TODO check for existing emfac and do not create twice, or only update
+    return create_eea_emfac
+
+
+# TODO check what is similar to import_pointsources code and make
+# separate functions for these code bits.
+def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
+    """Import point-sources from xlsx or csv-file.
+
+    args
+        filepath: path to file
+
+    options
+        encoding: encoding of file (default is utf-8)
+        srid: srid of file, default is same srid as domain
+        unit: unit of emissions, default is SI-units (kg/s)
+    """
+    # TODO something is wrong, timevar should not be None for source3!
+    # should complain that cannot import pointsource before timevars are imported.
+    ps = import_pointsources(filepath)
+    activities = cache_queryset(Activity.objects.all(), "name")
+    try:
+        workbook = load_workbook(filename=filepath, data_only=True)
+    except Exception as exc:
+        raise ImportError(str(exc))
+    # a pointsourceactivity xlsx has to have Activity and EmissionFactor sheets,
+    # but not necessarily Timevar.
+    data = workbook["Activity"].values
+    df = worksheet_to_dataframe(data)
+
+    sheet_names = [sheet.title for sheet in workbook.worksheets]
+    # breakpoint()
+    print(ps)
+    print(activities, df)
+    if "Timevar" in sheet_names:
+        import_timevars(data=workbook["Timevar"].values)
