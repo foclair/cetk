@@ -244,7 +244,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
             try:
                 source_data["timevar"] = timevars[timevar_name]
             except KeyError:
-                ImportError(
+                raise ImportError(
                     f"Timevar '{timevar_name}' " f"on row {row_nr} does not exist"
                 )
 
@@ -544,18 +544,18 @@ def import_eea_emfacs(filepath, encoding=None):
                 # TODO log warning
                 print(f"Undefined substance {subst}")
                 print("Saving pollutant as unknown_substance.")
-                print("Known substances are: ")
-                [
-                    print(e.slug)
-                    for e in Substance.objects.exclude(
-                        slug__in=[
-                            "activity",
-                            "traffix_work",
-                            "PM10resusp",
-                            "PM25resusp",
-                        ]
-                    )
-                ]
+                # print("Known substances are: ")
+                # [
+                #     print(e.slug)
+                #     for e in Substance.objects.exclude(
+                #         slug__in=[
+                #             "activity",
+                #             "traffix_work",
+                #             "PM10resusp",
+                #             "PM25resusp",
+                #         ]
+                #     )
+                # ]
                 emfac_data["unknown_substance"] = subst
                 emfac_data["substance"] = None
         if row_dict["Value"] is None:
@@ -611,8 +611,6 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
         srid: srid of file, default is same srid as domain
         unit: unit of emissions, default is SI-units (kg/s)
     """
-    # TODO something is wrong, timevar should not be None for source3!
-    # should complain that cannot import pointsource before timevars are imported.
     ps = import_pointsources(filepath)
     activities = cache_queryset(Activity.objects.all(), "name")
     try:
