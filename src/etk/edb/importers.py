@@ -621,6 +621,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
     except Exception as exc:
         raise ImportError(str(exc))
 
+    return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
     if "Timevar" in sheet_names:
         timevar_data = workbook["Timevar"].values
@@ -655,7 +656,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
     # or pointsources to be imported later, not requiring PointSource as sheet for now.
     if "PointSource" in sheet_names:
         ps = import_pointsources(filepath)
-        print(ps)
+        return_dict.update(ps)
 
     if "Activity" in sheet_names:
         activities = cache_queryset(
@@ -698,6 +699,14 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
         )
         # drop existing emfacs of activities that will be updated
         EmissionFactor.objects.filter(pk__in=[inst.id for inst in drop_emfacs]).delete()
+        return_dict.update(
+            {
+                "activity": {
+                    "updated": len(update_activities),
+                    "created": len(create_activities),
+                }
+            }
+        )
 
     if "EmissionFactor" in sheet_names:
         data = workbook["EmissionFactor"].values
@@ -756,9 +765,22 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
                 create_emfacs.append(emfac)
         # TODO should check uniquetogether constraint for activity and substance?
         # could be done to give more informative error than integrity error here.
-        EmissionFactor.objects.bulk_create(create_emfacs)
+        try:
+            EmissionFactor.objects.bulk_create(create_emfacs)
+        except IntegrityError:
+            raise ImportError(
+                "Two emission factors for the same activity and substance are given. "
+            )
         EmissionFactor.objects.bulk_update(
             update_emfacs, ["activity", "substance", "factor"]
+        )
+        return_dict.update(
+            {
+                "emission_factors": {
+                    "updated": len(update_emfacs),
+                    "created": len(create_emfacs),
+                }
+            }
         )
 
     if "PointSource" in sheet_names:
@@ -808,9 +830,21 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
         PointSourceActivity.objects.bulk_update(
             update_pointsourceactivities, ["activity", "source", "rate"]
         )
+        return_dict.update(
+            {
+                "pointsourceactivity": {
+                    "updated": len(update_pointsourceactivities),
+                    "created": len(create_pointsourceactivities),
+                }
+            }
+        )
 
-        # TODO
-        # add tests
-        # figure out how to handle facility, is this really useful?
-        # see also discussion about uniqueness wrt facility on mattermost.
-        # is it correct that activity rate is not converted to SI?
+    return return_dict
+
+    # TODO
+    # add tests
+    # figure out how to handle facility, is this really useful?
+    # see also discussion about uniqueness wrt facility on mattermost.
+    # is it correct that activity rate is not converted to SI?
+    # make it easier to validate files for import? or better feedback for correction
+    # add code and test for rasterizer that aggregates emissions

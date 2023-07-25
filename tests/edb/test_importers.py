@@ -109,6 +109,7 @@ class TestImport:
         filename = pkg_resources.resource_filename(
             __name__, "data/EMEPemissionfactors-short.xlsx"
         )
+
         # example code how to use eea emfacs for codeset
         import_eea_emfacs(filename)
         emfacs = EEAEmissionFactor.objects.all()
@@ -135,9 +136,11 @@ class TestImport:
         filepath = pkg_resources.resource_filename(__name__, filename)
 
         # test if create pointsourceactivities works
-        import_pointsourceactivities(filepath)
+        psa = import_pointsourceactivities(filepath)
+        print(psa)
         assert PointSourceActivity.objects.all().count()
 
         # test if update also works
-        import_pointsourceactivities(filepath)
+        psa = import_pointsourceactivities(filepath)
+        print(psa)
         assert PointSourceActivity.objects.all().count()
