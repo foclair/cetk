@@ -10,8 +10,7 @@ from etk.edb.importers import (  # , import_timevars
     import_pointsources,
 )
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
-from etk.edb.models.source_models import PointSource  # PointSourceSubstance, Timevar
-from etk.edb.models.source_models import CodeSet
+from etk.edb.models.source_models import CodeSet, PointSource, PointSourceActivity
 from etk.edb.units import emis_conversion_factor_from_si
 
 
@@ -134,6 +133,11 @@ class TestImport:
         # create pointsources
         filename = "data/pointsourceactivities.xlsx"
         filepath = pkg_resources.resource_filename(__name__, filename)
+
+        # test if create pointsourceactivities works
         import_pointsourceactivities(filepath)
-        # PointSource.objects.get(name="source3").timevar
-        assert PointSource.objects.all().count()
+        assert PointSourceActivity.objects.all().count()
+
+        # test if update also works
+        import_pointsourceactivities(filepath)
+        assert PointSourceActivity.objects.all().count()
