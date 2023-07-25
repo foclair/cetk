@@ -14,13 +14,15 @@ from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     Activity,
     CodeSet,
+    EmissionFactor,
     Facility,
     PointSource,
+    PointSourceActivity,
     PointSourceSubstance,
     Substance,
     Timevar,
 )
-from etk.edb.units import emission_unit_to_si  # , vehicle_ef_unit_to_si
+from etk.edb.units import activity_ef_unit_to_si, emission_unit_to_si
 from etk.tools.utils import cache_queryset
 
 # column facility and name are used as index and is therefore not included here
@@ -83,6 +85,10 @@ def worksheet_to_dataframe(data):
             break
     # TODO remove the last 'empty_count' lines
     df = df.head(df.shape[0] - empty_count)
+    # remove empty columns without label
+    if None in df.columns:
+        if np.all([pd.isnull(val) for val in df[None].values]):
+            df = df.drop(columns=[None])
     return df
 
 
@@ -611,20 +617,225 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
         srid: srid of file, default is same srid as domain
         unit: unit of emissions, default is SI-units (kg/s)
     """
-    ps = import_pointsources(filepath)
-    activities = cache_queryset(Activity.objects.all(), "name")
     try:
         workbook = load_workbook(filename=filepath, data_only=True)
     except Exception as exc:
         raise ImportError(str(exc))
-    # a pointsourceactivity xlsx has to have Activity and EmissionFactor sheets,
-    # but not necessarily Timevar.
-    data = workbook["Activity"].values
-    df = worksheet_to_dataframe(data)
 
     sheet_names = [sheet.title for sheet in workbook.worksheets]
-    # breakpoint()
-    print(ps)
-    print(activities, df)
+    # TODO move to function timevar sheet to dict
     if "Timevar" in sheet_names:
-        import_timevars(data=workbook["Timevar"].values)
+        timevar_data = workbook["Timevar"].values
+        df_timevar = worksheet_to_dataframe(timevar_data)
+        timevar_dict = {"emission": {}}
+        # NB this only
+        nr_timevars = (len(df_timevar["ID"]) + 1) // 27
+        for i in range(nr_timevars):
+            label = df_timevar["ID"][i * 27]
+            typeday = np.asarray(
+                df_timevar[
+                    [
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday",
+                        "sunday",
+                    ]
+                ][i * 27 : i * 27 + 24]
+            )
+            month = np.asarray(df_timevar.iloc[i * 27 + 25, 2:14])
+            typeday_str = np.array2string(typeday).replace("\n", "").replace(" ", ", ")
+            month_str = np.array2string(month).replace("\n", "").replace(" ", ", ")
+            timevar_dict["emission"].update(
+                {label: {"typeday": typeday_str, "month": month_str}}
+            )
+
+        import_timevars(timevar_dict)
+
+    # Could be that activities are linked to previously imported pointsources,
+    # not requiring PointSource as sheet for now.
+    if "PointSource" in sheet_names:
+        ps = import_pointsources(filepath)
+        print(ps)
+
+    if "Activity" in sheet_names:
+        activities = cache_queryset(Activity.objects.all(), "name")
+        activities_emfac = cache_queryset(
+            EmissionFactor.objects.all(), ["activity", "substance"]
+        )
+        data = workbook["Activity"].values
+        df_activity = worksheet_to_dataframe(data)
+        activity_names = df_activity["activity_name"]
+        update_activities = []
+        create_activities = {}
+        row_nr = 0
+        for activity_name in activity_names:
+            try:
+                activity = activities[activity_name]
+                setattr(activity, "name", activity_name)
+                setattr(activity, "unit", df_activity["activity_unit"][row_nr])
+                update_activities.append(activity)
+                # TODO drop all old emission factors for this activity,
+                # and old pointsource activities?
+                # similar to substance when updating sources, because could here change
+                # unit of the activity, and in that case need to update related entities
+                # can only implement this once I know what it looks like
+                # EmissionFactor.objects.filter(activity='testname')
+                # *** ValueError: Field 'id' expected a number but got 'testname'.
+                # drop_substances += list(source.substances.all())
+            except KeyError:
+                activity = Activity(
+                    name=activity_name, unit=df_activity["activity_unit"][row_nr]
+                )
+                if activity_name not in create_activities:
+                    create_activities[activity_name] = activity
+                else:
+                    raise ImportError(
+                        f"multiple rows for the same activity '{activity_name}'"
+                    )
+            try:
+                activities_emfac[activity_name]  # and any substance?!
+            except KeyError:
+                # no existing emfacs to drop
+                pass
+            row_nr += 1
+        Activity.objects.bulk_create(create_activities.values())
+        Activity.objects.bulk_update(
+            update_activities,
+            [
+                "name",
+                "unit",
+            ],
+        )
+
+    if "EmissionFactor" in sheet_names:
+        data = workbook["EmissionFactor"].values
+        df_emfac = worksheet_to_dataframe(data)
+        substances = cache_queryset(Substance.objects.all(), "slug")
+        activities = cache_queryset(Activity.objects.all(), "name")
+        # unique together activity_name and substance
+        emissionfactors = cache_queryset(
+            EmissionFactor.objects.all(), ["activity", "substance"]
+        )
+        update_emfacs = []
+        create_emfacs = []
+        for row_nr in range(len(df_emfac)):
+            activity_name = df_emfac.iloc[row_nr]["activity_name"]
+            try:
+                activity = activities[activity_name]
+            except KeyError:
+                raise ImportError(
+                    f"unknown activity '{activity_name}'"
+                    + f" for emission factor on row '{row_nr}'"
+                )
+            subst = df_emfac.iloc[row_nr]["substance"]
+            try:
+                substance = substances[subst]
+            except KeyError:
+                if subst == "PM2.5":
+                    substance = substances["PM25"]
+                else:
+                    raise ImportError(
+                        f"unknown substance '{subst}'"
+                        + f" for emission factor on row '{row_nr}'"
+                    )
+            factor = df_emfac.iloc[row_nr]["factor"]
+            factor_unit = df_emfac.iloc[row_nr]["emissionfactor_unit"]
+            activity_quantity_unit, time_unit = activity.unit.split("/")
+            mass_unit, factor_quantity_unit = factor_unit.split("/")
+            if activity_quantity_unit != factor_quantity_unit:
+                # emission factor and activity need to have the same unit for quantity
+                # be it GJ, m3 pellets, number of produces bottles, it has to be same
+                raise ImportError(
+                    f"Units for emission factor and activity rate for '{activity_name}'"
+                    + " are inconsistent, convert units before importing."
+                )
+            else:
+                factor = activity_ef_unit_to_si(factor, factor_unit)
+            try:
+                emfac = emissionfactors[(activity, substance)]
+                setattr(emfac, "activity", activity)
+                setattr(emfac, "substance", substance)
+                setattr(emfac, "factor", factor)
+                update_emfacs.append(emfac)
+            except KeyError:
+                emfac = EmissionFactor(
+                    activity=activity, substance=substance, factor=factor
+                )
+                create_emfacs.append(emfac)
+        # TODO should check uniquetogether constraint for activity and substance?
+        # could be done to give more informative error than integrity error here.
+        EmissionFactor.objects.bulk_create(create_emfacs)
+        EmissionFactor.objects.bulk_update(
+            update_emfacs, ["activity", "substance", "factor"]
+        )
+
+    if "PointSource" in sheet_names:
+        # now that activities, pointsources and emission factors are created,
+        # pointsourceactivities can be created.
+        # should not matter whether activities and emission factors were imported from
+        # same file or existed already in database.
+        pointsourceactivities = cache_queryset(
+            PointSourceActivity.objects.all(), ["activity", "source"]
+        )
+        # TODO check unique activity for source
+        data = workbook["PointSource"].values
+        df_pointsource = worksheet_to_dataframe(data)
+        # TODO add: if any df_pointsource['activity_name'] is not None?
+        # otherwise can skip this.
+        activities = cache_queryset(Activity.objects.all(), "name")
+        pointsources = cache_pointsources(
+            PointSource.objects.select_related("facility")
+            .prefetch_related("substances")
+            .all()
+        )
+        create_pointsourceactivities = []
+        for row_key, row in df_pointsource.iterrows():
+            if row["activity_name"] is not None:
+                print("import sourceactivity")
+                rate = row["activity_rate"]
+                # TODO convert rate to SI?! or later?
+                try:
+                    activity = activities[row["activity_name"]]
+                except KeyError:
+                    raise ImportError(
+                        f"unknown activity '{activity_name}'"
+                        + f" for pointsource '{row['source_name']}'"
+                    )
+                pointsource = pointsources[str(row["facility_id"]), row["source_name"]]
+                try:
+                    pointsourceactivities[row["activity_name"], row["source_name"]]
+                    # todo only update, not create
+                except KeyError:
+                    psa = PointSourceActivity(
+                        activity=activity, source=pointsource, rate=rate
+                    )
+                    create_pointsourceactivities.append(psa)
+        PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
+        # TODO add also possibility to update pointsourceactivities
+        # add tests
+        # figure out how to handle facility, is this really useful?
+        # see also discussion about uniqueness wrt facility on mattermost.
+
+    # Activity; name, unit
+    # pointsourceactivity: pointsource, activity, rate
+    # emissionfactor: factor, activity, substance.
+
+    # TODO convert factor to SI Units!! or only once creating pointsourceactivity,
+    # that should be in SI units? somehow need to check already when importing emfac
+    # that unit of factor is consistent with unit of rate for activity!
+    # example here; emission factor unit g/GJ
+    # activity rate unit GJ/yr
+    # Hence;
+    # First define activity and pointsource, then pointsourceactivity and emissionfactor
+    # TODO check if imported pointsources with activities have at least one emissionfact
+    # defined, throw an importerror if not?
+    # breakpoint()
+
+    # drop_substances += list(source.substances.all())
+    # create_substances += [
+    #     PointSourceSubstance(source=source, **emis)
+    #     for emis in emissions.values()
+    # ]
