@@ -412,7 +412,9 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
 
     # ensure PointSourceSubstance.source_id is not None
     for emis in create_substances:
-        emis.source_id = PointSource.objects.get(name=emis.source).id
+        emis.source_id = PointSource.objects.get(
+            name=emis.source, facility_id=emis.source.facility_id
+        ).id
     PointSourceSubstance.objects.bulk_create(create_substances)
     return {
         "facility": {
