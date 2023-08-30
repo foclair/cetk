@@ -815,27 +815,30 @@ def import_pointsourceactivities(
         create_pointsourceactivities = []
         update_pointsourceactivities = []
         for row_key, row in df_pointsource.iterrows():
-            if row["activity_name"] is not None:
-                rate = row["activity_rate"]
-                # TODO convert rate to SI?! or later?
-                # better not to convert so it is consistent with activity_unit?
-                try:
-                    activity = activities[row["activity_name"]]
-                except KeyError:
-                    raise ImportError(
-                        f"unknown activity '{activity_name}'"
-                        + f" for pointsource '{row['source_name']}'"
-                    )
-                pointsource = pointsources[str(row["facility_id"]), row["source_name"]]
-                try:
-                    psa = pointsourceactivities[activity, pointsource]
-                    setattr(psa, "rate", rate)
-                    update_pointsourceactivities.append(psa)
-                except KeyError:
-                    psa = PointSourceActivity(
-                        activity=activity, source=pointsource, rate=rate
-                    )
-                    create_pointsourceactivities.append(psa)
+            if "activity_name" in row:
+                if row["activity_name"] is not None:
+                    rate = row["activity_rate"]
+                    # TODO convert rate to SI?! or later?
+                    # better not to convert so it is consistent with activity_unit?
+                    try:
+                        activity = activities[row["activity_name"]]
+                    except KeyError:
+                        raise ImportError(
+                            f"unknown activity '{activity_name}'"
+                            + f" for pointsource '{row['source_name']}'"
+                        )
+                    pointsource = pointsources[
+                        str(row["facility_id"]), row["source_name"]
+                    ]
+                    try:
+                        psa = pointsourceactivities[activity, pointsource]
+                        setattr(psa, "rate", rate)
+                        update_pointsourceactivities.append(psa)
+                    except KeyError:
+                        psa = PointSourceActivity(
+                            activity=activity, source=pointsource, rate=rate
+                        )
+                        create_pointsourceactivities.append(psa)
         PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
         PointSourceActivity.objects.bulk_update(
             update_pointsourceactivities, ["activity", "source", "rate"]
