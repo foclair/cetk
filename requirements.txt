@@ -14,10 +14,14 @@ certifi==2022.12.7 \
     --hash=sha256:35824b4c3a97115964b408844d64aa14db1cc518f6562e8d7261699d1350a9e3 \
     --hash=sha256:4ad3232f5e926d6718ec31cfc1fcadfde020920e278684144551c91769c7bc18
     # via pyproj
-django==3.2.18 \
-    --hash=sha256:08208dfe892eb64fff073ca743b3b952311104f939e7f6dae954fe72dcc533ba \
-    --hash=sha256:4d492d9024c7b3dfababf49f94511ab6a58e2c9c3c7207786f1ba4eb77750706
+django==4.2.2 \
+    --hash=sha256:2a6b6fbff5b59dd07bef10bcb019bee2ea97a30b2a656d51346596724324badf \
+    --hash=sha256:672b3fa81e1f853bb58be1b51754108ab4ffa12a77c06db86aa8df9ed0c46fe5
     # via etk (setup.cfg)
+et-xmlfile==1.1.0 \
+    --hash=sha256:8eb9e2bc2f8c97e37a2dc85a09ecdcdec9d8a396530a6d5a33b30b9a92da0c5c \
+    --hash=sha256:a2ba85d1d6a74ef63837eed693bcb89c3f752169b0e3e7ae5b16ca5e1b3deada
+    # via openpyxl
 numpy==1.24.2 \
     --hash=sha256:003a9f530e880cb2cd177cba1af7220b9aa42def9c4afc2a2fc3ee6be7eb2b22 \
     --hash=sha256:150947adbdfeceec4e5926d956a06865c1c690f2fd902efede4ca6fe2e657c3f \
@@ -51,6 +55,10 @@ numpy==1.24.2 \
     #   etk (setup.cfg)
     #   pandas
     #   rastafari
+openpyxl==3.1.2 \
+    --hash=sha256:a6f5977418eff3b2d5500d54d9db50c8277a368436f4e4f8ddb1be3422870184 \
+    --hash=sha256:f91456ead12ab3c6c2e9491cf33ba6d08357d802192379bb482f1033ade496f5
+    # via etk (setup.cfg)
 pandas==2.0.0 \
     --hash=sha256:0778ab54c8f399d83d98ffb674d11ec716449956bc6f6821891ab835848687f2 \
     --hash=sha256:24472cfc7ced511ac90608728b88312be56edc8f19b9ed885a7d2e47ffaf69c0 \
@@ -122,9 +130,7 @@ python-dateutil==2.8.2 \
 pytz==2023.3 \
     --hash=sha256:1d8ce29db189191fb55338ee6d0387d82ab59f3d00eac103412d64e0ebd0c588 \
     --hash=sha256:a151b3abb88eda1d4e34a9814df37de2a80e301e68ba0fd856fb9b46bfbbbffb
-    # via
-    #   django
-    #   pandas
+    # via pandas
 rastafari==0.1.0 \
     --hash=sha256:30046c12cfca4680a1d14a98b7b06315c337da529596cf828a9b56689fb91123 \
     --hash=sha256:b3d90b1cd6cb6038c812ad4bc72966d60efd66da1c50abc4815ba0fb9e7f1a38

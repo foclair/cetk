@@ -3,8 +3,7 @@
 # import numpy as np
 import pytest
 
-from etk.edb import models
-from etk.edb.models import Domain  # , Substance
+from etk.edb.models.source_models import CodeSet, Domain  # , Substance
 
 # from django.contrib.auth import get_user_model
 # from django.contrib.gis.gdal import GDALRaster
@@ -153,7 +152,7 @@ def vertical_dist(domains):
 @pytest.fixture()
 def code_sets(domains, vertical_dist):
     domain = domains[0]
-    cs1 = models.CodeSet.objects.create(name="codeset1", slug="codeset1", domain=domain)
+    cs1 = CodeSet.objects.create(name="codeset1", slug="codeset1", domain=domain)
     cs1.codes.create(code="1", label="Energy")
     cs1.codes.create(
         code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
@@ -169,7 +168,7 @@ def code_sets(domains, vertical_dist):
     cs1.codes.create(code="2.2", label="Other")
     cs1.codes.create(code="3", label="Diffuse sources")
 
-    cs2 = models.CodeSet.objects.create(name="codeset2", slug="codeset2", domain=domain)
+    cs2 = CodeSet.objects.create(name="codeset2", slug="codeset2", domain=domain)
     cs2.codes.create(code="A", label="Bla bla")
 
     return (cs1, cs2)

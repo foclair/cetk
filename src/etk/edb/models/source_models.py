@@ -20,13 +20,6 @@ from etk.edb.copy import copy_codeset, copy_model_instance
 from etk.edb.ltreefield import LtreeField
 from etk.settings import TIME_ZONE
 
-# eller
-# from django.db import models, but maybe geodjango models api
-# inherits normal django api?
-# https://docs.djangoproject.com/en/4.2/ref/models/
-# https://docs.djangoproject.com/en/4.2/ref/contrib/gis/model-api/
-
-
 # TODO is a locid necessary when starting inventories from scratch, instead of importing
 # existing gadget databases?
 # locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
@@ -200,8 +193,8 @@ class VerticalDist(BaseNamedModel):
     domain = models.ForeignKey(
         "Domain", on_delete=models.CASCADE, related_name="vertical_dists"
     )
-    # TODO ArrayField in Gadget, need for compatability, how to convert?
-    # ArrayField not supported in SQLite
+    # TODO weights as ArrayField in Gadget, are all functions updated to fun on
+    # CharField instead?
     weights = models.CharField(
         max_length=CHAR_FIELD_LENGTH, default=default_vertical_dist
     )
@@ -492,7 +485,12 @@ class PointAreaGridSourceBase(SourceBase):
 
     class Meta:
         abstract = True
-        index_together = ["activitycode1", "activitycode2", "activitycode3"]
+        indexes = [
+            models.Index(
+                fields=("activitycode1", "activitycode2", "activitycode3"),
+                name="%(class)s_activities_idx",
+            ),
+        ]
 
 
 class Facility(SourceBase):
@@ -560,3 +558,48 @@ class PointSourceSubstance(SourceSubstance):
     """A point-source substance emission."""
 
     source = models.ForeignKey("PointSource", on_delete=models.CASCADE)
+
+
+class SourceActivity(models.Model):
+    """Base class for an emitting activity."""
+
+    rate = models.FloatField(verbose_name="activity rate")
+    activity = models.ForeignKey("Activity", on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        abstract = True
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source", "activity"),
+                name="%(class)s_unique_activity_in_source",
+            ),
+        ]
+        default_related_name = "activities"
+
+
+class PointSourceActivity(SourceActivity):
+    """An emitting activity of a point source."""
+
+    source = models.ForeignKey("PointSource", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "{}".format(self.activity.name)
+
+
+class EmissionFactor(models.Model):
+    """An emission factor."""
+
+    factor = models.FloatField(default=0)
+    activity = models.ForeignKey("Activity", on_delete=models.PROTECT)
+    substance = models.ForeignKey(
+        "Substance", on_delete=models.PROTECT, related_name="+"
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("activity", "substance"),
+                name="emissionfactor_activity_substance_unique_together",
+            ),
+        ]
+        default_related_name = "emissionfactors"

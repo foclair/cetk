@@ -1,11 +1,16 @@
 """Tests for emission model importers."""
 
+import numpy as np
 import pkg_resources
 import pytest
 
-from etk.edb import models
-from etk.edb.importers import import_pointsources  # , import_timevars
-from etk.edb.models import PointSource  # PointSourceSubstance, Timevar
+from etk.edb.importers import (  # , import_timevars
+    import_eea_emfacs,
+    import_pointsourceactivities,
+    import_pointsources,
+)
+from etk.edb.models.eea_emfacs import EEAEmissionFactor
+from etk.edb.models.source_models import CodeSet, PointSource, PointSourceActivity
 from etk.edb.units import emis_conversion_factor_from_si
 
 
@@ -14,16 +19,21 @@ def pointsource_csv(tmpdir, settings):
     return pkg_resources.resource_filename(__name__, "data/pointsources.csv")
 
 
-class TestImportPointSources:
+@pytest.fixture
+def pointsource_xlsx(tmpdir, settings):
+    return pkg_resources.resource_filename(__name__, "data/pointsources.xlsx")
+
+
+class TestImport:
 
     """Test importing point-sources from csv."""
 
-    def test_import_pointsources(self, domains, vertical_dist, pointsource_csv):
+    def test_import_pointsources(
+        self, domains, vertical_dist, pointsource_csv, pointsource_xlsx
+    ):
         domain = domains[0]
         # similar to base_set in gadget
-        cs1 = models.CodeSet.objects.create(
-            name="code set 1", slug="code_set1", domain=domain
-        )
+        cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1", domain=domain)
         cs1.codes.create(code="1", label="Energy")
         cs1.codes.create(
             code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
@@ -33,16 +43,14 @@ class TestImportPointSources:
         )
         cs1.codes.create(code="1.3", label="Road traffic", vertical_dist=vertical_dist)
         cs1.save()
-        cs2 = models.CodeSet.objects.create(
-            name="code set 2", slug="code_set2", domain=domain
-        )
+        cs2 = CodeSet.objects.create(name="code set 2", slug="code_set2", domain=domain)
         cs2.codes.create(code="A", label="Bla bla")
         cs2.save()
         # create pointsources
         import_pointsources(pointsource_csv, unit="ton/year")
 
         assert PointSource.objects.all().count()
-        source1 = PointSource.objects.filter(name="source1").first()
+        source1 = PointSource.objects.get(name="source1")
 
         assert source1.name == "source1"
         assert source1.tags["tag1"] == "val1"
@@ -57,12 +65,82 @@ class TestImportPointSources:
         source1.tags["test_tag"] = "test"
         source1.save()
 
-        # update pointsources
+        # update pointsources from xlsx
         import_pointsources(
-            pointsource_csv,
+            pointsource_xlsx,
             unit="ton/year",
         )
 
         # check that source has been overwritten
-        source1 = PointSource.objects.filter(name="source1").first()
+        source1 = PointSource.objects.get(name="source1")
         assert "test_tag" not in source1.tags
+
+    def test_import_eea_emfac(
+        self,
+        domains,
+    ):
+        # using domain just to get fixtures
+        domain = domains[0]  # noqa
+        filename = pkg_resources.resource_filename(
+            __name__, "data/EMEPemissionfactors-short.xlsx"
+        )
+        sd = import_eea_emfacs(filename)
+        assert len(sd) > 0
+
+    # do not need to test separately if included in importactivities
+    # def test_import_timevars(
+    #     self,
+    #     domains,
+    # ):
+    #     # using domain just to get fixtures
+    #     domain = domains[0]  # noqa
+    #     filename = pkg_resources.resource_filename(
+    #         __name__, "data/EMEPemissionfactors-short.xlsx"
+    #     )
+    #     sd = import_eea_emfacs(filename)
+    #     assert len(sd) > 0
+
+    def test_import_pointsourceactivities(
+        self, domains, vertical_dist, pointsource_csv, pointsource_xlsx
+    ):
+        domain = domains[0]
+        # similar to base_set in gadget
+        cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1", domain=domain)
+        filename = pkg_resources.resource_filename(
+            __name__, "data/EMEPemissionfactors-short.xlsx"
+        )
+
+        # example code how to use eea emfacs for codeset
+        import_eea_emfacs(filename)
+        emfacs = EEAEmissionFactor.objects.all()
+        nfr_codes = [ef.nfr_code for ef in emfacs]
+        unique_nfr_codes = set(nfr_codes)
+        sectors = [ef.sector for ef in emfacs]
+        for code in unique_nfr_codes:
+            index = np.argmax(np.asarray(nfr_codes) == code)
+            cs1.codes.create(code=code, label=sectors[index])
+
+        cs1.codes.create(
+            code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
+        )
+        cs1.codes.create(
+            code="1.2", label="Fugitive emissions", vertical_dist=vertical_dist
+        )
+        cs1.codes.create(code="1.3", label="Road traffic", vertical_dist=vertical_dist)
+        cs1.save()
+        cs2 = CodeSet.objects.create(name="code set 2", slug="code_set2", domain=domain)
+        cs2.codes.create(code="A", label="Bla bla")
+        cs2.save()
+        # create pointsources
+        filename = "data/pointsourceactivities.xlsx"
+        filepath = pkg_resources.resource_filename(__name__, filename)
+
+        # test if create pointsourceactivities works
+        psa = import_pointsourceactivities(filepath)
+        print(psa)
+        assert PointSourceActivity.objects.all().count()
+
+        # test if update also works
+        psa = import_pointsourceactivities(filepath)
+        print(psa)
+        assert PointSourceActivity.objects.all().count()

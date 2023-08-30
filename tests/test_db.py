@@ -3,7 +3,7 @@
 import os
 import subprocess
 
-from etk.edb.models import Activity
+from etk.edb.models.source_models import Activity
 from etk.tools import Editor
 
 

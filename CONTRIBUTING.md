@@ -15,6 +15,7 @@ $ python3.9 -m venv --prompt etk .venv
 $ . .venv/bin/activate
 $ pip install -U pip setuptools wheel
 $ pip install -r requirements.txt
+$ pip install djangorestframework
 $ pre-commit install
 ```
 To run pre-commit on all files:
@@ -25,7 +26,7 @@ $ pre-commit run --all-files
 ### Dependency management
 
 Dependencies are organized in the following files:
-TODO these files do not exist here?
+TODO not all of these files exist here?
 
 | Filename                           | Contents                                                                  |
 | ---------------------------------- | ------------------------------------------------------------------------- |

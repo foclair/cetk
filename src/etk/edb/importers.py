@@ -1,36 +1,42 @@
 """Data importers for the edb application."""
 
 import logging
+from itertools import islice
 
 import numpy as np
 import pandas as pd
 from django.contrib.gis.geos import Point
 from django.db import IntegrityError
+from openpyxl import load_workbook
 
 from etk.edb.const import WGS84_SRID
-from etk.edb.models import (
+from etk.edb.models.eea_emfacs import EEAEmissionFactor
+from etk.edb.models.source_models import (
+    Activity,
     CodeSet,
+    EmissionFactor,
     Facility,
     PointSource,
+    PointSourceActivity,
     PointSourceSubstance,
     Substance,
     Timevar,
 )
-from etk.edb.units import emission_unit_to_si  # , vehicle_ef_unit_to_si
+from etk.edb.units import activity_ef_unit_to_si, emission_unit_to_si
 from etk.tools.utils import cache_queryset
 
 # column facility and name are used as index and is therefore not included here
 REQUIRED_COLUMNS = {
     "facility_id": np.str_,
-    "x": float,
-    "y": float,
+    "lat": float,
+    "lon": float,
     "facility_name": np.str_,
     "source_name": np.str_,
     "timevar": np.str_,
     "activitycode1": np.str_,
     "activitycode2": np.str_,
     "activitycode3": np.str_,
-    "height": float,
+    "chimney_height": float,
     "outer_diameter": float,
     "inner_diameter": float,
     "gas_speed": float,
@@ -65,15 +71,36 @@ def cache_codeset(code_set):
     return cache_queryset(code_set.codes.all(), "code")
 
 
-def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
-    """Import point-sources from csv-file.
+def worksheet_to_dataframe(data):
+    cols = next(data)
+    data = list(data)
+    data = (islice(r, 0, None) for r in data)
+    df = pd.DataFrame(data, columns=cols)
+    # remove empty rows
+    empty_count = 0
+    for ind in range(-1, -1 * len(df), -1):
+        if all([pd.isnull(val) for val in df.iloc[ind]]):
+            empty_count += 1
+        else:
+            break
+    # remove the last 'empty_count' lines
+    df = df.head(df.shape[0] - empty_count)
+    # remove empty columns without label
+    if None in df.columns:
+        if np.all([pd.isnull(val) for val in df[None].values]):
+            df = df.drop(columns=[None])
+    return df
+
+
+def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
+    """Import point-sources from xlsx or csv-file.
 
     args
-        csvfile: path to csvfile
+        filepath: path to file
 
     options
-        encoding: encoding of csvfile (default is utf-8)
-        srid: srid of csvfile, default is same srid as domain
+        encoding: encoding of file (default is utf-8)
+        srid: srid of file, default is same srid as domain
         unit: unit of emissions, default is SI-units (kg/s)
     """
     # or change to user defined SRID?
@@ -88,16 +115,42 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
         .all()
     )
 
+    # using filter.first() here, not get() because code_set{i} does not have to exist
     code_sets = [
         cache_codeset(CodeSet.objects.filter(slug=f"code_set{i}").first())
         for i in range(1, 4)
     ]
-    # read csv-file
-    with open(csvfile, encoding=encoding or "utf-8") as csvfile:
-        log.debug("reading point-sources from csv-file")
-        df = pd.read_csv(
-            csvfile, sep=";", skip_blank_lines=True, comment="#", dtype=REQUIRED_COLUMNS
-        )
+
+    extension = filepath.split(".")[-1]
+    if extension == "csv":
+        # read csv-file
+        with open(filepath, encoding=encoding or "utf-8") as csvfile:
+            log.debug("reading point-sources from csv-file")
+            df = pd.read_csv(
+                csvfile,
+                sep=";",
+                skip_blank_lines=True,
+                comment="#",
+                dtype=REQUIRED_COLUMNS,
+            )
+    elif extension == "xlsx":
+        # read spreadsheet
+        try:
+            workbook = load_workbook(filename=filepath, data_only=True)
+        except Exception as exc:
+            raise ImportError(str(exc))
+        worksheet = workbook.worksheets[0]
+        if len(workbook.worksheets) > 1:
+            log.debug("Multiple sheets in spreadsheet, importing sheet 'PointSource'.")
+            data = workbook["PointSource"].values
+        else:
+            data = worksheet.values
+        df = worksheet_to_dataframe(data)
+        df = df.astype(dtype=REQUIRED_COLUMNS)
+        # below is necessary not to create facilities with name 'None'
+        df = df.replace(to_replace="None", value=None)
+    else:
+        raise ImportError("Only xlsx and csv files are supported for import")
     for col in REQUIRED_COLUMNS.keys():
         if col not in df.columns:
             raise ImportError(f"Missing required column '{col}'")
@@ -130,10 +183,10 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
 
         # get pointsource coordinates
         try:
-            if pd.isnull(row_dict["x"]) or pd.isnull(row_dict["y"]):
+            if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
                 raise ImportError(f"missing coordinates for source '{row_key}'")
-            x = float(row_dict["x"])
-            y = float(row_dict["y"])
+            x = float(row_dict["lat"])
+            y = float(row_dict["lon"])
         except ValueError:
             raise ImportError(f"Invalid coordinates on row {row_nr}")
 
@@ -144,7 +197,7 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
 
         # get chimney properties
         for attr, key in {
-            "chimney_height": "height",
+            "chimney_height": "chimney_height",
             "chimney_inner_diameter": "inner_diameter",
             "chimney_outer_diameter": "outer_diameter",
             "chimney_gas_speed": "gas_speed",
@@ -164,9 +217,18 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
         # get activitycodes
         for code_ind, code_set in enumerate(code_sets, 1):
             code_attribute = f"activitycode{code_ind}"
-            if len(code_set) == 0:
-                break
             code = row_dict[code_attribute]
+            if len(code_set) == 0:
+                if code is not None and code is not np.nan:
+                    raise ImportError(
+                        f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
+                    )
+                else:
+                    # TODO check whether it is ok to stop entire loop when codeset1
+                    # is empty, can codeset2 be non empty?
+                    # and how to make sure that activitycode1 always refers to codeset1?
+                    # or should we for ETK support only one codeset per inventory?
+                    break
 
             try:
                 source_data[code_attribute] = code_set[code]
@@ -188,7 +250,7 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
             try:
                 source_data["timevar"] = timevars[timevar_name]
             except KeyError:
-                ImportError(
+                raise ImportError(
                     f"Timevar '{timevar_name}' " f"on row {row_nr} does not exist"
                 )
 
@@ -214,6 +276,13 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
                 raise ImportError(f"Undefined substance {subst}")
 
             try:
+                if not pd.isnull(row_dict["unit"]):
+                    if (unit != "kg/s") and (unit != row_dict["unit"]):
+                        raise ImportError(
+                            f"Conflicting unit {row_dict[unit]} on row {row_nr}"
+                        )
+                    else:
+                        unit = row_dict["unit"]
                 emis["value"] = emission_unit_to_si(float(row_dict[subst_key]), unit)
             except ValueError:
                 raise ImportError(
@@ -275,6 +344,7 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
                     f"multiple rows for the same point-source '{source_name}'"
                 )
         row_nr += 1
+
     existing_facility_names = set([f.name for f in facilities.values()])
     duplicate_facility_names = []
     for official_id, f in create_facilities.items():
@@ -300,7 +370,7 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
             f"with different facility_id: {duplicate_facility_names}"
         )
 
-    # adjusted by Eef because no inentory
+    # adjusted by Eef because no inventory
     Facility.objects.bulk_create(create_facilities.values())
     Facility.objects.bulk_update(update_facilities, ["name"])
 
@@ -308,9 +378,7 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
     for source in create_sources.values():
         if source.facility is not None:
             # changed by Eef, because IDs were None
-            source.facility_id = (
-                Facility.objects.filter(official_id=source.facility).first().id
-            )
+            source.facility_id = Facility.objects.get(official_id=source.facility).id
 
     PointSource.objects.bulk_create(create_sources.values())
     PointSource.objects.bulk_update(
@@ -339,9 +407,8 @@ def import_pointsources(csvfile, encoding=None, srid=None, unit=None):
 
     # ensure PointSourceSubstance.source_id is not None
     for emis in create_substances:
-        emis.source_id = PointSource.objects.filter(name=emis.source).first().id
+        emis.source_id = PointSource.objects.get(name=emis.source).id
     PointSourceSubstance.objects.bulk_create(create_substances)
-
     return {
         "facility": {
             "updated": len(update_facilities),
@@ -395,20 +462,389 @@ def import_timevars(timevar_data, overwrite=False):
     return timevars
 
 
-# code for spreadsheet
+def import_eea_emfacs(filepath, encoding=None):
+    """Import point-sources from xlsx or csv-file.
 
-# try:
-#     workbook = load_workbook(filename=self.sourcefile)
-# except Exception as exc:
-#     raise CommandError(str(exc))
-# worksheet = workbook.worksheets[0]
-# if len(workbook.worksheets) > 1:
-#     log.debug("debug: multiple sheets in spreadsheet, only importing 1st.")
-# data = worksheet.values
-# cols = next(data)[1:]
-# data = list(data)
-# idx = [r[0] for r in data]
-# data = (islice(r, 1, None) for r in data)
-# df = pd.DataFrame(data, index=idx, columns=cols)
-# print(df)
-# # TODO same here with df as in parse_csv ? add to test_importers as well
+    args
+        filepath: path to file
+
+    options
+        encoding: encoding of file (default is utf-8)
+    """
+    existing_eea_emfacs = EEAEmissionFactor.objects.all()
+    if len(existing_eea_emfacs) > 1:
+        log.debug("emfacs have previously been imported")
+        log.debug("for now delete all previous emfacs")
+        # TODO if automatically linking EEA emfacs to applied emfacs,
+        # then cannot remove but can only update, to avoid removing
+        # an emfac which is used for a certain activity.
+        existing_eea_emfacs.delete()
+
+    substances = cache_queryset(Substance.objects.all(), "slug")
+
+    extension = filepath.split(".")[-1]
+    if extension == "csv":
+        # read csv-file
+        with open(filepath, encoding=encoding or "utf-8") as csvfile:
+            log.debug("reading point-sources from csv-file")
+            df = pd.read_csv(
+                csvfile,
+                sep=";",
+                skip_blank_lines=True,
+                comment="#",
+            )
+    elif extension == "xlsx":
+        # read spreadsheet
+        try:
+            workbook = load_workbook(filename=filepath)
+        except Exception as exc:
+            raise ImportError(str(exc))
+        worksheet = workbook.worksheets[0]
+        if len(workbook.worksheets) > 1:
+            log.debug("debug: multiple sheets in spreadsheet, only importing 1st.")
+        data = worksheet.values
+        df = worksheet_to_dataframe(data)
+        # TODO could replace NA by None?
+        # df = df.replace(to_replace="NA", value=None)
+    else:
+        raise ImportError("Only xlsx and csv files are supported for import")
+
+    row_nr = 2
+    no_value_count = 0
+    no_unit_count = 0
+    create_eea_emfac = []
+    for row_key, row in df.iterrows():
+        emfac_data = {}
+        row_dict = row.to_dict()
+        for attr, key in {
+            "nfr_code": "NFR",
+            "sector": "Sector",
+            "table": "Table",
+            "tier": "Type",
+            "technology": "Technology",
+            "fuel": "Fuel",
+            "abatement": "Abatement",
+            "region": "Region",
+            "substance": "Pollutant",
+            "value": "Value",
+            "unit": "Unit",
+            "lower": "CI_lower",
+            "upper": "CI_upper",
+            "reference": "Reference",
+        }.items():
+            emfac_data[attr] = row_dict[key]
+        # check if substance known
+        try:
+            subst = emfac_data["substance"]
+        except KeyError:
+            print(f"No pollutant given, ignoring row {row_nr}")
+            row_nr += 1
+            no_value_count += 1
+            continue
+        try:
+            emfac_data["substance"] = substances[subst]
+        except KeyError:
+            if subst == "PM2.5":
+                emfac_data["substance"] = substances["PM25"]
+            else:
+                # TODO log warning? many undefined substances in EEA so dont want to
+                # raise import warning
+                print(f"Undefined substance {subst}")
+                print("Saving pollutant as unknown_substance.")
+                # print("Known substances are: ")
+                # [
+                #     print(e.slug)
+                #     for e in Substance.objects.exclude(
+                #         slug__in=[
+                #             "activity",
+                #             "traffix_work",
+                #             "PM10resusp",
+                #             "PM25resusp",
+                #         ]
+                #     )
+                # ]
+                emfac_data["unknown_substance"] = subst
+                emfac_data["substance"] = None
+        if row_dict["Value"] is None:
+            if (row_dict["CI_lower"] is None) and (row_dict["CI_upper"] is None):
+                # TODO log warning
+                print(f"No emission factor given, ignoring row {row_nr}")
+                row_nr += 1
+                no_value_count += 1
+                continue
+            else:
+                # taking mean if both upper and lower not nan, if only one not nan,
+                # take that value.
+                emfac_data["value"] = np.nanmean(
+                    np.array(
+                        [row_dict["CI_lower"], row_dict["CI_upper"]], dtype=np.float64
+                    )
+                )
+        if emfac_data["unit"] is None:
+            # TODO log warning
+            print(f"No unit given, ignoring row {row_nr}")
+            row_nr += 1
+            no_unit_count += 1
+            continue
+        # set data in EEA emfac data model
+        try:
+            float(emfac_data["value"])
+        except ValueError:
+            print(f"Non numerical value, ignoring row {row_nr}")
+            row_nr += 1
+            no_value_count += 1
+            continue
+        eea_emfac = EEAEmissionFactor()
+        for key, val in emfac_data.items():
+            setattr(eea_emfac, key, val)
+        create_eea_emfac.append(eea_emfac)
+        row_nr += 1
+
+    EEAEmissionFactor.objects.bulk_create(create_eea_emfac)
+    # TODO check for existing emfac and do not create twice, or only update
+    return create_eea_emfac
+
+
+def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
+    """Import point-sources from xlsx or csv-file.
+
+    args
+        filepath: path to file
+
+    options
+        encoding: encoding of file (default is utf-8)
+        srid: srid of file, default is same srid as domain
+        unit: unit of emissions, default is SI-units (kg/s)
+    """
+    try:
+        workbook = load_workbook(filename=filepath, data_only=True)
+    except Exception as exc:
+        raise ImportError(str(exc))
+
+    return_dict = {}
+    sheet_names = [sheet.title for sheet in workbook.worksheets]
+    if "Timevar" in sheet_names:
+        timevar_data = workbook["Timevar"].values
+        df_timevar = worksheet_to_dataframe(timevar_data)
+        timevar_dict = {"emission": {}}
+        # NB this only works if Excel file has exact same format
+        nr_timevars = (len(df_timevar["ID"]) + 1) // 27
+        for i in range(nr_timevars):
+            label = df_timevar["ID"][i * 27]
+            typeday = np.asarray(
+                df_timevar[
+                    [
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday",
+                        "sunday",
+                    ]
+                ][i * 27 : i * 27 + 24]
+            )
+            month = np.asarray(df_timevar.iloc[i * 27 + 25, 2:14])
+            typeday_str = np.array2string(typeday).replace("\n", "").replace(" ", ", ")
+            month_str = np.array2string(month).replace("\n", "").replace(" ", ", ")
+            timevar_dict["emission"].update(
+                {label: {"typeday": typeday_str, "month": month_str}}
+            )
+        import_timevars(timevar_dict, overwrite=True)
+
+    # Could be that activities are linked to previously imported pointsources,
+    # or pointsources to be imported later, not requiring PointSource as sheet for now.
+    if "PointSource" in sheet_names:
+        ps = import_pointsources(filepath)
+        return_dict.update(ps)
+
+    if "Activity" in sheet_names:
+        activities = cache_queryset(
+            Activity.objects.prefetch_related("emissionfactors").all(), "name"
+        )
+        data = workbook["Activity"].values
+        df_activity = worksheet_to_dataframe(data)
+        activity_names = df_activity["activity_name"]
+        update_activities = []
+        create_activities = {}
+        drop_emfacs = []
+        row_nr = 0
+        for activity_name in activity_names:
+            try:
+                activity = activities[activity_name]
+                setattr(activity, "name", activity_name)
+                setattr(activity, "unit", df_activity["activity_unit"][row_nr])
+                update_activities.append(activity)
+                drop_emfacs += list(activities[activity_name].emissionfactors.all())
+                # create emfacs just as create new substances? or sufficient to
+                # re-create in next if "EmissionFactor" in sheet_names?
+            except KeyError:
+                activity = Activity(
+                    name=activity_name, unit=df_activity["activity_unit"][row_nr]
+                )
+                if activity_name not in create_activities:
+                    create_activities[activity_name] = activity
+                else:
+                    raise ImportError(
+                        f"multiple rows for the same activity '{activity_name}'"
+                    )
+            row_nr += 1
+        Activity.objects.bulk_create(create_activities.values())
+        Activity.objects.bulk_update(
+            update_activities,
+            [
+                "name",
+                "unit",
+            ],
+        )
+        # drop existing emfacs of activities that will be updated
+        EmissionFactor.objects.filter(pk__in=[inst.id for inst in drop_emfacs]).delete()
+        return_dict.update(
+            {
+                "activity": {
+                    "updated": len(update_activities),
+                    "created": len(create_activities),
+                }
+            }
+        )
+
+    if "EmissionFactor" in sheet_names:
+        data = workbook["EmissionFactor"].values
+        df_emfac = worksheet_to_dataframe(data)
+        substances = cache_queryset(Substance.objects.all(), "slug")
+        activities = cache_queryset(Activity.objects.all(), "name")
+        # unique together activity_name and substance
+        emissionfactors = cache_queryset(
+            EmissionFactor.objects.all(), ["activity", "substance"]
+        )
+        update_emfacs = []
+        create_emfacs = []
+        for row_nr in range(len(df_emfac)):
+            activity_name = df_emfac.iloc[row_nr]["activity_name"]
+            try:
+                activity = activities[activity_name]
+            except KeyError:
+                raise ImportError(
+                    f"unknown activity '{activity_name}'"
+                    + f" for emission factor on row '{row_nr}'"
+                )
+            subst = df_emfac.iloc[row_nr]["substance"]
+            try:
+                substance = substances[subst]
+            except KeyError:
+                if subst == "PM2.5":
+                    substance = substances["PM25"]
+                else:
+                    raise ImportError(
+                        f"unknown substance '{subst}'"
+                        + f" for emission factor on row '{row_nr}'"
+                    )
+            factor = df_emfac.iloc[row_nr]["factor"]
+            factor_unit = df_emfac.iloc[row_nr]["emissionfactor_unit"]
+            activity_quantity_unit, time_unit = activity.unit.split("/")
+            mass_unit, factor_quantity_unit = factor_unit.split("/")
+            if activity_quantity_unit != factor_quantity_unit:
+                # emission factor and activity need to have the same unit for quantity
+                # be it GJ, m3 pellets, number of produces bottles, it has to be same
+                raise ImportError(
+                    f"Units for emission factor and activity rate for '{activity_name}'"
+                    + " are inconsistent, convert units before importing."
+                )
+            else:
+                factor = activity_ef_unit_to_si(factor, factor_unit)
+            try:
+                emfac = emissionfactors[(activity, substance)]
+                setattr(emfac, "activity", activity)
+                setattr(emfac, "substance", substance)
+                setattr(emfac, "factor", factor)
+                update_emfacs.append(emfac)
+            except KeyError:
+                emfac = EmissionFactor(
+                    activity=activity, substance=substance, factor=factor
+                )
+                create_emfacs.append(emfac)
+        # TODO should check uniquetogether constraint for activity and substance?
+        # could be done to give more informative error than integrity error here.
+        try:
+            EmissionFactor.objects.bulk_create(create_emfacs)
+        except IntegrityError:
+            raise ImportError(
+                "Two emission factors for the same activity and substance are given. "
+            )
+        EmissionFactor.objects.bulk_update(
+            update_emfacs, ["activity", "substance", "factor"]
+        )
+        return_dict.update(
+            {
+                "emission_factors": {
+                    "updated": len(update_emfacs),
+                    "created": len(create_emfacs),
+                }
+            }
+        )
+
+    if "PointSource" in sheet_names:
+        # now that activities, pointsources and emission factors are created,
+        # pointsourceactivities can be created.
+        # should not matter whether activities and emission factors were imported from
+        # same file or existed already in database.
+        pointsourceactivities = cache_queryset(
+            PointSourceActivity.objects.all(), ["activity", "source"]
+        )
+        # TODO check unique activity for source
+        data = workbook["PointSource"].values
+        df_pointsource = worksheet_to_dataframe(data)
+        # TODO add: if any df_pointsource['activity_name'] is not None?
+        # otherwise can skip this.
+        activities = cache_queryset(Activity.objects.all(), "name")
+        pointsources = cache_pointsources(
+            PointSource.objects.select_related("facility")
+            .prefetch_related("substances")
+            .all()
+        )
+        create_pointsourceactivities = []
+        update_pointsourceactivities = []
+        for row_key, row in df_pointsource.iterrows():
+            if row["activity_name"] is not None:
+                rate = row["activity_rate"]
+                # TODO convert rate to SI?! or later?
+                # better not to convert so it is consistent with activity_unit?
+                try:
+                    activity = activities[row["activity_name"]]
+                except KeyError:
+                    raise ImportError(
+                        f"unknown activity '{activity_name}'"
+                        + f" for pointsource '{row['source_name']}'"
+                    )
+                pointsource = pointsources[str(row["facility_id"]), row["source_name"]]
+                try:
+                    psa = pointsourceactivities[activity, pointsource]
+                    setattr(psa, "rate", rate)
+                    update_pointsourceactivities.append(psa)
+                except KeyError:
+                    psa = PointSourceActivity(
+                        activity=activity, source=pointsource, rate=rate
+                    )
+                    create_pointsourceactivities.append(psa)
+        PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
+        PointSourceActivity.objects.bulk_update(
+            update_pointsourceactivities, ["activity", "source", "rate"]
+        )
+        return_dict.update(
+            {
+                "pointsourceactivity": {
+                    "updated": len(update_pointsourceactivities),
+                    "created": len(create_pointsourceactivities),
+                }
+            }
+        )
+
+    return return_dict
+
+    # TODO
+    # add tests
+    # figure out how to handle facility, is this really useful?
+    # see also discussion about uniqueness wrt facility on mattermost.
+    # is it correct that activity rate is not converted to SI?
+    # make it easier to validate files for import? or better feedback for correction
+    # add code and test for rasterizer that aggregates emissions
