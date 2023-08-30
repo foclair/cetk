@@ -45,6 +45,11 @@ REQUIRED_COLUMNS = {
     "house_height": float,
 }
 
+# sheet names which are valid for data import
+SHEET_NAMES = ["Timevar", "PointSource", "Activity", "EmissionFactor"]
+# TODO add log warning if a sheet name exists in file to be imported
+# which is not in SHEET_NAMES
+
 log = logging.getLogger(__name__)
 
 
@@ -605,7 +610,9 @@ def import_eea_emfacs(filepath, encoding=None):
     return create_eea_emfac
 
 
-def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
+def import_pointsourceactivities(
+    filepath, encoding=None, srid=None, unit=None, import_sheets=SHEET_NAMES
+):
     """Import point-sources from xlsx or csv-file.
 
     args
@@ -623,7 +630,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
 
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
-    if "Timevar" in sheet_names:
+    if ("Timevar" in sheet_names) and ("Timevar" in import_sheets):
         timevar_data = workbook["Timevar"].values
         df_timevar = worksheet_to_dataframe(timevar_data)
         timevar_dict = {"emission": {}}
@@ -650,15 +657,16 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
             timevar_dict["emission"].update(
                 {label: {"typeday": typeday_str, "month": month_str}}
             )
-        import_timevars(timevar_dict, overwrite=True)
+        tv = import_timevars(timevar_dict, overwrite=True)
+        return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
 
     # Could be that activities are linked to previously imported pointsources,
-    # or pointsources to be imported later, not requiring PointSource as sheet for now.
-    if "PointSource" in sheet_names:
+    # or pointsources to be imported later, therefore not requiring PointSource-sheet.
+    if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
         ps = import_pointsources(filepath)
         return_dict.update(ps)
 
-    if "Activity" in sheet_names:
+    if ("Activity" in sheet_names) and ("Activity" in import_sheets):
         activities = cache_queryset(
             Activity.objects.prefetch_related("emissionfactors").all(), "name"
         )
@@ -708,7 +716,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
             }
         )
 
-    if "EmissionFactor" in sheet_names:
+    if ("EmissionFactor" in sheet_names) and ("EmissionFactor" in import_sheets):
         data = workbook["EmissionFactor"].values
         df_emfac = worksheet_to_dataframe(data)
         substances = cache_queryset(Substance.objects.all(), "slug")
@@ -783,7 +791,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
             }
         )
 
-    if "PointSource" in sheet_names:
+    if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
         # now that activities, pointsources and emission factors are created,
         # pointsourceactivities can be created.
         # should not matter whether activities and emission factors were imported from
