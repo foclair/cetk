@@ -670,6 +670,54 @@ def import_pointsourceactivities(
         tv = import_timevars(timevar_dict, overwrite=True)
         return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
 
+    if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
+        # code_sets = [
+        #     cache_codeset(CodeSet.objects.filter(id=i).first())
+        #     for i in range(1, 4)
+        # ]
+        nr_codesets = len(CodeSet.objects.all())
+        data = workbook["CodeSet"].values
+        df_codeset = worksheet_to_dataframe(data)
+        slugs = df_codeset["slug"]
+        update_codesets = []
+        create_codesets = {}
+        for row_nr, slug in enumerate(slugs):
+            try:
+                codeset = CodeSet.objects.get(slug=slug)
+                setattr(codeset, "name", df_codeset["name"][row_nr])
+                setattr(codeset, "description", df_codeset["description"][row_nr])
+                update_codesets.append(codeset)
+            except CodeSet.DoesNotExist:
+                if nr_codesets < 4:
+                    create_codesets
+                    codeset = CodeSet(
+                        name=df_codeset["name"][row_nr],
+                        slug=slug,
+                        description=df_codeset["description"][row_nr],
+                    )
+                    if slug not in create_codesets:
+                        create_codesets[slug] = codeset
+                else:
+                    raise ImportError(
+                        "Trying to import a new codeset, but can have maximum 3."
+                    )
+        CodeSet.objects.bulk_create(create_codesets.values())
+        CodeSet.objects.bulk_update(
+            update_codesets,
+            [
+                "name",
+                "description",
+            ],
+        )
+        return_dict.update(
+            {
+                "codeset": {
+                    "updated": len(update_codesets),
+                    "created": len(create_codesets),
+                }
+            }
+        )
+
     # Could be that activities are linked to previously imported pointsources,
     # or pointsources to be imported later, therefore not requiring PointSource-sheet.
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
@@ -686,8 +734,7 @@ def import_pointsourceactivities(
         update_activities = []
         create_activities = {}
         drop_emfacs = []
-        row_nr = 0
-        for activity_name in activity_names:
+        for row_nr, activity_name in enumerate(activity_names):
             try:
                 activity = activities[activity_name]
                 setattr(activity, "name", activity_name)
@@ -706,7 +753,7 @@ def import_pointsourceactivities(
                     raise ImportError(
                         f"multiple rows for the same activity '{activity_name}'"
                     )
-            row_nr += 1
+
         Activity.objects.bulk_create(create_activities.values())
         Activity.objects.bulk_update(
             update_activities,
