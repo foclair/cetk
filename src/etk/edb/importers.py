@@ -33,9 +33,9 @@ REQUIRED_COLUMNS = {
     "facility_name": np.str_,
     "source_name": np.str_,
     "timevar": np.str_,
-    "activitycode1": np.str_,
-    "activitycode2": np.str_,
-    "activitycode3": np.str_,
+    # "activitycode1": np.str_,
+    # "activitycode2": np.str_,
+    # "activitycode3": np.str_,
     "chimney_height": float,
     "outer_diameter": float,
     "inner_diameter": float,
@@ -46,7 +46,14 @@ REQUIRED_COLUMNS = {
 }
 
 # sheet names which are valid for data import
-SHEET_NAMES = ["Timevar", "PointSource", "Activity", "EmissionFactor"]
+SHEET_NAMES = [
+    "Timevar",
+    "PointSource",
+    "Activity",
+    "EmissionFactor",
+    "ActivityCode",
+    "CodeSet",
+]
 # TODO add log warning if a sheet name exists in file to be imported
 # which is not in SHEET_NAMES
 
@@ -122,8 +129,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
 
     # using filter.first() here, not get() because code_set{i} does not have to exist
     code_sets = [
-        cache_codeset(CodeSet.objects.filter(slug=f"code_set{i}").first())
-        for i in range(1, 4)
+        cache_codeset(CodeSet.objects.filter(id=i).first()) for i in range(1, 4)
     ]
 
     extension = filepath.suffix
@@ -221,26 +227,28 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
 
         # get activitycodes
         for code_ind, code_set in enumerate(code_sets, 1):
-            code_attribute = f"activitycode{code_ind}"
-            code = row_dict[code_attribute]
-            if len(code_set) == 0:
-                if code is not None and code is not np.nan:
-                    raise ImportError(
-                        f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
-                    )
-                else:
-                    # TODO check whether it is ok to stop entire loop when codeset1
-                    # is empty, can codeset2 be non empty?
-                    # and how to make sure that activitycode1 always refers to codeset1?
-                    # or should we for ETK support only one codeset per inventory?
-                    break
-
             try:
-                source_data[code_attribute] = code_set[code]
-            except KeyError:
-                raise ImportError(
-                    f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
-                )
+                code_set_slug = CodeSet.objects.filter(id=code_ind).first().slug
+                code_attribute = f"activitycode_{code_set_slug}"
+                if code_attribute in row_dict:
+                    code = row_dict[code_attribute]
+                    if len(code_set) == 0:
+                        if code is not None and code is not np.nan:
+                            raise ImportError(
+                                f"Unknown activitycode_{code_set_slug} '{code}'"
+                                + f" on row {row_nr}"
+                            )
+                    if code is not None and code is not np.nan:
+                        try:
+                            source_data[code_attribute] = code_set[code]
+                        except KeyError:
+                            raise ImportError(
+                                f"Unknown activitycode_{code_set_slug} '{code}'"
+                                + f" on row {row_nr}"
+                            )
+            except AttributeError:
+                # no such codeset exists
+                pass
 
         # get columns with tag values for the current row
         tag_keys = [key for key in row_dict.keys() if key.startswith("tag:")]
