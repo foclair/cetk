@@ -240,7 +240,11 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
                             )
                     if code is not None and code is not np.nan:
                         try:
-                            source_data[code_attribute] = code_set[code]
+                            # note this can be problematic with codes 01 etc as SNAP
+                            # TODO activitycodes should be string directly on import!
+                            activity_code = code_set[str(code)]
+                            codeset_id = activity_code.code_set_id
+                            source_data[f"activitycode{codeset_id}"] = activity_code
                         except KeyError:
                             raise ImportError(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"

@@ -29,11 +29,11 @@ class TestImport:
     """Test importing point-sources from csv."""
 
     def test_import_pointsources(
-        self, domains, vertical_dist, pointsource_csv, pointsource_xlsx
+        self, vertical_dist, pointsource_csv, pointsource_xlsx
     ):
-        domain = domains[0]
+
         # similar to base_set in gadget
-        cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1", domain=domain)
+        cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1")
         cs1.codes.create(code="1", label="Energy")
         cs1.codes.create(
             code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
@@ -43,7 +43,7 @@ class TestImport:
         )
         cs1.codes.create(code="1.3", label="Road traffic", vertical_dist=vertical_dist)
         cs1.save()
-        cs2 = CodeSet.objects.create(name="code set 2", slug="code_set2", domain=domain)
+        cs2 = CodeSet.objects.create(name="code set 2", slug="code_set2")
         cs2.codes.create(code="A", label="Bla bla")
         cs2.save()
         # create pointsources
@@ -64,7 +64,6 @@ class TestImport:
 
         source1.tags["test_tag"] = "test"
         source1.save()
-
         # update pointsources from xlsx
         import_pointsources(
             pointsource_xlsx,
@@ -75,36 +74,23 @@ class TestImport:
         source1 = PointSource.objects.get(name="source1")
         assert "test_tag" not in source1.tags
 
-    def test_import_eea_emfac(
-        self,
-        domains,
-    ):
-        # using domain just to get fixtures
-        domain = domains[0]  # noqa
-        filename = resources.files("edb.data") / "EMEPemissionfactors-short.xlsx"
+    def test_import_eea_emfac(self, vertical_dist):
+        # using vertical_dist just to get fixtures
+        vdist = vertical_dist  # noqa
+        filename = pkg_resources.resource_filename(
+            __name__, "data/EMEPemissionfactors-short.xlsx"
+        )
         sd = import_eea_emfacs(filename)
         assert len(sd) > 0
 
-    # do not need to test separately if included in importactivities
-    # def test_import_timevars(
-    #     self,
-    #     domains,
-    # ):
-    #     # using domain just to get fixtures
-    #     domain = domains[0]  # noqa
-    #     filename = pkg_resources.resource_filename(
-    #         __name__, "data/EMEPemissionfactors-short.xlsx"
-    #     )
-    #     sd = import_eea_emfacs(filename)
-    #     assert len(sd) > 0
-
     def test_import_pointsourceactivities(
-        self, domains, vertical_dist, pointsource_csv, pointsource_xlsx
+        self, vertical_dist, pointsource_csv, pointsource_xlsx
     ):
-        domain = domains[0]
         # similar to base_set in gadget
-        cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1", domain=domain)
-        filename = resources.files("edb.data") / "EMEPemissionfactors-short.xlsx"
+        cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1")
+        filename = pkg_resources.resource_filename(
+            __name__, "data/EMEPemissionfactors-short.xlsx"
+        )
 
         # example code how to use eea emfacs for codeset
         import_eea_emfacs(filename)
@@ -124,7 +110,7 @@ class TestImport:
         )
         cs1.codes.create(code="1.3", label="Road traffic", vertical_dist=vertical_dist)
         cs1.save()
-        cs2 = CodeSet.objects.create(name="code set 2", slug="code_set2", domain=domain)
+        cs2 = CodeSet.objects.create(name="code set 2", slug="code_set2")
         cs2.codes.create(code="A", label="Bla bla")
         cs2.save()
         # create pointsources
@@ -133,7 +119,6 @@ class TestImport:
         psa = import_pointsourceactivities(filepath)
         print(psa)
         assert PointSourceActivity.objects.all().count()
-
         # test if update also works
         psa = import_pointsourceactivities(filepath)
         print(psa)

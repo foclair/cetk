@@ -4,8 +4,7 @@
 import pytest
 import sys
 
-if sys.argv[0] != "pytest" and "--help" not in sys.argv:
-    from etk.edb.models.source_models import CodeSet, Domain  # , Substance
+from etk.edb.models.source_models import CodeSet, VerticalDist  # , Substance
 
 # from django.contrib.auth import get_user_model
 # from django.contrib.gis.gdal import GDALRaster
@@ -52,33 +51,8 @@ if sys.argv[0] != "pytest" and "--help" not in sys.argv:
 
 
 @pytest.fixture()
-def domains(db):
-    extent = (
-        "MULTIPOLYGON ((("
-        "10.95 50.33, 24.16 50.33, 24.16 69.06, 10.95 69.06, 10.95 50.33"
-        ")))"
-    )
-    dmn1 = Domain.objects.create(
-        name="Domain 1",
-        slug="domain-1",
-        srid=3006,
-        extent=extent,
-        timezone="Europe/Stockholm",
-    )
-    dmn2 = Domain.objects.create(
-        name="Domain 2",
-        slug="domain-2",
-        srid=3006,
-        extent=extent,
-        timezone="Europe/Stockholm",
-    )
-    return (dmn1, dmn2)
-
-
-@pytest.fixture()
-def vertical_dist(domains):
-    dmn1 = domains[0]
-    vdist = dmn1.vertical_dists.create(
+def vertical_dist(db):
+    vdist = VerticalDist.objects.create(
         name="vdist1", weights="[[5.0, 0.4], [10.0, 0.6]]"
     )
     return vdist
@@ -152,9 +126,8 @@ def vertical_dist(domains):
 
 
 @pytest.fixture()
-def code_sets(domains, vertical_dist):
-    domain = domains[0]
-    cs1 = CodeSet.objects.create(name="codeset1", slug="codeset1", domain=domain)
+def code_sets(vertical_dist):
+    cs1 = CodeSet.objects.create(name="codeset1", slug="codeset1")
     cs1.codes.create(code="1", label="Energy")
     cs1.codes.create(
         code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
@@ -170,7 +143,7 @@ def code_sets(domains, vertical_dist):
     cs1.codes.create(code="2.2", label="Other")
     cs1.codes.create(code="3", label="Diffuse sources")
 
-    cs2 = CodeSet.objects.create(name="codeset2", slug="codeset2", domain=domain)
+    cs2 = CodeSet.objects.create(name="codeset2", slug="codeset2")
     cs2.codes.create(code="A", label="Bla bla")
 
     return (cs1, cs2)

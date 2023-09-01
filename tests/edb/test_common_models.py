@@ -48,11 +48,13 @@ class TestActivityCodes:
 
 
 class TestVerticalDist:
-    def test_create_vertical_dist(self, domains):
-        # breakpoint()
-        domain = domains[0]
-        vdist = domain.vertical_dists.create(
-            name="residential heating", weights="[[5, 0], [10, 0.3], [15, 0.7]]"
+    def test_create_vertical_dist(self, code_sets):
+        # code_sets only used to get fixture
+        code_set = code_sets[0]  # noqa
+        vdist = source_models.VerticalDist.objects.create(
+            name="residential heating",
+            weights="[[5, 0], [10, 0.3], [15, 0.7]]",
+            slug="residential_heating",
         )
         assert len(np.array(ast.literal_eval(vdist.weights))) == 3
 
