@@ -13,6 +13,7 @@ from etk.edb.const import WGS84_SRID
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     Activity,
+    ActivityCode,
     CodeSet,
     EmissionFactor,
     Facility,
@@ -21,6 +22,7 @@ from etk.edb.models.source_models import (
     PointSourceSubstance,
     Substance,
     Timevar,
+    VerticalDist,
 )
 from etk.edb.units import activity_ef_unit_to_si, emission_unit_to_si
 from etk.tools.utils import cache_queryset
@@ -693,7 +695,6 @@ def import_pointsourceactivities(
                 update_codesets.append(codeset)
             except CodeSet.DoesNotExist:
                 if nr_codesets < 4:
-                    create_codesets
                     codeset = CodeSet(
                         name=df_codeset["name"][row_nr],
                         slug=slug,
@@ -718,6 +719,68 @@ def import_pointsourceactivities(
                 "codeset": {
                     "updated": len(update_codesets),
                     "created": len(create_codesets),
+                }
+            }
+        )
+
+    if ("ActivityCode" in sheet_names) and ("ActivityCode" in import_sheets):
+        data = workbook["ActivityCode"].values
+        df_activitycode = worksheet_to_dataframe(data)
+        update_activitycodes = []
+        create_activitycodes = {}
+        for row_key, row in df_activitycode.iterrows():
+            row_dict = row.to_dict()
+            try:
+                codeset = CodeSet.objects.get(slug=row_dict["codeset_slug"])
+            except CodeSet.DoesNotExist:
+                raise ImportError(
+                    f"Trying to import an activity code from row '{row_nr}'"
+                    + f"but CodeSet '{row_dict['codeset_slug']}' is not defined."
+                )
+            if row_dict["vertical_distribution_slug"] is not None:
+                try:
+                    vdist = VerticalDist.objects.get(
+                        slug=row_dict["vertical_distribution_slug"]
+                    )
+                    vdist_id = vdist.id
+                except VerticalDist.DoesNotExist:
+                    raise ImportError(
+                        f"Trying to import an activity code from row '{row_nr}'"
+                        + "but Vertical Distribution "
+                        + f"'{row_dict['vertical_distribution_slug']}'"
+                        + " is not defined."
+                    )
+            else:
+                vdist_id = None
+            try:
+                activitycode = ActivityCode.objects.get(
+                    code_set_id=codeset.id, code=row_dict["activitycode"]
+                )
+                setattr(activitycode, "label", row_dict["label"])
+                setattr(activitycode, "vertical_dist_id", vdist_id)
+                update_activitycodes.append(activitycode)
+            except ActivityCode.DoesNotExist:
+                activitycode = ActivityCode(
+                    code=row_dict["activitycode"],
+                    label=row_dict["label"],
+                    code_set_id=codeset.id,
+                    vertical_dist_id=vdist_id,
+                )
+                create_activitycodes[row_dict["activitycode"]] = activitycode
+
+        ActivityCode.objects.bulk_create(create_activitycodes.values())
+        ActivityCode.objects.bulk_update(
+            update_activitycodes,
+            [
+                "label",
+                "vertical_dist_id",
+            ],
+        )
+        return_dict.update(
+            {
+                "activitycode": {
+                    "updated": len(update_activitycodes),
+                    "created": len(create_activitycodes),
                 }
             }
         )
