@@ -2,8 +2,10 @@
 
 # import numpy as np
 import pytest
+import sys
 
-from etk.edb.models.source_models import CodeSet, Domain  # , Substance
+if sys.argv[0] != "pytest" and "--help" not in sys.argv:
+    from etk.edb.models.source_models import CodeSet, Domain  # , Substance
 
 # from django.contrib.auth import get_user_model
 # from django.contrib.gis.gdal import GDALRaster

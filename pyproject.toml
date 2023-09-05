@@ -28,5 +28,6 @@ omit = [
 profile = "black"
 
 [tool.pytest.ini_options]
-addopts = "--doctest-glob='*.rst' --reuse-db"
+addopts = "--reuse-db"
+pythonpath = "tests"
 DJANGO_SETTINGS_MODULE = "etk.settings"
