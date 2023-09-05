@@ -1,7 +1,7 @@
 """Tests for emission model importers."""
 
 import numpy as np
-import pkg_resources
+from importlib import resources
 import pytest
 
 from etk.edb.importers import (  # , import_timevars
@@ -16,12 +16,12 @@ from etk.edb.units import emis_conversion_factor_from_si
 
 @pytest.fixture
 def pointsource_csv(tmpdir, settings):
-    return pkg_resources.resource_filename(__name__, "data/pointsources.csv")
+    return resources.files("edb.data") / "pointsources.csv"
 
 
 @pytest.fixture
 def pointsource_xlsx(tmpdir, settings):
-    return pkg_resources.resource_filename(__name__, "data/pointsources.xlsx")
+    return resources.files("edb.data") / "pointsources.xlsx"
 
 
 class TestImport:
@@ -81,9 +81,7 @@ class TestImport:
     ):
         # using domain just to get fixtures
         domain = domains[0]  # noqa
-        filename = pkg_resources.resource_filename(
-            __name__, "data/EMEPemissionfactors-short.xlsx"
-        )
+        filename = resources.files("edb.data") / "EMEPemissionfactors-short.xlsx"
         sd = import_eea_emfacs(filename)
         assert len(sd) > 0
 
@@ -106,9 +104,7 @@ class TestImport:
         domain = domains[0]
         # similar to base_set in gadget
         cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1", domain=domain)
-        filename = pkg_resources.resource_filename(
-            __name__, "data/EMEPemissionfactors-short.xlsx"
-        )
+        filename = resources.files("edb.data") / "EMEPemissionfactors-short.xlsx"
 
         # example code how to use eea emfacs for codeset
         import_eea_emfacs(filename)
@@ -132,9 +128,7 @@ class TestImport:
         cs2.codes.create(code="A", label="Bla bla")
         cs2.save()
         # create pointsources
-        filename = "data/pointsourceactivities.xlsx"
-        filepath = pkg_resources.resource_filename(__name__, filename)
-
+        filepath = resources.files("edb.data") / "pointsourceactivities.xlsx"
         # test if create pointsourceactivities works
         psa = import_pointsourceactivities(filepath)
         print(psa)

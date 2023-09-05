@@ -1,0 +1,11 @@
+# CI/CD and development requirements for the Gadget
+pip-tools
+black
+build
+django ~=4.2
+flake8
+isort
+pre-commit
+pytest
+pytest-cov
+pytest-django

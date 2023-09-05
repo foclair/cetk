@@ -121,8 +121,8 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
         for i in range(1, 4)
     ]
 
-    extension = filepath.split(".")[-1]
-    if extension == "csv":
+    extension = filepath.suffix
+    if extension == ".csv":
         # read csv-file
         with open(filepath, encoding=encoding or "utf-8") as csvfile:
             log.debug("reading point-sources from csv-file")
@@ -133,7 +133,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
                 comment="#",
                 dtype=REQUIRED_COLUMNS,
             )
-    elif extension == "xlsx":
+    elif extension == ".xlsx":
         # read spreadsheet
         try:
             workbook = load_workbook(filename=filepath, data_only=True)
@@ -482,8 +482,8 @@ def import_eea_emfacs(filepath, encoding=None):
 
     substances = cache_queryset(Substance.objects.all(), "slug")
 
-    extension = filepath.split(".")[-1]
-    if extension == "csv":
+    extension = filepath.suffix
+    if extension == ".csv":
         # read csv-file
         with open(filepath, encoding=encoding or "utf-8") as csvfile:
             log.debug("reading point-sources from csv-file")
@@ -493,7 +493,7 @@ def import_eea_emfacs(filepath, encoding=None):
                 skip_blank_lines=True,
                 comment="#",
             )
-    elif extension == "xlsx":
+    elif extension == ".xlsx":
         # read spreadsheet
         try:
             workbook = load_workbook(filename=filepath)

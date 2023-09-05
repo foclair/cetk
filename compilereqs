@@ -18,4 +18,5 @@ compile() {
 
 export CUSTOM_COMPILE_COMMAND="./compilereqs"
 extra_compile_args="${@}"
-compile requirements.txt setup.cfg --extra full
+compile requirements.txt setup.cfg --strip-extras
+compile requirements-dev.txt requirements-dev.in setup.cfg --strip-extras

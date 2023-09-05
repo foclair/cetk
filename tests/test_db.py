@@ -12,7 +12,7 @@ def test_init_db(tmpdir):
     filepath = tmpdir / "test.sqlite"
     os.environ["ETK_DATABASE_PATH"] = str(filepath)
     editor = Editor()
-    editor.init()
+    editor.migrate()
     assert filepath.exists(), "no database created"
 
 
@@ -21,12 +21,12 @@ def test_edit_test_db(db):
     assert Activity.objects.filter(name="activity1").exists(), "no record created"
 
 
-def test_eclair_cli(tmpdir):
+def test_etk_cli(tmpdir):
     filepath = tmpdir / "test.sqlite"
     os.environ["ETK_DATABASE_PATH"] = str(filepath)
     try:
         subprocess.run(
-            ["eclair", "init"],
+            ["etk", "migrate"],
             # env={"EKT_DATABASE_PATH": str(filepath)},
             capture_output=True,
             check=True,

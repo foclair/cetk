@@ -3,7 +3,6 @@
 Emission toolkit to import, validate, edit and analyse emissions.
 
 ## Installation
-See also CONTRIBUTING.md for installation guidelines, unclear whether that is updated?
 ```
 python3 -m venv --prompt etk .venv
 . .venv/bin/activate
@@ -13,23 +12,56 @@ python -m pip install -e .
 ```
 Check that installation was successful and receive information on how to use the toolkit:
 ```
-python manage.py -h
+etk -h
 ```
 
-Get started by
+Before using the toolkit, initialize the template database by:
 ```
-./manage.py makemigrations
-./manage.py migrate
+etkmanage migrate
 ```
-If you did not change the default path, then the migrate command should create
+
+If you did not change the default path, this should create
 `~/.config/eclair/eclair.sqlite`
+
+New databases can now be created by copying the template database. This is easiest done using the etk command:
+```
+etk create /home/myuser/mydatabase.sqlite
+```
+
+To use a specific database, set environment variable "ETK_DATABASE_PATH".
+```
+export ETK_DATABASE_PATH="/home/myuser/mydatabase.sqlite"
+```
+
+For more verbose logging, set environment variable ETK_DEBUG=1:
+```
+export ETK_DEBUG=1
+```
+
+## Contributing
+
+### Environment
+Install pre-commit hooks:
+
+```
+. .venv/bin/activate
+pip install -r requirements-dev.txt
+pre-commit install
+```
+
+### Testing
 
 Run tests by
 ```
-python -m pip install pytest-django
-python -m pip install pytest-django-ifactory
-. .venv/bin/activate
-pytest ./tests/edb/test_models.py
+pytest
 ```
-Note that the venv has to be (re-)activated *after* pytest is installed, otherwise
-pytest does not use the venv-python version but the default python of your system.
+### Update requirements
+
+Install pip-tools:
+```
+pip install pip-tools
+```
+Update requirements.txt and requirements-dev.txt by:
+```
+./compilereqs
+```

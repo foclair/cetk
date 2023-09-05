@@ -1,1 +1,1 @@
-from .editor import Editor  # noqa
+from .etk_command import Editor  # noqa
