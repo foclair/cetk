@@ -788,7 +788,7 @@ def import_pointsourceactivities(
     # Could be that activities are linked to previously imported pointsources,
     # or pointsources to be imported later, therefore not requiring PointSource-sheet.
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        ps = import_pointsources(filepath)
+        ps = import_pointsources(filepath, srid=srid)
         return_dict.update(ps)
 
     if ("Activity" in sheet_names) and ("Activity" in import_sheets):
