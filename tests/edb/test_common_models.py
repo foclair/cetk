@@ -66,15 +66,15 @@ class TestVerticalDist:
 
 class TestSettings:
     def test_settings(self, code_sets):
-        primary_code_set = code_sets[0]  # noqa
+        primary_codeset = code_sets[0]
         # Create or update the settings
         instance, created = Settings.objects.get_or_create(
             defaults={
                 "srid": WGS84_SRID,
-                "extent": "MULTIPOLYGON (((10.95 55.33, 24.16 55.33, 24.16 69.06,"
-                + " 10.95 69.06, 10.95 55.33)))",
+                "extent": "POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06,"
+                + " 10.95 69.06, 10.95 55.33))",
                 "timezone": "Europe/Stockholm",
-                "primary_codeset": primary_code_set,
+                "primary_codeset": primary_codeset,
             }
         )
         assert Settings.objects.get().srid == 4326
@@ -83,5 +83,19 @@ class TestSettings:
         settings = Settings.objects.get()
         settings.srid = 3006
         settings.save()
-
         assert Settings.objects.get().srid == 3006
+
+    def test_settings_functions(self, code_sets):
+        primary_codeset = code_sets[0]
+        # use functions defined in Settings directly
+        settings = Settings()
+        current_settings = settings.get_current()
+        assert current_settings is None
+
+        settings.update(
+            srid=WGS84_SRID,
+            extent="POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06,"
+            + " 10.95 69.06, 10.95 55.33))",
+            timezone="Europe/Stockholm",
+            primary_codeset=primary_codeset,
+        )

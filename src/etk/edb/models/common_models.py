@@ -29,3 +29,33 @@ class Settings(models.Model):
     class Meta:
         db_table = "settings"
         default_related_name = "settings"
+
+    def get_current(self):
+        # Retrieve the settings, if exist
+        try:
+            return Settings.objects.get()
+        except Settings.DoesNotExist:
+            return None
+
+    def update(self, srid=None, extent=None, timezone=None, primary_codeset=None):
+        # Retrieve settings and update
+        settings = self.get_current()
+        if settings:
+            # if exist
+            if srid is not None:
+                settings.srid = srid
+            if extent is None:
+                settings.extent = extent
+            if timezone is not None:
+                settings.timezone = timezone
+            if primary_codeset is None:
+                settings.primary_codest = primary_codeset
+            settings.save()
+        else:
+            # If no instance exists, create a new one
+            Settings.objects.create(
+                srid=srid,
+                extent=extent,
+                timezone=timezone,
+                primary_codeset=primary_codeset,
+            )

@@ -25,7 +25,11 @@ from etk.edb.models.source_models import (
     Timevar,
     VerticalDist,
 )
-from etk.edb.units import activity_ef_unit_to_si, emission_unit_to_si
+from etk.edb.units import (
+    activity_ef_unit_to_si,
+    activity_rate_unit_to_si,
+    emission_unit_to_si,
+)
 from etk.tools.utils import cache_queryset
 
 # column facility and name are used as index and is therefore not included here
@@ -572,22 +576,10 @@ def import_eea_emfacs(filepath, encoding=None):
             if subst == "PM2.5":
                 emfac_data["substance"] = substances["PM25"]
             else:
-                # TODO log warning? many undefined substances in EEA so dont want to
-                # raise import warning
+                # TODO log warning
+                # many undefined substances in EEA so dont want to raise import warning
                 print(f"Undefined substance {subst}")
                 print("Saving pollutant as unknown_substance.")
-                # print("Known substances are: ")
-                # [
-                #     print(e.slug)
-                #     for e in Substance.objects.exclude(
-                #         slug__in=[
-                #             "activity",
-                #             "traffix_work",
-                #             "PM10resusp",
-                #             "PM25resusp",
-                #         ]
-                #     )
-                # ]
                 emfac_data["unknown_substance"] = subst
                 emfac_data["substance"] = None
         if row_dict["Value"] is None:
@@ -681,10 +673,6 @@ def import_pointsourceactivities(
         return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
 
     if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
-        # code_sets = [
-        #     cache_codeset(CodeSet.objects.filter(id=i).first())
-        #     for i in range(1, 4)
-        # ]
         nr_codesets = len(CodeSet.objects.all())
         data = workbook["CodeSet"].values
         df_codeset = worksheet_to_dataframe(data)
@@ -812,8 +800,6 @@ def import_pointsourceactivities(
                 setattr(activity, "unit", df_activity["activity_unit"][row_nr])
                 update_activities.append(activity)
                 drop_emfacs += list(activities[activity_name].emissionfactors.all())
-                # create emfacs just as create new substances? or sufficient to
-                # re-create in next if "EmissionFactor" in sheet_names?
             except KeyError:
                 activity = Activity(
                     name=activity_name, unit=df_activity["activity_unit"][row_nr]
@@ -944,8 +930,6 @@ def import_pointsourceactivities(
             if "activity_name" in row:
                 if row["activity_name"] is not None:
                     rate = row["activity_rate"]
-                    # TODO convert rate to SI?! or later?
-                    # better not to convert so it is consistent with activity_unit?
                     try:
                         activity = activities[row["activity_name"]]
                     except KeyError:
@@ -953,6 +937,9 @@ def import_pointsourceactivities(
                             f"unknown activity '{activity_name}'"
                             + f" for pointsource '{row['source_name']}'"
                         )
+                    rate = activity_rate_unit_to_si(rate, activity.unit)
+                    # original unit stored in activity.unit, but
+                    # pointsourceactivity.rate stored as activity / s.
                     pointsource = pointsources[
                         str(row["facility_id"]), row["source_name"]
                     ]
