@@ -16,7 +16,7 @@ class Settings(models.Model):
     srid = models.IntegerField(
         _("SRID"), help_text=_("Spatial reference system identifier")
     )
-    extent = models.MultiPolygonField(_("extent"), geography=True)
+    extent = models.PolygonField(_("extent"), geography=True)
     timezone = models.CharField(_("timezone"), max_length=64)
 
     # some functionality in Gadget only works for one out of the three codesets.
