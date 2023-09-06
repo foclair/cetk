@@ -1,7 +1,8 @@
 """Tests for emission model importers."""
 
-import numpy as np
 from importlib import resources
+
+import numpy as np
 import pytest
 
 from etk.edb.importers import (  # , import_timevars
@@ -77,9 +78,7 @@ class TestImport:
     def test_import_eea_emfac(self, vertical_dist):
         # using vertical_dist just to get fixtures
         vdist = vertical_dist  # noqa
-        filename = pkg_resources.resource_filename(
-            __name__, "data/EMEPemissionfactors-short.xlsx"
-        )
+        filename = resources.files("edb.data") / "EMEPemissionfactors-short.xlsx"
         sd = import_eea_emfacs(filename)
         assert len(sd) > 0
 
@@ -88,9 +87,7 @@ class TestImport:
     ):
         # similar to base_set in gadget
         cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1")
-        filename = pkg_resources.resource_filename(
-            __name__, "data/EMEPemissionfactors-short.xlsx"
-        )
+        filename = resources.files("edb.data") / "EMEPemissionfactors-short.xlsx"
 
         # example code how to use eea emfacs for codeset
         import_eea_emfacs(filename)
