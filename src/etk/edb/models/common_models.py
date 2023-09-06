@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from etk.edb.models.source_models import CodeSet
 
 
-class Settings(models.Manager):
+class Settings(models.Model):
     """Inventory specific database settings, replaces gadgets Domain and Inventory."""
 
     srid = models.IntegerField(
