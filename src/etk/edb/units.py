@@ -11,6 +11,7 @@ MASS_UNIT_TO_KILOGRAMS = {
     "hg": 0.1,
     "kg": 1.0,
     "ton": 1000,
+    "tonne": 1000,
     "t": 1000,
     "Mg": 1000,
     "kt": 1.0e6,
@@ -26,6 +27,7 @@ TIME_UNIT_TO_SECONDS = {
     "hour": 3600,
     "day": 3600 * 24,
     "year": 3600 * 24 * 365.25,
+    "yr": 3600 * 24 * 365.25,
 }
 
 LENGTH_UNIT_TO_METERS = {"km": 1000, "m": 1.0}
