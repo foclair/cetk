@@ -6,7 +6,9 @@ import ast
 import numpy as np
 import pytest
 
+from etk.edb.const import WGS84_SRID
 from etk.edb.models import source_models
+from etk.edb.models.common_models import Settings
 
 
 class TestActivityCodes:
@@ -60,3 +62,26 @@ class TestVerticalDist:
 
     def test_str(self, vertical_dist):
         assert str(vertical_dist) == vertical_dist.name
+
+
+class TestSettings:
+    def test_settings(self, code_sets):
+        primary_code_set = code_sets[0]  # noqa
+        # Create or update the settings
+        instance, created = Settings.objects.get_or_create(
+            defaults={
+                "srid": WGS84_SRID,
+                "extent": "MULTIPOLYGON (((10.95 55.33, 24.16 55.33, 24.16 69.06,"
+                + " 10.95 69.06, 10.95 55.33)))",
+                "timezone": "Europe/Stockholm",
+                "primary_codeset": primary_code_set,
+            }
+        )
+        assert Settings.objects.get().srid == 4326
+
+        # update settings
+        settings = Settings.objects.get()
+        settings.srid = 3006
+        settings.save()
+
+        assert Settings.objects.get().srid == 3006

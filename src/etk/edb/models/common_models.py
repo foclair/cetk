@@ -4,6 +4,12 @@ from django.utils.translation import gettext_lazy as _
 from etk.edb.models.source_models import CodeSet
 
 
+class SettingsManager(models.Manager):
+    # makes sure always just one instance of settings exists
+    def get_queryset(self):
+        return super().get_queryset()[:1]
+
+
 class Settings(models.Model):
     """Inventory specific database settings, replaces gadgets Domain and Inventory."""
 
@@ -17,6 +23,8 @@ class Settings(models.Model):
     primary_codeset = models.ForeignKey(
         CodeSet, on_delete=models.CASCADE, related_name="primary_codeset"
     )
+
+    objects = SettingsManager()
 
     class Meta:
         db_table = "settings"
