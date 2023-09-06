@@ -10,6 +10,7 @@ from django.db import IntegrityError
 from openpyxl import load_workbook
 
 from etk.edb.const import WGS84_SRID
+from etk.edb.models.common_models import Settings
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     Activity,
@@ -118,7 +119,10 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
         unit: unit of emissions, default is SI-units (kg/s)
     """
     # or change to user defined SRID?
-    project_srid = WGS84_SRID
+    try:
+        project_srid = Settings.objects.get().srid
+    except Settings.DoesNotExist:
+        project_srid = WGS84_SRID
     # cache related models
     substances = cache_queryset(Substance.objects.all(), "slug")
     timevars = cache_queryset(Timevar.objects.all(), "name")
