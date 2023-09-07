@@ -22,13 +22,15 @@ settings = etk.configure()
 
 from etk.edb import importers  # noqa
 from etk.edb.models import Substance  # noqa
+from etk.edb.importers import SHEET_NAMES  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
 from etk.emissions.views import create_pointsource_emis_table  # noqa
 
-# sheets in order of import
-SHEETNAMES = ("codesets", "pointsources")
+
 SOURCETYPES = ("point",)
 DEFAULT_EMISSION_UNIT = "kg/year"
+
+sheet_choices = SHEET_NAMES.append("All")
 
 
 class Editor(object):
@@ -49,6 +51,9 @@ class Editor(object):
 
     def import_pointsources(self, filename, unit):
         importers.import_pointsources(filename, unit=unit)
+
+    def import_pointsourceactivities(self, filename, unit, sheet):
+        importers.import_pointsourceactivities(filename, unit=unit, import_sheets=sheet)
 
     def update_emission_tables(
         self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
@@ -77,6 +82,8 @@ class Editor(object):
                 f"could not write aggregated emission to file {filename}: {str(err)}"
             )
             sys.exit(1)
+
+
 
     def export_data(self):
         print("Not implemented")
@@ -149,7 +156,9 @@ def main():
         sub_parser.add_argument(
             "filename", help="Path to xslx-file", type=check_and_get_path
         )
-        sub_parser.add_argument("sheet", help="Sheet to import", choices=SHEETNAMES)
+        sub_parser.add_argument(
+            "sheet", help="Sheet to import. ", choices=sheet_choices
+        )
         pointsource_grp = sub_parser.add_argument_group(
             "pointsources", description="Options for pointsource import"
         )
@@ -161,11 +170,20 @@ def main():
         args = sub_parser.parse_args(sys.argv[2:])
         if not Path(db_path).exists():
             sys.stderr.write(
-                "Database does not exist, first run " "'etk create' or 'etk migrate'\n"
+                "Database " + db_path + " does not exist, first run "
+                "'etk create' or 'etk migrate'\n"
             )
             sys.exit(1)
-        if args.sheet == "pointsources":
+        if args.sheet == "PointSource":
             editor.import_pointsources(args.filename, unit=args.unit)
+        elif args.sheet == "All":
+            editor.import_pointsourceactivities(
+                args.filename, unit=args.unit, sheet=SHEET_NAMES
+            )
+        else:
+            editor.import_pointsourceactivities(
+                args.filename, unit=args.unit, sheet=[args.sheet]
+            )
 
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(
