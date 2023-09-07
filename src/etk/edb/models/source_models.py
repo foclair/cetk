@@ -1,11 +1,9 @@
 """Emission database models."""
 
 import ast
-import datetime
 
 import numpy as np
 import pandas as pd
-import pytz
 
 # from django.conf import settings
 from django.contrib.gis.db import models
@@ -16,9 +14,16 @@ from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from etk.edb.const import CHAR_FIELD_LENGTH, WGS84_SRID
-from etk.edb.copy import copy_codeset, copy_model_instance
+
+# from etk.edb.copy import copy_model_instance
 from etk.edb.ltreefield import LtreeField
 from etk.settings import TIME_ZONE
+
+# import datetime
+
+
+# import pytz
+
 
 # TODO is a locid necessary when starting inventories from scratch, instead of importing
 # existing gadget databases?
@@ -156,29 +161,6 @@ class SourceSubstance(models.Model):
         return self.substance.name
 
 
-class Domain(NamedModel):
-    """A spatial domain."""
-
-    srid = models.IntegerField(
-        _("SRID"), help_text=_("Spatial reference system identifier")
-    )
-    extent = models.MultiPolygonField(_("extent"), geography=True)
-    timezone = models.CharField(_("timezone"), max_length=64)
-    # users = models.ManyToManyField(settings.AUTH_USER_MODEL, verbose_name=_("users"))
-
-    class Meta:
-        db_table = "domains"
-        default_related_name = "domains"
-
-    @property
-    def utc_offset(self):
-        tz = pytz.timezone(self.timezone)
-        offset_1jan = tz.utcoffset(datetime.datetime(2012, 1, 1))
-        offset_1jul = tz.utcoffset(datetime.datetime(2012, 7, 1))
-        dst_jan = tz.dst(datetime.datetime(2012, 1, 1))
-        return offset_1jan if dst_jan == datetime.timedelta(0) else offset_1jul
-
-
 def default_vertical_dist():
     return "[[5.0, 1.0]]"
 
@@ -189,10 +171,7 @@ class VerticalDist(BaseNamedModel):
     objects = NaturalKeyManager()
 
     name = models.CharField(max_length=64)
-    slug = models.SlugField(max_length=64)
-    domain = models.ForeignKey(
-        "Domain", on_delete=models.CASCADE, related_name="vertical_dists"
-    )
+    slug = models.SlugField(max_length=64, unique=True)
     # TODO weights as ArrayField in Gadget, are all functions updated to fun on
     # CharField instead?
     weights = models.CharField(
@@ -200,12 +179,13 @@ class VerticalDist(BaseNamedModel):
     )
 
     class Meta:
-        unique_together = (("domain", "name"), ("domain", "slug"))
+        db_table = "vertical_distributions"
+        default_related_name = "vertical_distributions"
 
-    natural_key_fields = ("domain__slug", "slug")
+    natural_key_fields = "slug"
 
     def natural_key(self):
-        return (self.domain.slug, self.slug)
+        return self.slug
 
     def __str__(self):
         return self.name
@@ -235,31 +215,19 @@ class CodeSet(BaseNamedModel):
     objects = NaturalKeyManager()
 
     name = models.CharField(max_length=64)
-    slug = models.SlugField(max_length=64)
-    domain = models.ForeignKey(
-        "Domain", on_delete=models.CASCADE, related_name="code_sets"
-    )
+    slug = models.SlugField(max_length=64, unique=True)
     description = models.CharField(
         verbose_name="description", max_length=200, null=True, blank=True
     )
 
     class Meta:
-        unique_together = (("domain", "name"), ("domain", "slug"))
+        db_table = "codesets"
+        default_related_name = "codesets"
 
-    natural_key_fields = ("domain__slug", "slug")
+    natural_key_fields = "slug"
 
     def natural_key(self):
-        return (self.domain.slug, self.slug)
-
-    def copy(self, domain=None, **updated_fields):
-        """Create a copy of the CodeSet in another domain."""
-
-        if domain is not None:
-            updated_fields["domain"] = domain
-
-        copy = copy_model_instance(self, **updated_fields)
-        copy_codeset(self, copy)
-        return copy
+        return self.slug
 
     def __str__(self):
         return self.name
@@ -277,7 +245,7 @@ class ActivityCode(models.Model):
     vertical_dist = models.ForeignKey(
         VerticalDist, on_delete=models.SET_NULL, related_name="+", null=True, blank=True
     )
-    natural_key_fields = ("code_set__domain__slug", "code_set__slug", "code")
+    natural_key_fields = ("code_set__slug", "code")
 
     class Meta:
         constraints = [
@@ -287,7 +255,7 @@ class ActivityCode(models.Model):
         ]
 
     def natural_key(self):
-        return (self.code_set.domain.slug, self.code_set.slug, self.code)
+        return (self.code_set.slug, self.code)
 
     def __lt__(self, other):
         return self.code < other.code
@@ -392,8 +360,6 @@ def normalize(timevar, timezone=None):
 
 class TimevarBase(models.Model):
     name = models.CharField(max_length=CHAR_FIELD_LENGTH, unique=True)
-    # same domain for all data
-    # domain = models.ForeignKey("Domain", on_delete=models.CASCADE)
 
     # typeday should be a 2d-field with hours as rows and weekdays as columns
     # ArrayField not supported in SQLite

@@ -6,7 +6,9 @@ import ast
 import numpy as np
 import pytest
 
+from etk.edb.const import WGS84_SRID
 from etk.edb.models import source_models
+from etk.edb.models.common_models import Settings
 
 
 class TestActivityCodes:
@@ -48,13 +50,52 @@ class TestActivityCodes:
 
 
 class TestVerticalDist:
-    def test_create_vertical_dist(self, domains):
-        # breakpoint()
-        domain = domains[0]
-        vdist = domain.vertical_dists.create(
-            name="residential heating", weights="[[5, 0], [10, 0.3], [15, 0.7]]"
+    def test_create_vertical_dist(self, code_sets):
+        # code_sets only used to get fixture
+        code_set = code_sets[0]  # noqa
+        vdist = source_models.VerticalDist.objects.create(
+            name="residential heating",
+            weights="[[5, 0], [10, 0.3], [15, 0.7]]",
+            slug="residential_heating",
         )
         assert len(np.array(ast.literal_eval(vdist.weights))) == 3
 
     def test_str(self, vertical_dist):
         assert str(vertical_dist) == vertical_dist.name
+
+
+class TestSettings:
+    def test_settings(self, code_sets):
+        primary_codeset = code_sets[0]
+        # Create or update the settings
+        instance, created = Settings.objects.get_or_create(
+            defaults={
+                "srid": WGS84_SRID,
+                "extent": "POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06,"
+                + " 10.95 69.06, 10.95 55.33))",
+                "timezone": "Europe/Stockholm",
+                "primary_codeset": primary_codeset,
+            }
+        )
+        assert Settings.objects.get().srid == 4326
+
+        # update settings
+        settings = Settings.objects.get()
+        settings.srid = 3006
+        settings.save()
+        assert Settings.objects.get().srid == 3006
+
+    def test_settings_functions(self, code_sets):
+        primary_codeset = code_sets[0]
+        # use functions defined in Settings directly
+        settings = Settings()
+        current_settings = settings.get_current()
+        assert current_settings is None
+
+        settings.update(
+            srid=WGS84_SRID,
+            extent="POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06,"
+            + " 10.95 69.06, 10.95 55.33))",
+            timezone="Europe/Stockholm",
+            primary_codeset=primary_codeset,
+        )

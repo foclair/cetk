@@ -10,9 +10,11 @@ from django.db import IntegrityError
 from openpyxl import load_workbook
 
 from etk.edb.const import WGS84_SRID
+from etk.edb.models.common_models import Settings
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     Activity,
+    ActivityCode,
     CodeSet,
     EmissionFactor,
     Facility,
@@ -21,8 +23,13 @@ from etk.edb.models.source_models import (
     PointSourceSubstance,
     Substance,
     Timevar,
+    VerticalDist,
 )
-from etk.edb.units import activity_ef_unit_to_si, emission_unit_to_si
+from etk.edb.units import (
+    activity_ef_unit_to_si,
+    activity_rate_unit_to_si,
+    emission_unit_to_si,
+)
 from etk.tools.utils import cache_queryset
 
 # column facility and name are used as index and is therefore not included here
@@ -33,9 +40,9 @@ REQUIRED_COLUMNS = {
     "facility_name": np.str_,
     "source_name": np.str_,
     "timevar": np.str_,
-    "activitycode1": np.str_,
-    "activitycode2": np.str_,
-    "activitycode3": np.str_,
+    # "activitycode1": np.str_,
+    # "activitycode2": np.str_,
+    # "activitycode3": np.str_,
     "chimney_height": float,
     "outer_diameter": float,
     "inner_diameter": float,
@@ -44,6 +51,18 @@ REQUIRED_COLUMNS = {
     "house_width": float,
     "house_height": float,
 }
+
+# sheet names which are valid for data import
+SHEET_NAMES = [
+    "Timevar",
+    "PointSource",
+    "Activity",
+    "EmissionFactor",
+    "ActivityCode",
+    "CodeSet",
+]
+# TODO add log warning if a sheet name exists in file to be imported
+# which is not in SHEET_NAMES
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +123,10 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
         unit: unit of emissions, default is SI-units (kg/s)
     """
     # or change to user defined SRID?
-    project_srid = WGS84_SRID
+    try:
+        project_srid = Settings.objects.get().srid
+    except Settings.DoesNotExist:
+        project_srid = WGS84_SRID
     # cache related models
     substances = cache_queryset(Substance.objects.all(), "slug")
     timevars = cache_queryset(Timevar.objects.all(), "name")
@@ -117,8 +139,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
 
     # using filter.first() here, not get() because code_set{i} does not have to exist
     code_sets = [
-        cache_codeset(CodeSet.objects.filter(slug=f"code_set{i}").first())
-        for i in range(1, 4)
+        cache_codeset(CodeSet.objects.filter(id=i).first()) for i in range(1, 4)
     ]
 
     extension = filepath.suffix
@@ -170,6 +191,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
     create_substances = []
     update_sources = []
     create_sources = {}
+    activitycode_columns = [key for key in df.columns if key.startswith("activitycode")]
     row_nr = 2
     for row_key, row in df.iterrows():
         row_dict = row.to_dict()
@@ -216,26 +238,47 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
 
         # get activitycodes
         for code_ind, code_set in enumerate(code_sets, 1):
-            code_attribute = f"activitycode{code_ind}"
-            code = row_dict[code_attribute]
-            if len(code_set) == 0:
-                if code is not None and code is not np.nan:
-                    raise ImportError(
-                        f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
-                    )
-                else:
-                    # TODO check whether it is ok to stop entire loop when codeset1
-                    # is empty, can codeset2 be non empty?
-                    # and how to make sure that activitycode1 always refers to codeset1?
-                    # or should we for ETK support only one codeset per inventory?
-                    break
-
             try:
-                source_data[code_attribute] = code_set[code]
-            except KeyError:
-                raise ImportError(
-                    f"Unknown activitycode{code_ind} '{code}' on row {row_nr}"
-                )
+                code_set_slug = CodeSet.objects.filter(id=code_ind).first().slug
+                code_attribute = f"activitycode_{code_set_slug}"
+                if code_attribute in row_dict:
+                    code = row_dict[code_attribute]
+                    if len(code_set) == 0:
+                        if code is not None and code is not np.nan:
+                            raise ImportError(
+                                f"Unknown activitycode_{code_set_slug} '{code}'"
+                                + f" on row {row_nr}"
+                            )
+                    if not pd.isnull(code):
+                        try:
+                            # note this can be problematic with codes 01 etc as SNAP
+                            # TODO activitycodes should be string directly on import!
+                            activity_code = code_set[str(code)]
+                            codeset_id = activity_code.code_set_id
+                            source_data[f"activitycode{codeset_id}"] = activity_code
+                        except KeyError:
+                            raise ImportError(
+                                f"Unknown activitycode_{code_set_slug} '{code}'"
+                                + f" on row {row_nr}"
+                            )
+            except AttributeError:
+                # no such codeset exists
+                if len(activitycode_columns) > len(CodeSet.objects.all()):
+                    # need to check if activitycode is specified for unimported codeset
+                    codeset_slug = [
+                        column.split("_", 1)[-1] for column in activitycode_columns
+                    ]
+                    for index, column in enumerate(activitycode_columns):
+                        if not pd.isnull(row_dict[column]):
+                            try:
+                                CodeSet.objects.get(slug=codeset_slug[index])
+                            except CodeSet.DoesNotExist:
+                                raise ImportError(
+                                    f"Specified activitycode {row_dict[column]} for "
+                                    + f" unknown codeset {codeset_slug[index]}"
+                                    + f" on row {row_nr}"
+                                )
+                pass
 
         # get columns with tag values for the current row
         tag_keys = [key for key in row_dict.keys() if key.startswith("tag:")]
@@ -407,7 +450,9 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
 
     # ensure PointSourceSubstance.source_id is not None
     for emis in create_substances:
-        emis.source_id = PointSource.objects.get(name=emis.source).id
+        emis.source_id = PointSource.objects.get(
+            name=emis.source, facility_id=emis.source.facility_id
+        ).id
     PointSourceSubstance.objects.bulk_create(create_substances)
     return {
         "facility": {
@@ -547,22 +592,10 @@ def import_eea_emfacs(filepath, encoding=None):
             if subst == "PM2.5":
                 emfac_data["substance"] = substances["PM25"]
             else:
-                # TODO log warning? many undefined substances in EEA so dont want to
-                # raise import warning
+                # TODO log warning
+                # many undefined substances in EEA so dont want to raise import warning
                 print(f"Undefined substance {subst}")
                 print("Saving pollutant as unknown_substance.")
-                # print("Known substances are: ")
-                # [
-                #     print(e.slug)
-                #     for e in Substance.objects.exclude(
-                #         slug__in=[
-                #             "activity",
-                #             "traffix_work",
-                #             "PM10resusp",
-                #             "PM25resusp",
-                #         ]
-                #     )
-                # ]
                 emfac_data["unknown_substance"] = subst
                 emfac_data["substance"] = None
         if row_dict["Value"] is None:
@@ -605,7 +638,9 @@ def import_eea_emfacs(filepath, encoding=None):
     return create_eea_emfac
 
 
-def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
+def import_pointsourceactivities(
+    filepath, encoding=None, srid=None, unit=None, import_sheets=SHEET_NAMES
+):
     """Import point-sources from xlsx or csv-file.
 
     args
@@ -623,7 +658,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
 
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
-    if "Timevar" in sheet_names:
+    if ("Timevar" in sheet_names) and ("Timevar" in import_sheets):
         timevar_data = workbook["Timevar"].values
         df_timevar = worksheet_to_dataframe(timevar_data)
         timevar_dict = {"emission": {}}
@@ -650,15 +685,121 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
             timevar_dict["emission"].update(
                 {label: {"typeday": typeday_str, "month": month_str}}
             )
-        import_timevars(timevar_dict, overwrite=True)
+        tv = import_timevars(timevar_dict, overwrite=True)
+        return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
+
+    if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
+        nr_codesets = len(CodeSet.objects.all())
+        data = workbook["CodeSet"].values
+        df_codeset = worksheet_to_dataframe(data)
+        slugs = df_codeset["slug"]
+        update_codesets = []
+        create_codesets = {}
+        for row_nr, slug in enumerate(slugs):
+            try:
+                codeset = CodeSet.objects.get(slug=slug)
+                setattr(codeset, "name", df_codeset["name"][row_nr])
+                setattr(codeset, "description", df_codeset["description"][row_nr])
+                update_codesets.append(codeset)
+            except CodeSet.DoesNotExist:
+                if nr_codesets < 4:
+                    codeset = CodeSet(
+                        name=df_codeset["name"][row_nr],
+                        slug=slug,
+                        description=df_codeset["description"][row_nr],
+                    )
+                    if slug not in create_codesets:
+                        create_codesets[slug] = codeset
+                else:
+                    raise ImportError(
+                        "Trying to import a new codeset, but can have maximum 3."
+                    )
+        CodeSet.objects.bulk_create(create_codesets.values())
+        CodeSet.objects.bulk_update(
+            update_codesets,
+            [
+                "name",
+                "description",
+            ],
+        )
+        return_dict.update(
+            {
+                "codeset": {
+                    "updated": len(update_codesets),
+                    "created": len(create_codesets),
+                }
+            }
+        )
+
+    if ("ActivityCode" in sheet_names) and ("ActivityCode" in import_sheets):
+        data = workbook["ActivityCode"].values
+        df_activitycode = worksheet_to_dataframe(data)
+        update_activitycodes = []
+        create_activitycodes = {}
+        for row_key, row in df_activitycode.iterrows():
+            row_dict = row.to_dict()
+            try:
+                codeset = CodeSet.objects.get(slug=row_dict["codeset_slug"])
+            except CodeSet.DoesNotExist:
+                raise ImportError(
+                    f"Trying to import an activity code from row '{row_nr}'"
+                    + f"but CodeSet '{row_dict['codeset_slug']}' is not defined."
+                )
+            if row_dict["vertical_distribution_slug"] is not None:
+                try:
+                    vdist = VerticalDist.objects.get(
+                        slug=row_dict["vertical_distribution_slug"]
+                    )
+                    vdist_id = vdist.id
+                except VerticalDist.DoesNotExist:
+                    raise ImportError(
+                        f"Trying to import an activity code from row '{row_nr}'"
+                        + "but Vertical Distribution "
+                        + f"'{row_dict['vertical_distribution_slug']}'"
+                        + " is not defined."
+                    )
+            else:
+                vdist_id = None
+            try:
+                activitycode = ActivityCode.objects.get(
+                    code_set_id=codeset.id, code=row_dict["activitycode"]
+                )
+                setattr(activitycode, "label", row_dict["label"])
+                setattr(activitycode, "vertical_dist_id", vdist_id)
+                update_activitycodes.append(activitycode)
+            except ActivityCode.DoesNotExist:
+                activitycode = ActivityCode(
+                    code=row_dict["activitycode"],
+                    label=row_dict["label"],
+                    code_set_id=codeset.id,
+                    vertical_dist_id=vdist_id,
+                )
+                create_activitycodes[row_dict["activitycode"]] = activitycode
+
+        ActivityCode.objects.bulk_create(create_activitycodes.values())
+        ActivityCode.objects.bulk_update(
+            update_activitycodes,
+            [
+                "label",
+                "vertical_dist_id",
+            ],
+        )
+        return_dict.update(
+            {
+                "activitycode": {
+                    "updated": len(update_activitycodes),
+                    "created": len(create_activitycodes),
+                }
+            }
+        )
 
     # Could be that activities are linked to previously imported pointsources,
-    # or pointsources to be imported later, not requiring PointSource as sheet for now.
-    if "PointSource" in sheet_names:
-        ps = import_pointsources(filepath)
+    # or pointsources to be imported later, therefore not requiring PointSource-sheet.
+    if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
+        ps = import_pointsources(filepath, srid=srid)
         return_dict.update(ps)
 
-    if "Activity" in sheet_names:
+    if ("Activity" in sheet_names) and ("Activity" in import_sheets):
         activities = cache_queryset(
             Activity.objects.prefetch_related("emissionfactors").all(), "name"
         )
@@ -668,16 +809,13 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
         update_activities = []
         create_activities = {}
         drop_emfacs = []
-        row_nr = 0
-        for activity_name in activity_names:
+        for row_nr, activity_name in enumerate(activity_names):
             try:
                 activity = activities[activity_name]
                 setattr(activity, "name", activity_name)
                 setattr(activity, "unit", df_activity["activity_unit"][row_nr])
                 update_activities.append(activity)
                 drop_emfacs += list(activities[activity_name].emissionfactors.all())
-                # create emfacs just as create new substances? or sufficient to
-                # re-create in next if "EmissionFactor" in sheet_names?
             except KeyError:
                 activity = Activity(
                     name=activity_name, unit=df_activity["activity_unit"][row_nr]
@@ -688,7 +826,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
                     raise ImportError(
                         f"multiple rows for the same activity '{activity_name}'"
                     )
-            row_nr += 1
+
         Activity.objects.bulk_create(create_activities.values())
         Activity.objects.bulk_update(
             update_activities,
@@ -708,7 +846,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
             }
         )
 
-    if "EmissionFactor" in sheet_names:
+    if ("EmissionFactor" in sheet_names) and ("EmissionFactor" in import_sheets):
         data = workbook["EmissionFactor"].values
         df_emfac = worksheet_to_dataframe(data)
         substances = cache_queryset(Substance.objects.all(), "slug")
@@ -783,7 +921,7 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
             }
         )
 
-    if "PointSource" in sheet_names:
+    if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
         # now that activities, pointsources and emission factors are created,
         # pointsourceactivities can be created.
         # should not matter whether activities and emission factors were imported from
@@ -805,27 +943,31 @@ def import_pointsourceactivities(filepath, encoding=None, srid=None, unit=None):
         create_pointsourceactivities = []
         update_pointsourceactivities = []
         for row_key, row in df_pointsource.iterrows():
-            if row["activity_name"] is not None:
-                rate = row["activity_rate"]
-                # TODO convert rate to SI?! or later?
-                # better not to convert so it is consistent with activity_unit?
-                try:
-                    activity = activities[row["activity_name"]]
-                except KeyError:
-                    raise ImportError(
-                        f"unknown activity '{activity_name}'"
-                        + f" for pointsource '{row['source_name']}'"
-                    )
-                pointsource = pointsources[str(row["facility_id"]), row["source_name"]]
-                try:
-                    psa = pointsourceactivities[activity, pointsource]
-                    setattr(psa, "rate", rate)
-                    update_pointsourceactivities.append(psa)
-                except KeyError:
-                    psa = PointSourceActivity(
-                        activity=activity, source=pointsource, rate=rate
-                    )
-                    create_pointsourceactivities.append(psa)
+            if "activity_name" in row:
+                if row["activity_name"] is not None:
+                    rate = row["activity_rate"]
+                    try:
+                        activity = activities[row["activity_name"]]
+                    except KeyError:
+                        raise ImportError(
+                            f"unknown activity '{activity_name}'"
+                            + f" for pointsource '{row['source_name']}'"
+                        )
+                    rate = activity_rate_unit_to_si(rate, activity.unit)
+                    # original unit stored in activity.unit, but
+                    # pointsourceactivity.rate stored as activity / s.
+                    pointsource = pointsources[
+                        str(row["facility_id"]), row["source_name"]
+                    ]
+                    try:
+                        psa = pointsourceactivities[activity, pointsource]
+                        setattr(psa, "rate", rate)
+                        update_pointsourceactivities.append(psa)
+                    except KeyError:
+                        psa = PointSourceActivity(
+                            activity=activity, source=pointsource, rate=rate
+                        )
+                        create_pointsourceactivities.append(psa)
         PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
         PointSourceActivity.objects.bulk_update(
             update_pointsourceactivities, ["activity", "source", "rate"]

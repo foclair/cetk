@@ -5,9 +5,8 @@ from etk.edb.models.source_models import ActivityCode, CodeSet
 
 
 @pytest.fixture
-def activity_codes(domains):
-    dmn = domains[0]
-    codeset = CodeSet.objects.create(domain=dmn, name="TestCodeSet")
+def activity_codes(db):
+    codeset = CodeSet.objects.create(name="TestCodeSet")
     codes = []
     for ltreecode in [
         "",
@@ -23,9 +22,7 @@ def activity_codes(domains):
         "2.1.1",
         "3",
     ]:
-        codes.append(
-            codeset.codes.create(code=ltreecode, label=f"{ltreecode}-label")
-        )
+        codes.append(codeset.codes.create(code=ltreecode, label=f"{ltreecode}-label"))
     return codes
 
 
@@ -71,5 +68,3 @@ def test_dore(activity_codes, ltreecode, expected):
         "code", flat=True
     )
     assert set(actual) == expected
-
-
