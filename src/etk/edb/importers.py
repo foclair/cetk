@@ -191,6 +191,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
     create_substances = []
     update_sources = []
     create_sources = {}
+    activitycode_columns = [key for key in df.columns if key.startswith("activitycode")]
     row_nr = 2
     for row_key, row in df.iterrows():
         row_dict = row.to_dict()
@@ -248,7 +249,7 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
                                 + f" on row {row_nr}"
                             )
-                    if code is not None and code is not np.nan:
+                    if not pd.isnull(code):
                         try:
                             # note this can be problematic with codes 01 etc as SNAP
                             # TODO activitycodes should be string directly on import!
@@ -262,6 +263,21 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
                             )
             except AttributeError:
                 # no such codeset exists
+                if len(activitycode_columns) > len(CodeSet.objects.all()):
+                    # need to check if activitycode is specified for unimported codeset
+                    codeset_slug = [
+                        column.split("_", 1)[-1] for column in activitycode_columns
+                    ]
+                    for index, column in enumerate(activitycode_columns):
+                        if not pd.isnull(row_dict[column]):
+                            try:
+                                CodeSet.objects.get(slug=codeset_slug[index])
+                            except CodeSet.DoesNotExist:
+                                raise ImportError(
+                                    f"Specified activitycode {row_dict[column]} for "
+                                    + f" unknown codeset {codeset_slug[index]}"
+                                    + f" on row {row_nr}"
+                                )
                 pass
 
         # get columns with tag values for the current row
