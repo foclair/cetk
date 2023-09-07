@@ -184,6 +184,8 @@ def main():
             editor.import_pointsourceactivities(
                 args.filename, unit=args.unit, sheet=[args.sheet]
             )
+        log.debug("Imported data from '{args.filename}' to '{db_path}")
+        sys.exit(0)
 
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(
