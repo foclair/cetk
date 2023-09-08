@@ -22,13 +22,13 @@ settings = etk.configure()
 
 from etk.edb import importers  # noqa
 from etk.edb.models import Substance  # noqa
-from etk.edb.importers import SHEET_NAMES  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
 from etk.emissions.views import create_pointsource_emis_table  # noqa
-
+from etk.edb.const import SHEET_NAMES  # noqa
 
 SOURCETYPES = ("point",)
 DEFAULT_EMISSION_UNIT = "kg/year"
+
 
 sheet_choices = ["All"]
 sheet_choices.extend(SHEET_NAMES)

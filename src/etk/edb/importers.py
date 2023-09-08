@@ -9,7 +9,7 @@ from django.contrib.gis.geos import Point
 from django.db import IntegrityError
 from openpyxl import load_workbook
 
-from etk.edb.const import WGS84_SRID
+from etk.edb.const import SHEET_NAMES, WGS84_SRID
 from etk.edb.models.common_models import Settings
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
@@ -52,17 +52,6 @@ REQUIRED_COLUMNS = {
     "house_height": float,
 }
 
-# sheet names which are valid for data import
-SHEET_NAMES = [
-    "Timevar",
-    "PointSource",
-    "Activity",
-    "EmissionFactor",
-    "ActivityCode",
-    "CodeSet",
-]
-# TODO add log warning if a sheet name exists in file to be imported
-# which is not in SHEET_NAMES
 
 log = logging.getLogger(__name__)
 
