@@ -37,11 +37,12 @@ class Editor(object):
     def __init__(self):
         self.db_path = settings.DATABASES["default"]["NAME"]
 
-    def migrate(self, template=False):
-        if template:
-            db_path = get_template_db()
-        else:
-            db_path = get_db()
+    def migrate(self, template=False, db_path=None):
+        if db_path is None:
+            if template:
+                db_path = get_template_db()
+            else:
+                db_path = get_db()
         log.debug(f"Running migrations for database {db_path}")
         try:
             std_out, std_err = run_migrate(db_path=db_path)
@@ -138,7 +139,7 @@ def main():
 
     if main_args.command == "migrate":
         sub_parser = argparse.ArgumentParser(
-            description="Migrate database {db_path}.",
+            description=f"Migrate database {db_path}.",
             usage="usage: etk migrate",
         )
         sub_parser.add_argument(
@@ -146,8 +147,12 @@ def main():
             action="store_true",
             help="Migrate the template database",
         )
+        sub_parser.add_argument(
+            "--dbpath",
+            help="Specify database path manually",
+        )
         args = sub_parser.parse_args(sys.argv[2:])
-        editor.migrate(template=args.template)
+        editor.migrate(template=args.template, db_path=args.dbpath)
     elif main_args.command == "import":
         sub_parser = argparse.ArgumentParser(
             description="Import data from an xlsx-file",
