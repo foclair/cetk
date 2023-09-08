@@ -30,7 +30,8 @@ from etk.emissions.views import create_pointsource_emis_table  # noqa
 SOURCETYPES = ("point",)
 DEFAULT_EMISSION_UNIT = "kg/year"
 
-sheet_choices = SHEET_NAMES.append("All")
+sheet_choices = ["All"]
+sheet_choices.extend(SHEET_NAMES)
 
 
 class Editor(object):
@@ -162,7 +163,7 @@ def main():
             "filename", help="Path to xslx-file", type=check_and_get_path
         )
         sub_parser.add_argument(
-            "sheet", help="Sheet to import. ", choices=sheet_choices
+            "sheets", help="List of sheets to import, valid names {SHEET_NAMES}"
         )
         pointsource_grp = sub_parser.add_argument_group(
             "pointsources", description="Options for pointsource import"
@@ -179,15 +180,11 @@ def main():
                 "'etk create' or 'etk migrate'\n"
             )
             sys.exit(1)
-        if args.sheet == "PointSource":
+        if args.sheets == "PointSource":
             editor.import_pointsources(args.filename, unit=args.unit)
-        elif args.sheet == "All":
-            editor.import_pointsourceactivities(
-                args.filename, unit=args.unit, sheet=SHEET_NAMES
-            )
         else:
             editor.import_pointsourceactivities(
-                args.filename, unit=args.unit, sheet=[args.sheet]
+                args.filename, unit=args.unit, sheet=args.sheets
             )
         log.debug("Imported data from '{args.filename}' to '{db_path}")
         sys.exit(0)

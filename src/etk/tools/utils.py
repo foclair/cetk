@@ -53,7 +53,7 @@ def run_aggregate_emissions(filename, db_path=None, **kwargs):
 
 def run_import(filename, sheet, db_path=None, **kwargs):
     """run import in a sub-process."""
-    cmd_args = [str(filename), sheet]
+    cmd_args = [str(filename), str(sheet)]
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
