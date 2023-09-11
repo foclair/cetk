@@ -100,7 +100,7 @@ def worksheet_to_dataframe(data):
     return df
 
 
-def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
+def import_pointsources(filepath, encoding=None, srid=None):
     """Import point-sources from xlsx or csv-file.
 
     args
@@ -109,7 +109,6 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
     options
         encoding: encoding of file (default is utf-8)
         srid: srid of file, default is same srid as domain
-        unit: unit of emissions, default is SI-units (kg/s)
     """
     # or change to user defined SRID?
     try:
@@ -309,13 +308,11 @@ def import_pointsources(filepath, encoding=None, srid=None, unit="kg/s"):
 
             try:
                 if not pd.isnull(row_dict["unit"]):
-                    if (unit != "kg/s") and (unit != row_dict["unit"]):
-                        raise ImportError(
-                            f"Conflicting unit {row_dict[unit]} on row {row_nr}"
-                        )
-                    else:
-                        unit = row_dict["unit"]
-                emis["value"] = emission_unit_to_si(float(row_dict[subst_key]), unit)
+                    emis["value"] = emission_unit_to_si(
+                        float(row_dict[subst_key]), row_dict["unit"]
+                    )
+                else:
+                    raise ImportError(f"No unit specified for emissions on {row_nr}")
             except ValueError:
                 raise ImportError(
                     f"Invalid emission value {row_dict[subst_key]} on row {row_nr}"
@@ -628,7 +625,7 @@ def import_eea_emfacs(filepath, encoding=None):
 
 
 def import_pointsourceactivities(
-    filepath, encoding=None, srid=None, unit=None, import_sheets=SHEET_NAMES
+    filepath, encoding=None, srid=None, import_sheets=SHEET_NAMES
 ):
     """Import point-sources from xlsx or csv-file.
 
@@ -638,7 +635,6 @@ def import_pointsourceactivities(
     options
         encoding: encoding of file (default is utf-8)
         srid: srid of file, default is same srid as domain
-        unit: unit of emissions, default is SI-units (kg/s)
     """
     try:
         workbook = load_workbook(filename=filepath, data_only=True)
