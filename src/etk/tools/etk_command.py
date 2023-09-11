@@ -51,11 +51,11 @@ class Editor(object):
             log.error(f"Error while migrating {db_path}: {err}")
         log.debug(f"Successfully migrated database {db_path}")
 
-    def import_pointsources(self, filename, unit):
-        importers.import_pointsources(filename, unit=unit)
+    def import_pointsources(self, filename):
+        importers.import_pointsources(filename)
 
-    def import_pointsourceactivities(self, filename, unit, sheet):
-        importers.import_pointsourceactivities(filename, unit=unit, import_sheets=sheet)
+    def import_pointsourceactivities(self, filename, sheet):
+        importers.import_pointsourceactivities(filename, import_sheets=sheet)
 
     def update_emission_tables(
         self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
@@ -165,14 +165,9 @@ def main():
         sub_parser.add_argument(
             "sheets", help="List of sheets to import, valid names {SHEET_NAMES}"
         )
-        pointsource_grp = sub_parser.add_argument_group(
-            "pointsources", description="Options for pointsource import"
-        )
-        pointsource_grp.add_argument(
-            "--unit",
-            default="ton/year",
-            help="Unit of emissions to be imported, default=%(default)s",
-        )
+        # pointsource_grp = sub_parser.add_argument_group(
+        #     "pointsources", description="Options for pointsource import"
+        # )
         args = sub_parser.parse_args(sys.argv[2:])
         if not Path(db_path).exists():
             sys.stderr.write(
@@ -181,11 +176,9 @@ def main():
             )
             sys.exit(1)
         if args.sheets == "PointSource":
-            editor.import_pointsources(args.filename, unit=args.unit)
+            editor.import_pointsources(args.filename)
         else:
-            editor.import_pointsourceactivities(
-                args.filename, unit=args.unit, sheet=args.sheets
-            )
+            editor.import_pointsourceactivities(args.filename, sheet=args.sheets)
         log.debug("Imported data from '{args.filename}' to '{db_path}")
         sys.exit(0)
 
