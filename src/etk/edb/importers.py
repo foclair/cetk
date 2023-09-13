@@ -62,8 +62,8 @@ class ImportError(Exception):
     pass
 
 
-def import_error(message, return_message="", dry_run=False):
-    if not dry_run:
+def import_error(message, return_message="", validation=False):
+    if not validation:
         raise ImportError(message)
     else:
         return_message += message + "\n"
@@ -109,7 +109,7 @@ def worksheet_to_dataframe(data):
 
 
 def import_pointsources(
-    filepath, return_message="", dry_run=False, encoding=None, srid=None
+    filepath, return_message="", validation=False, encoding=None, srid=None
 ):
     """Import point-sources from xlsx or csv-file.
 
@@ -157,7 +157,7 @@ def import_pointsources(
         try:
             workbook = load_workbook(filename=filepath, data_only=True)
         except Exception as exc:
-            return_message = import_error(str(exc), return_message, dry_run)
+            return_message = import_error(str(exc), return_message, validation)
         worksheet = workbook.worksheets[0]
         if len(workbook.worksheets) > 1:
             log.debug("Multiple sheets in spreadsheet, importing sheet 'PointSource'.")
@@ -170,12 +170,14 @@ def import_pointsources(
         df = df.replace(to_replace="None", value=None)
     else:
         return_message = import_error(
-            "Only xlsx and csv files are supported for import", return_message, dry_run
+            "Only xlsx and csv files are supported for import",
+            return_message,
+            validation,
         )
     for col in REQUIRED_COLUMNS.keys():
         if col not in df.columns:
             return_message = import_error(
-                f"Missing required column '{col}'", return_message, dry_run
+                f"Missing required column '{col}'", return_message, validation
             )
 
     # set dataframe index
@@ -187,7 +189,7 @@ def import_pointsources(
         return_message = import_error(
             f"Non-unique combination of facility_id and source_name: {err}",
             return_message,
-            dry_run,
+            validation,
         )
     update_facilities = []
     create_facilities = {}
@@ -213,13 +215,13 @@ def import_pointsources(
                 return_message = import_error(
                     f"missing coordinates for source '{row_key}'",
                     return_message,
-                    dry_run,
+                    validation,
                 )
             x = float(row_dict["lon"])
             y = float(row_dict["lat"])
         except ValueError:
             return_message = import_error(
-                f"Invalid coordinates on row {row_nr}", return_message, dry_run
+                f"Invalid coordinates on row {row_nr}", return_message, validation
             )
 
         # create geometry
@@ -237,7 +239,9 @@ def import_pointsources(
         }.items():
             if pd.isna(row_dict[key]):
                 return_message = import_error(
-                    f"Missing value for {key} on row {row_nr}", return_message, dry_run
+                    f"Missing value for {key} on row {row_nr}",
+                    return_message,
+                    validation,
                 )
             else:
                 source_data[attr] = row_dict[key]
@@ -261,7 +265,7 @@ def import_pointsources(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
                                 + f" on row {row_nr}",
                                 return_message,
-                                dry_run,
+                                validation,
                             )
                     if not pd.isnull(code):
                         try:
@@ -275,7 +279,7 @@ def import_pointsources(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
                                 + f" on row {row_nr}",
                                 return_message,
-                                dry_run,
+                                validation,
                             )
             except AttributeError:
                 # no such codeset exists
@@ -294,7 +298,7 @@ def import_pointsources(
                                     + f" unknown codeset {codeset_slug[index]}"
                                     + f" on row {row_nr}",
                                     return_message,
-                                    dry_run,
+                                    validation,
                                 )
 
                 pass
@@ -315,7 +319,7 @@ def import_pointsources(
                 return_message = import_error(
                     f"Timevar '{timevar_name}' " f"on row {row_nr} does not exist",
                     return_message,
-                    dry_run,
+                    validation,
                 )
 
         # get all column-names starting with "subst" whith value for the current row
@@ -338,7 +342,7 @@ def import_pointsources(
                 emis["substance"] = substances[subst]
             except KeyError:
                 return_message = import_error(
-                    f"Undefined substance {subst}", return_message, dry_run
+                    f"Undefined substance {subst}", return_message, validation
                 )
 
             try:
@@ -350,16 +354,16 @@ def import_pointsources(
                     return_message = import_error(
                         f"No unit specified for emissions on {row_nr}",
                         return_message,
-                        dry_run,
+                        validation,
                     )
             except ValueError:
                 return_message = import_error(
                     f"Invalid emission value {row_dict[subst_key]} on row {row_nr}",
                     return_message,
-                    dry_run,
+                    validation,
                 )
             except KeyError as err:
-                return_message = import_error(f"{err}", return_message, dry_run)
+                return_message = import_error(f"{err}", return_message, validation)
 
         official_facility_id, source_name = row_key
         if pd.isna(official_facility_id):
@@ -369,7 +373,7 @@ def import_pointsources(
             return_message = import_error(
                 f"No name specified for point-source on row {row_nr}",
                 return_message,
-                dry_run,
+                validation,
             )
 
         if pd.isna(row_dict["facility_name"]):
@@ -417,7 +421,7 @@ def import_pointsources(
                 return_message = import_error(
                     f"multiple rows for the same point-source '{source_name}'",
                     return_message,
-                    dry_run,
+                    validation,
                 )
         row_nr += 1
 
@@ -431,7 +435,7 @@ def import_pointsources(
             "The following facility names are already used in inventory but "
             f"for facilities with different official_id: {duplicate_facility_names}",
             return_message,
-            dry_run,
+            validation,
         )
     duplicate_facility_names = {}
     for f in create_facilities.values():
@@ -447,10 +451,9 @@ def import_pointsources(
             "The same facility name is used on multiple rows but "
             f"with different facility_id: {duplicate_facility_names}",
             return_message,
-            dry_run,
+            validation,
         )
 
-    # if not dry_run:
     Facility.objects.bulk_create(create_facilities.values())
     Facility.objects.bulk_update(update_facilities, ["name"])
 
@@ -460,7 +463,6 @@ def import_pointsources(
             # changed by Eef, because IDs were None
             source.facility_id = Facility.objects.get(official_id=source.facility).id
 
-    # if not dry_run:
     PointSource.objects.bulk_create(create_sources.values())
     PointSource.objects.bulk_update(
         update_sources,
@@ -502,12 +504,12 @@ def import_pointsources(
     return return_dict, return_message
 
 
-def import_timevars(timevar_data, overwrite=False, dry_run=False):
+def import_timevars(timevar_data, overwrite=False, validation=False):
     """import time-variation profiles."""
 
     # Timevar instances must not be created by bulk_create as the save function
     # is overloaded to calculate the normation constant.
-    def make_timevar(data, timevarclass, subname=None, dry_run=False):
+    def make_timevar(data, timevarclass, subname=None, validation=False):
         retdict = {}
         return_message = ""
         for name, timevar_data in data.items():
@@ -535,7 +537,7 @@ def import_timevars(timevar_data, overwrite=False, dry_run=False):
                     f"Invalid specification of timevar {name}"
                     f", are 'typeday' and 'month' given?",
                     return_message,
-                    dry_run,
+                    validation,
                 )
         return retdict, return_message
 
@@ -549,7 +551,7 @@ def import_timevars(timevar_data, overwrite=False, dry_run=False):
             return_message = import_error(
                 f"invalid time-variation type '{vartype}' specified",
                 return_message,
-                dry_run,
+                validation,
             )
     return timevars, return_message
 
@@ -691,7 +693,7 @@ def import_pointsourceactivities(
     srid=None,
     import_sheets=SHEET_NAMES,
     return_message="",
-    dry_run=False,
+    validation=False,
 ):
     """Import point-sources from xlsx or csv-file.
 
@@ -705,7 +707,7 @@ def import_pointsourceactivities(
     try:
         workbook = load_workbook(filename=filepath, data_only=True)
     except Exception as exc:
-        return_message = import_error(str(exc), return_message, dry_run)
+        return_message = import_error(str(exc), return_message, validation)
 
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
@@ -737,7 +739,7 @@ def import_pointsourceactivities(
                 {label: {"typeday": typeday_str, "month": month_str}}
             )
         tv, return_append = import_timevars(
-            timevar_dict, overwrite=True, dry_run=dry_run
+            timevar_dict, overwrite=True, validation=validation
         )
         return_message += return_append
         return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
@@ -768,9 +770,9 @@ def import_pointsourceactivities(
                     return_message = import_error(
                         "Trying to import a new codeset, but can have maximum 3.",
                         return_message,
-                        dry_run,
+                        validation,
                     )
-        # have to import anyhow, otherwise get tons of import errors if not dry_run:
+
         CodeSet.objects.bulk_create(create_codesets.values())
         CodeSet.objects.bulk_update(
             update_codesets,
@@ -810,7 +812,7 @@ def import_pointsourceactivities(
                             + f"'{row_dict['vertical_distribution_slug']}'"
                             + " is not defined.",
                             return_message,
-                            dry_run,
+                            validation,
                         )
                 else:
                     vdist_id = None
@@ -834,10 +836,9 @@ def import_pointsourceactivities(
                     f"Trying to import an activity code from row '{row_key}'"
                     + f"but CodeSet '{row_dict['codeset_slug']}' is not defined.",
                     return_message,
-                    dry_run,
+                    validation,
                 )
 
-        # if not dry_run:
         ActivityCode.objects.bulk_create(create_activitycodes.values())
         ActivityCode.objects.bulk_update(
             update_activitycodes,
@@ -859,7 +860,7 @@ def import_pointsourceactivities(
     # or pointsources to be imported later, therefore not requiring PointSource-sheet.
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
         ps, return_message = import_pointsources(
-            filepath, srid=srid, return_message=return_message, dry_run=dry_run
+            filepath, srid=srid, return_message=return_message, validation=validation
         )
         return_dict.update(ps)
 
@@ -890,9 +891,8 @@ def import_pointsourceactivities(
                     return_message = import_error(
                         f"multiple rows for the same activity '{activity_name}'",
                         return_message,
-                        dry_run,
+                        validation,
                     )
-        # if not dry_run:
         Activity.objects.bulk_create(create_activities.values())
         Activity.objects.bulk_update(
             update_activities,
@@ -942,7 +942,7 @@ def import_pointsourceactivities(
                             + f" '{activity_name}'"
                             + " are inconsistent, convert units before importing.",
                             return_message,
-                            dry_run,
+                            validation,
                         )
                     else:
                         factor = activity_ef_unit_to_si(factor, factor_unit)
@@ -965,26 +965,23 @@ def import_pointsourceactivities(
                             f"unknown substance '{subst}'"
                             + f" for emission factor on row '{row_nr}'",
                             return_message,
-                            dry_run,
+                            validation,
                         )
             except KeyError:
                 return_message = import_error(
                     f"unknown activity '{activity_name}'"
                     + f" for emission factor on row '{row_nr}'",
                     return_message,
-                    dry_run,
+                    validation,
                 )
 
-        # TODO should check uniquetogether constraint for activity and substance?
-        # could be done to give more informative error than integrity error here.
-        # if not dry_run:
         try:
             EmissionFactor.objects.bulk_create(create_emfacs)
         except IntegrityError:
             return_message = import_error(
                 "Two emission factors for same activity and substance are given.",
                 return_message,
-                dry_run,
+                validation,
             )
         EmissionFactor.objects.bulk_update(
             update_emfacs, ["activity", "substance", "factor"]
@@ -1009,8 +1006,6 @@ def import_pointsourceactivities(
         # TODO check unique activity for source
         data = workbook["PointSource"].values
         df_pointsource = worksheet_to_dataframe(data)
-        # TODO add: if any df_pointsource['activity_name'] is not None?
-        # otherwise can skip this.
         activities = cache_queryset(Activity.objects.all(), "name")
         pointsources = cache_pointsources(
             PointSource.objects.select_related("facility")
@@ -1030,7 +1025,7 @@ def import_pointsourceactivities(
                             f"unknown activity '{activity_name}'"
                             + f" for pointsource '{row['source_name']}'",
                             return_message,
-                            dry_run,
+                            validation,
                         )
                     rate = activity_rate_unit_to_si(rate, activity.unit)
                     # original unit stored in activity.unit, but
@@ -1047,7 +1042,7 @@ def import_pointsourceactivities(
                             activity=activity, source=pointsource, rate=rate
                         )
                         create_pointsourceactivities.append(psa)
-        # if not dry_run:
+
         PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
         PointSourceActivity.objects.bulk_update(
             update_pointsourceactivities, ["activity", "source", "rate"]
@@ -1064,9 +1059,5 @@ def import_pointsourceactivities(
     return return_dict, return_message
 
     # TODO
-    # add tests
     # figure out how to handle facility, is this really useful?
     # see also discussion about uniqueness wrt facility on mattermost.
-    # is it correct that activity rate is not converted to SI?
-    # make it easier to validate files for import? or better feedback for correction
-    # add code and test for rasterizer that aggregates emissions

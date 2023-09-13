@@ -5,6 +5,8 @@ import logging
 import sys
 from pathlib import Path
 
+from django.db import transaction
+
 import etk
 from etk.db import run_migrate
 from etk.tools.utils import (
@@ -34,6 +36,12 @@ sheet_choices = ["All"]
 sheet_choices.extend(SHEET_NAMES)
 
 
+class DryrunAbort(Exception):
+    """Forcing abort of database changes when doing dryrun."""
+
+    pass
+
+
 class Editor(object):
     def __init__(self):
         self.db_path = settings.DATABASES["default"]["NAME"]
@@ -52,12 +60,25 @@ class Editor(object):
         log.debug(f"Successfully migrated database {db_path}")
 
     def import_pointsources(self, filename, dry_run=False):
-        return importers.import_pointsources(filename, dry_run=dry_run)
+        # reverse all created/updated DataModels if doing dry run or error occurs.
+        try:
+            with transaction.atomic():
+                progress = importers.import_pointsources(filename, validation=dry_run)
+                raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
 
     def import_pointsourceactivities(self, filename, sheet, dry_run=False):
-        return importers.import_pointsourceactivities(
-            filename, import_sheets=sheet, dry_run=dry_run
-        )
+        try:
+            with transaction.atomic():
+                progress = importers.import_pointsourceactivities(
+                    filename, import_sheets=sheet, validation=dry_run
+                )
+                raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
 
     def update_emission_tables(
         self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
