@@ -450,9 +450,9 @@ def import_pointsources(
             dry_run,
         )
 
-    if not dry_run:
-        Facility.objects.bulk_create(create_facilities.values())
-        Facility.objects.bulk_update(update_facilities, ["name"])
+    # if not dry_run:
+    Facility.objects.bulk_create(create_facilities.values())
+    Facility.objects.bulk_update(update_facilities, ["name"])
 
     # ensure PointSource.facility_id is not None
     for source in create_sources.values():
@@ -770,15 +770,15 @@ def import_pointsourceactivities(
                         return_message,
                         dry_run,
                     )
-        if not dry_run:
-            CodeSet.objects.bulk_create(create_codesets.values())
-            CodeSet.objects.bulk_update(
-                update_codesets,
-                [
-                    "name",
-                    "description",
-                ],
-            )
+        # have to import anyhow, otherwise get tons of import errors if not dry_run:
+        CodeSet.objects.bulk_create(create_codesets.values())
+        CodeSet.objects.bulk_update(
+            update_codesets,
+            [
+                "name",
+                "description",
+            ],
+        )
         return_dict.update(
             {
                 "codeset": {
@@ -837,15 +837,15 @@ def import_pointsourceactivities(
                     dry_run,
                 )
 
-        if not dry_run:
-            ActivityCode.objects.bulk_create(create_activitycodes.values())
-            ActivityCode.objects.bulk_update(
-                update_activitycodes,
-                [
-                    "label",
-                    "vertical_dist_id",
-                ],
-            )
+        # if not dry_run:
+        ActivityCode.objects.bulk_create(create_activitycodes.values())
+        ActivityCode.objects.bulk_update(
+            update_activitycodes,
+            [
+                "label",
+                "vertical_dist_id",
+            ],
+        )
         return_dict.update(
             {
                 "activitycode": {
@@ -892,15 +892,16 @@ def import_pointsourceactivities(
                         return_message,
                         dry_run,
                     )
+        # if not dry_run:
+        Activity.objects.bulk_create(create_activities.values())
+        Activity.objects.bulk_update(
+            update_activities,
+            [
+                "name",
+                "unit",
+            ],
+        )
         if not dry_run:
-            Activity.objects.bulk_create(create_activities.values())
-            Activity.objects.bulk_update(
-                update_activities,
-                [
-                    "name",
-                    "unit",
-                ],
-            )
             # drop existing emfacs of activities that will be updated
             EmissionFactor.objects.filter(
                 pk__in=[inst.id for inst in drop_emfacs]
@@ -929,6 +930,46 @@ def import_pointsourceactivities(
             activity_name = df_emfac.iloc[row_nr]["activity_name"]
             try:
                 activity = activities[activity_name]
+                subst = df_emfac.iloc[row_nr]["substance"]
+                try:
+                    substance = substances[subst]
+                    factor = df_emfac.iloc[row_nr]["factor"]
+                    factor_unit = df_emfac.iloc[row_nr]["emissionfactor_unit"]
+                    activity_quantity_unit, time_unit = activity.unit.split("/")
+                    mass_unit, factor_quantity_unit = factor_unit.split("/")
+                    if activity_quantity_unit != factor_quantity_unit:
+                        # emission factor and activity need to have the same unit
+                        # for quantity, eg GJ, m3 pellets, number of produces bottles
+                        return_message = import_error(
+                            "Units for emission factor and activity rate for"
+                            + f" '{activity_name}'"
+                            + " are inconsistent, convert units before importing.",
+                            return_message,
+                            dry_run,
+                        )
+                    else:
+                        factor = activity_ef_unit_to_si(factor, factor_unit)
+                    try:
+                        emfac = emissionfactors[(activity, substance)]
+                        setattr(emfac, "activity", activity)
+                        setattr(emfac, "substance", substance)
+                        setattr(emfac, "factor", factor)
+                        update_emfacs.append(emfac)
+                    except KeyError:
+                        emfac = EmissionFactor(
+                            activity=activity, substance=substance, factor=factor
+                        )
+                        create_emfacs.append(emfac)
+                except KeyError:
+                    if subst == "PM2.5":
+                        substance = substances["PM25"]
+                    else:
+                        return_message = import_error(
+                            f"unknown substance '{subst}'"
+                            + f" for emission factor on row '{row_nr}'",
+                            return_message,
+                            dry_run,
+                        )
             except KeyError:
                 return_message = import_error(
                     f"unknown activity '{activity_name}'"
@@ -936,45 +977,7 @@ def import_pointsourceactivities(
                     return_message,
                     dry_run,
                 )
-            subst = df_emfac.iloc[row_nr]["substance"]
-            try:
-                substance = substances[subst]
-            except KeyError:
-                if subst == "PM2.5":
-                    substance = substances["PM25"]
-                else:
-                    return_message = import_error(
-                        f"unknown substance '{subst}'"
-                        + f" for emission factor on row '{row_nr}'",
-                        return_message,
-                        dry_run,
-                    )
-            factor = df_emfac.iloc[row_nr]["factor"]
-            factor_unit = df_emfac.iloc[row_nr]["emissionfactor_unit"]
-            activity_quantity_unit, time_unit = activity.unit.split("/")
-            mass_unit, factor_quantity_unit = factor_unit.split("/")
-            if activity_quantity_unit != factor_quantity_unit:
-                # emission factor and activity need to have the same unit for quantity
-                # be it GJ, m3 pellets, number of produces bottles, it has to be same
-                return_message = import_error(
-                    f"Units for emission factor and activity rate for '{activity_name}'"
-                    + " are inconsistent, convert units before importing.",
-                    return_message,
-                    dry_run,
-                )
-            else:
-                factor = activity_ef_unit_to_si(factor, factor_unit)
-            try:
-                emfac = emissionfactors[(activity, substance)]
-                setattr(emfac, "activity", activity)
-                setattr(emfac, "substance", substance)
-                setattr(emfac, "factor", factor)
-                update_emfacs.append(emfac)
-            except KeyError:
-                emfac = EmissionFactor(
-                    activity=activity, substance=substance, factor=factor
-                )
-                create_emfacs.append(emfac)
+
         # TODO should check uniquetogether constraint for activity and substance?
         # could be done to give more informative error than integrity error here.
         if not dry_run:
