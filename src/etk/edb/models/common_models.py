@@ -1,6 +1,8 @@
 from django.contrib.gis.db import models
+from django.contrib.gis.geos import GEOSGeometry
 from django.utils.translation import gettext_lazy as _
 
+from etk.edb.const import WGS84_SRID
 from etk.edb.models.source_models import CodeSet
 
 
@@ -8,6 +10,9 @@ class SettingsManager(models.Manager):
     # makes sure always just one instance of settings exists
     def get_queryset(self):
         return super().get_queryset()[:1]
+
+
+DEFAULT_EXTENT = "Polygon((-25.0 35.0, -25.0 70.0, 40.0 70.0, 40.0 35.0, -25.0 35.0))"
 
 
 class Settings(models.Model):
@@ -20,42 +25,40 @@ class Settings(models.Model):
     timezone = models.CharField(_("timezone"), max_length=64)
 
     # some functionality in Gadget only works for one out of the three codesets.
-    primary_codeset = models.ForeignKey(
-        CodeSet, on_delete=models.CASCADE, related_name="primary_codeset"
+    codeset1 = models.ForeignKey(
+        CodeSet, null=True, on_delete=models.SET_NULL, related_name="+"
     )
-
+    codeset2 = models.ForeignKey(
+        CodeSet, null=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    codeset3 = models.ForeignKey(
+        CodeSet, null=True, on_delete=models.SET_NULL, related_name="+"
+    )
     objects = SettingsManager()
 
     class Meta:
         db_table = "settings"
         default_related_name = "settings"
 
-    def get_current(self):
+    def get_current():
         # Retrieve the settings, if exist
-        try:
-            return Settings.objects.get()
-        except Settings.DoesNotExist:
-            return None
+        return Settings.objects.get_or_create(
+            defaults={
+                "srid": 3857,
+                "timezone": "Europe/Stockholm",
+                "extent": GEOSGeometry(DEFAULT_EXTENT, WGS84_SRID),
+            }
+        )[0]
 
-    def update(self, srid=None, extent=None, timezone=None, primary_codeset=None):
-        # Retrieve settings and update
-        settings = self.get_current()
-        if settings:
-            # if exist
-            if srid is not None:
-                settings.srid = srid
-            if extent is None:
-                settings.extent = extent
-            if timezone is not None:
-                settings.timezone = timezone
-            if primary_codeset is None:
-                settings.primary_codest = primary_codeset
-            settings.save()
+    def get_codeset_index(self, codeset):
+        """Return index of a specific codeset."""
+        if codeset == self.codeset1:
+            return 1
+        elif codeset == self.codeset2:
+            return 2
+        elif codeset == self.codeset3:
+            return 3
         else:
-            # If no instance exists, create a new one
-            Settings.objects.create(
-                srid=srid,
-                extent=extent,
-                timezone=timezone,
-                primary_codeset=primary_codeset,
+            raise ValueError(
+                f"codeset '{codeset.slug}' not found in inventory settings"
             )

@@ -21,9 +21,14 @@ log = logging.getLogger(__name__)
 settings = etk.configure()
 
 from etk.edb import importers  # noqa
+from etk.edb.models import Substance  # noqa
+from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
+from etk.emissions.views import create_pointsource_emis_table  # noqa
 
 # sheets in order of import
 SHEETNAMES = ("codesets", "pointsources")
+SOURCETYPES = ("point",)
+DEFAULT_EMISSION_UNIT = "kg/year"
 
 
 class Editor(object):
@@ -45,6 +50,34 @@ class Editor(object):
     def import_pointsources(self, filename, unit):
         importers.import_pointsources(filename, unit=unit)
 
+    def update_emission_tables(
+        self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
+    ):
+        sourcetypes = sourcetypes or SOURCETYPES
+        substances = substances or get_used_substances()
+        if "point" in sourcetypes:
+            create_pointsource_emis_table(substances=substances, unit=unit)
+
+    def aggregate_emissions(
+        self,
+        filename,
+        sourcetypes=None,
+        unit=DEFAULT_EMISSION_UNIT,
+        codeset=None,
+        substances=None,
+    ):
+        substances = substances or get_used_substances()
+        df = aggregate_emissions(
+            sourcetypes=sourcetypes, unit=unit, codeset=codeset, substances=substances
+        )
+        try:
+            df.to_csv(filename, sep=";")
+        except Exception as err:
+            log.error(
+                f"could not write aggregated emission to file {filename}: {str(err)}"
+            )
+            sys.exit(1)
+
     def export_data(self):
         print("Not implemented")
 
@@ -59,6 +92,7 @@ def main():
         migrate  migrate an sqlite inventory
         import   import data
         export   export data
+        calc     calculate emissions
 
         Current database is {db_path} (set by $ETK_DATABASE_PATH)
         """,
@@ -66,7 +100,7 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "import", "export"),
+        choices=("migrate", "create", "import", "export", "calc"),
     )
     main_args = parser.parse_args(args=sys.argv[1:2])
 
@@ -132,6 +166,55 @@ def main():
             sys.exit(1)
         if args.sheet == "pointsources":
             editor.import_pointsources(args.filename, unit=args.unit)
+
+    elif main_args.command == "calc":
+        sub_parser = argparse.ArgumentParser(
+            description="Calculate emissions",
+            usage="etk calc [options]",
+        )
+        sub_parser.add_argument(
+            "--unit",
+            default=DEFAULT_EMISSION_UNIT,
+            help="Unit of emissions, default=%(default)s",
+        )
+        sub_parser.add_argument(
+            "--sourcetypes", nargs="*", help="Only sourcetypes", choices=SOURCETYPES
+        )
+        sub_parser.add_argument(
+            "--substances",
+            nargs="*",
+            help="Only substances (default is all with emissions)",
+            choices=Substance.objects.values_list("slug", flat=True),
+            metavar=("NOx", "PM10"),
+        )
+        calc_grp = sub_parser.add_mutually_exclusive_group()
+        calc_grp.add_argument(
+            "--update", help="Create/update emission tables", action="store_true"
+        )
+        calc_grp.add_argument(
+            "--aggregate", help="Aggregate emissions", metavar="FILENAME"
+        )
+        aggregate_grp = sub_parser.add_argument_group(
+            "aggregate emissions", description="Options to aggregate emissions"
+        )
+        aggregate_grp.add_argument(
+            "--codeset", help="Aggregate emissions by codeset", metavar="SLUG"
+        )
+        # TODO add argument to aggregate emissions within polygon
+
+        args = sub_parser.parse_args(sys.argv[2:])
+        if not Path(db_path).exists():
+            sys.stderr.write("Database does not exist.\n")
+            sys.exit(1)
+        if args.update:
+            editor.update_emission_tables(sourcetypes=args.sourcetypes, unit=args.unit)
+        if args.aggregate is not None:
+            editor.aggregate_emissions(
+                args.aggregate,
+                sourcetypes=args.sourcetypes,
+                unit=args.unit,
+                codeset=args.codeset,
+            )
 
     elif main_args.command == "export":
         sub_parser = argparse.ArgumentParser(description="Export data to file")
