@@ -51,11 +51,13 @@ class Editor(object):
             log.error(f"Error while migrating {db_path}: {err}")
         log.debug(f"Successfully migrated database {db_path}")
 
-    def import_pointsources(self, filename):
-        importers.import_pointsources(filename)
+    def import_pointsources(self, filename, dry_run=False):
+        return importers.import_pointsources(filename, dry_run=dry_run)
 
-    def import_pointsourceactivities(self, filename, sheet):
-        importers.import_pointsourceactivities(filename, import_sheets=sheet)
+    def import_pointsourceactivities(self, filename, sheet, dry_run=False):
+        return importers.import_pointsourceactivities(
+            filename, import_sheets=sheet, dry_run=dry_run
+        )
 
     def update_emission_tables(
         self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
@@ -165,6 +167,11 @@ def main():
         sub_parser.add_argument(
             "sheets", help="List of sheets to import, valid names {SHEET_NAMES}"
         )
+        sub_parser.add_argument(
+            "dryrun",
+            action="store_true",
+            help="Do dry run to validate import file without actually importing data",
+        )
         # pointsource_grp = sub_parser.add_argument_group(
         #     "pointsources", description="Options for pointsource import"
         # )
@@ -176,10 +183,13 @@ def main():
             )
             sys.exit(1)
         if args.sheets == "PointSource":
-            editor.import_pointsources(args.filename)
+            status = editor.import_pointsources(args.filename, dry_run=args.dryrun)
         else:
-            editor.import_pointsourceactivities(args.filename, sheet=args.sheets)
+            status = editor.import_pointsourceactivities(
+                args.filename, sheet=args.sheets, dry_run=args.dryrun
+            )
         log.debug("Imported data from '{args.filename}' to '{db_path}")
+        sys.stdout.write(str(status))
         sys.exit(0)
 
     elif main_args.command == "calc":

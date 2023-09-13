@@ -62,6 +62,14 @@ class ImportError(Exception):
     pass
 
 
+def import_error(message, return_message="", dry_run=False):
+    if not dry_run:
+        raise ImportError(message)
+    else:
+        return_message += "\n" + message + "\n"
+    return return_message
+
+
 def cache_pointsources(queryset):
     """Return dict of model instances with (facility__official_id, name): instance"""
     sources = {}
@@ -100,7 +108,9 @@ def worksheet_to_dataframe(data):
     return df
 
 
-def import_pointsources(filepath, encoding=None, srid=None):
+def import_pointsources(
+    filepath, return_message="", dry_run=False, encoding=None, srid=None
+):
     """Import point-sources from xlsx or csv-file.
 
     args
@@ -147,7 +157,7 @@ def import_pointsources(filepath, encoding=None, srid=None):
         try:
             workbook = load_workbook(filename=filepath, data_only=True)
         except Exception as exc:
-            raise ImportError(str(exc))
+            return_message = import_error(str(exc), return_message, dry_run)
         worksheet = workbook.worksheets[0]
         if len(workbook.worksheets) > 1:
             log.debug("Multiple sheets in spreadsheet, importing sheet 'PointSource'.")
@@ -159,10 +169,14 @@ def import_pointsources(filepath, encoding=None, srid=None):
         # below is necessary not to create facilities with name 'None'
         df = df.replace(to_replace="None", value=None)
     else:
-        raise ImportError("Only xlsx and csv files are supported for import")
+        return_message = import_error(
+            "Only xlsx and csv files are supported for import", return_message, dry_run
+        )
     for col in REQUIRED_COLUMNS.keys():
         if col not in df.columns:
-            raise ImportError(f"Missing required column '{col}'")
+            return_message = import_error(
+                f"Missing required column '{col}'", return_message, dry_run
+            )
 
     # set dataframe index
     try:
@@ -170,8 +184,10 @@ def import_pointsources(filepath, encoding=None, srid=None):
             ["facility_id", "source_name"], verify_integrity=True, inplace=True
         )
     except ValueError as err:
-        raise ImportError(
-            f"Non-unique combination of facility_id and source_name: {err}"
+        return_message = import_error(
+            f"Non-unique combination of facility_id and source_name: {err}",
+            return_message,
+            dry_run,
         )
     update_facilities = []
     create_facilities = {}
@@ -194,11 +210,17 @@ def import_pointsources(filepath, encoding=None, srid=None):
         # get pointsource coordinates
         try:
             if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
-                raise ImportError(f"missing coordinates for source '{row_key}'")
+                return_message = import_error(
+                    f"missing coordinates for source '{row_key}'",
+                    return_message,
+                    dry_run,
+                )
             x = float(row_dict["lat"])
             y = float(row_dict["lon"])
         except ValueError:
-            raise ImportError(f"Invalid coordinates on row {row_nr}")
+            return_message = import_error(
+                f"Invalid coordinates on row {row_nr}", return_message, dry_run
+            )
 
         # create geometry
         source_data["geom"] = Point(x, y, srid=srid or project_srid).transform(
@@ -214,7 +236,9 @@ def import_pointsources(filepath, encoding=None, srid=None):
             "chimney_gas_temperature": "gas_temperature",
         }.items():
             if pd.isna(row_dict[key]):
-                raise ImportError(f"Missing value for {key} on row {row_nr}")
+                return_message = import_error(
+                    f"Missing value for {key} on row {row_nr}", return_message, dry_run
+                )
             else:
                 source_data[attr] = row_dict[key]
 
@@ -233,9 +257,11 @@ def import_pointsources(filepath, encoding=None, srid=None):
                     code = row_dict[code_attribute]
                     if len(code_set) == 0:
                         if code is not None and code is not np.nan:
-                            raise ImportError(
+                            return_message = import_error(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
-                                + f" on row {row_nr}"
+                                + f" on row {row_nr}",
+                                return_message,
+                                dry_run,
                             )
                     if not pd.isnull(code):
                         try:
@@ -245,9 +271,11 @@ def import_pointsources(filepath, encoding=None, srid=None):
                             codeset_id = activity_code.code_set_id
                             source_data[f"activitycode{codeset_id}"] = activity_code
                         except KeyError:
-                            raise ImportError(
+                            return_message = import_error(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
-                                + f" on row {row_nr}"
+                                + f" on row {row_nr}",
+                                return_message,
+                                dry_run,
                             )
             except AttributeError:
                 # no such codeset exists
@@ -261,11 +289,14 @@ def import_pointsources(filepath, encoding=None, srid=None):
                             try:
                                 CodeSet.objects.get(slug=codeset_slug[index])
                             except CodeSet.DoesNotExist:
-                                raise ImportError(
+                                return_message = import_error(
                                     f"Specified activitycode {row_dict[column]} for "
                                     + f" unknown codeset {codeset_slug[index]}"
-                                    + f" on row {row_nr}"
+                                    + f" on row {row_nr}",
+                                    return_message,
+                                    dry_run,
                                 )
+
                 pass
 
         # get columns with tag values for the current row
@@ -281,8 +312,10 @@ def import_pointsources(filepath, encoding=None, srid=None):
             try:
                 source_data["timevar"] = timevars[timevar_name]
             except KeyError:
-                raise ImportError(
-                    f"Timevar '{timevar_name}' " f"on row {row_nr} does not exist"
+                return_message = import_error(
+                    f"Timevar '{timevar_name}' " f"on row {row_nr} does not exist",
+                    return_message,
+                    dry_run,
                 )
 
         # get all column-names starting with "subst" whith value for the current row
@@ -304,7 +337,9 @@ def import_pointsources(filepath, encoding=None, srid=None):
             try:
                 emis["substance"] = substances[subst]
             except KeyError:
-                raise ImportError(f"Undefined substance {subst}")
+                return_message = import_error(
+                    f"Undefined substance {subst}", return_message, dry_run
+                )
 
             try:
                 if not pd.isnull(row_dict["unit"]):
@@ -312,20 +347,30 @@ def import_pointsources(filepath, encoding=None, srid=None):
                         float(row_dict[subst_key]), row_dict["unit"]
                     )
                 else:
-                    raise ImportError(f"No unit specified for emissions on {row_nr}")
+                    return_message = import_error(
+                        f"No unit specified for emissions on {row_nr}",
+                        return_message,
+                        dry_run,
+                    )
             except ValueError:
-                raise ImportError(
-                    f"Invalid emission value {row_dict[subst_key]} on row {row_nr}"
+                return_message = import_error(
+                    f"Invalid emission value {row_dict[subst_key]} on row {row_nr}",
+                    return_message,
+                    dry_run,
                 )
             except KeyError as err:
-                raise ImportError(f"{err}")
+                return_message = import_error(f"{err}", return_message, dry_run)
 
         official_facility_id, source_name = row_key
         if pd.isna(official_facility_id):
             official_facility_id = None
 
         if pd.isna(source_name):
-            raise ImportError(f"No name specified for point-source on row {row_nr}")
+            return_message = import_error(
+                f"No name specified for point-source on row {row_nr}",
+                return_message,
+                dry_run,
+            )
 
         if pd.isna(row_dict["facility_name"]):
             facility_name = None
@@ -369,8 +414,10 @@ def import_pointsources(filepath, encoding=None, srid=None):
                     for emis in emissions.values()
                 ]
             else:
-                raise ImportError(
-                    f"multiple rows for the same point-source '{source_name}'"
+                return_message = import_error(
+                    f"multiple rows for the same point-source '{source_name}'",
+                    return_message,
+                    dry_run,
                 )
         row_nr += 1
 
@@ -380,9 +427,11 @@ def import_pointsources(filepath, encoding=None, srid=None):
         if f.name in existing_facility_names:
             duplicate_facility_names.append(f.name)
     if len(duplicate_facility_names) > 0:
-        raise ImportError(
+        return_message = import_error(
             "The following facility names are already used in inventory but "
-            f"for facilities with different official_id: {duplicate_facility_names}"
+            f"for facilities with different official_id: {duplicate_facility_names}",
+            return_message,
+            dry_run,
         )
     duplicate_facility_names = {}
     for f in create_facilities.values():
@@ -394,14 +443,16 @@ def import_pointsources(filepath, encoding=None, srid=None):
         name for name, nr in duplicate_facility_names.items() if nr > 1
     ]
     if len(duplicate_facility_names) > 0:
-        raise ImportError(
+        return_message = import_error(
             "The same facility name is used on multiple rows but "
-            f"with different facility_id: {duplicate_facility_names}"
+            f"with different facility_id: {duplicate_facility_names}",
+            return_message,
+            dry_run,
         )
 
-    # adjusted by Eef because no inventory
-    Facility.objects.bulk_create(create_facilities.values())
-    Facility.objects.bulk_update(update_facilities, ["name"])
+    if not dry_run:
+        Facility.objects.bulk_create(create_facilities.values())
+        Facility.objects.bulk_update(update_facilities, ["name"])
 
     # ensure PointSource.facility_id is not None
     for source in create_sources.values():
@@ -409,58 +460,60 @@ def import_pointsources(filepath, encoding=None, srid=None):
             # changed by Eef, because IDs were None
             source.facility_id = Facility.objects.get(official_id=source.facility).id
 
-    PointSource.objects.bulk_create(create_sources.values())
-    PointSource.objects.bulk_update(
-        update_sources,
-        [
-            "name",
-            "geom",
-            "tags",
-            "chimney_gas_speed",
-            "chimney_gas_temperature",
-            "chimney_height",
-            "chimney_inner_diameter",
-            "chimney_outer_diameter",
-            "house_height",
-            "house_width",
-            "activitycode1",
-            "activitycode2",
-            "activitycode3",
-        ],
-    )
+    if not dry_run:
+        PointSource.objects.bulk_create(create_sources.values())
+        PointSource.objects.bulk_update(
+            update_sources,
+            [
+                "name",
+                "geom",
+                "tags",
+                "chimney_gas_speed",
+                "chimney_gas_temperature",
+                "chimney_height",
+                "chimney_inner_diameter",
+                "chimney_outer_diameter",
+                "house_height",
+                "house_width",
+                "activitycode1",
+                "activitycode2",
+                "activitycode3",
+            ],
+        )
 
-    # drop existing substance emissions of point-sources that will be updated
-    PointSourceSubstance.objects.filter(
-        pk__in=[inst.id for inst in drop_substances]
-    ).delete()
+        # drop existing substance emissions of point-sources that will be updated
+        PointSourceSubstance.objects.filter(
+            pk__in=[inst.id for inst in drop_substances]
+        ).delete()
 
-    # ensure PointSourceSubstance.source_id is not None
-    for emis in create_substances:
-        emis.source_id = PointSource.objects.get(
-            name=emis.source, facility_id=emis.source.facility_id
-        ).id
-    PointSourceSubstance.objects.bulk_create(create_substances)
-    return {
+        # ensure PointSourceSubstance.source_id is not None
+        for emis in create_substances:
+            emis.source_id = PointSource.objects.get(
+                name=emis.source, facility_id=emis.source.facility_id
+            ).id
+        PointSourceSubstance.objects.bulk_create(create_substances)
+    return_dict = {
         "facility": {
             "updated": len(update_facilities),
             "created": len(create_facilities),
         },
-        "source": {"updated": len(update_sources), "created": len(create_sources)},
+        "pointsource": {"updated": len(update_sources), "created": len(create_sources)},
     }
+    return return_dict, return_message
 
 
-def import_timevars(timevar_data, overwrite=False):
+def import_timevars(timevar_data, overwrite=False, dry_run=False):
     """import time-variation profiles."""
 
     # Timevar instances must not be created by bulk_create as the save function
     # is overloaded to calculate the normation constant.
-    def make_timevar(data, timevarclass, subname=None):
+    def make_timevar(data, timevarclass, subname=None, dry_run=False):
         retdict = {}
+        return_message = ""
         for name, timevar_data in data.items():
             try:
                 typeday = timevar_data["typeday"]
                 month = timevar_data["month"]
-
                 if overwrite:
                     newobj, _ = timevarclass.objects.update_or_create(
                         name=name,
@@ -478,19 +531,27 @@ def import_timevars(timevar_data, overwrite=False):
                         )
                 retdict[name] = newobj
             except KeyError:
-                raise ImportError(
+                return_message = import_error(
                     f"Invalid specification of timevar {name}"
-                    f", are 'typeday' and 'month' given?"
+                    f", are 'typeday' and 'month' given?",
+                    return_message,
+                    dry_run,
                 )
-        return retdict
+        return retdict, return_message
 
     timevars = {}
     for vartype, subdict in timevar_data.items():
         if vartype == "emission":
-            timevars["emission"] = make_timevar(timevar_data[vartype], Timevar)
+            timevars["emission"], return_message = make_timevar(
+                timevar_data[vartype], Timevar
+            )
         else:
-            raise ImportError(f"invalid time-variation type '{vartype}' specified")
-    return timevars
+            return_message = import_error(
+                f"invalid time-variation type '{vartype}' specified",
+                return_message,
+                dry_run,
+            )
+    return timevars, return_message
 
 
 def import_eea_emfacs(filepath, encoding=None):
@@ -625,7 +686,12 @@ def import_eea_emfacs(filepath, encoding=None):
 
 
 def import_pointsourceactivities(
-    filepath, encoding=None, srid=None, import_sheets=SHEET_NAMES
+    filepath,
+    encoding=None,
+    srid=None,
+    import_sheets=SHEET_NAMES,
+    return_message="",
+    dry_run=False,
 ):
     """Import point-sources from xlsx or csv-file.
 
@@ -639,7 +705,7 @@ def import_pointsourceactivities(
     try:
         workbook = load_workbook(filename=filepath, data_only=True)
     except Exception as exc:
-        raise ImportError(str(exc))
+        return_message = import_error(str(exc), return_message, dry_run)
 
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
@@ -670,7 +736,10 @@ def import_pointsourceactivities(
             timevar_dict["emission"].update(
                 {label: {"typeday": typeday_str, "month": month_str}}
             )
-        tv = import_timevars(timevar_dict, overwrite=True)
+        tv, return_append = import_timevars(
+            timevar_dict, overwrite=True, dry_run=dry_run
+        )
+        return_message += return_append
         return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
 
     if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
@@ -696,17 +765,20 @@ def import_pointsourceactivities(
                     if slug not in create_codesets:
                         create_codesets[slug] = codeset
                 else:
-                    raise ImportError(
-                        "Trying to import a new codeset, but can have maximum 3."
+                    return_message = import_error(
+                        "Trying to import a new codeset, but can have maximum 3.",
+                        return_message,
+                        dry_run,
                     )
-        CodeSet.objects.bulk_create(create_codesets.values())
-        CodeSet.objects.bulk_update(
-            update_codesets,
-            [
-                "name",
-                "description",
-            ],
-        )
+        if not dry_run:
+            CodeSet.objects.bulk_create(create_codesets.values())
+            CodeSet.objects.bulk_update(
+                update_codesets,
+                [
+                    "name",
+                    "description",
+                ],
+            )
         return_dict.update(
             {
                 "codeset": {
@@ -726,9 +798,11 @@ def import_pointsourceactivities(
             try:
                 codeset = CodeSet.objects.get(slug=row_dict["codeset_slug"])
             except CodeSet.DoesNotExist:
-                raise ImportError(
+                return_message = import_error(
                     f"Trying to import an activity code from row '{row_nr}'"
-                    + f"but CodeSet '{row_dict['codeset_slug']}' is not defined."
+                    + f"but CodeSet '{row_dict['codeset_slug']}' is not defined.",
+                    return_message,
+                    dry_run,
                 )
             if row_dict["vertical_distribution_slug"] is not None:
                 try:
@@ -737,11 +811,13 @@ def import_pointsourceactivities(
                     )
                     vdist_id = vdist.id
                 except VerticalDist.DoesNotExist:
-                    raise ImportError(
+                    return_message = import_error(
                         f"Trying to import an activity code from row '{row_nr}'"
                         + "but Vertical Distribution "
                         + f"'{row_dict['vertical_distribution_slug']}'"
-                        + " is not defined."
+                        + " is not defined.",
+                        return_message,
+                        dry_run,
                     )
             else:
                 vdist_id = None
@@ -760,15 +836,15 @@ def import_pointsourceactivities(
                     vertical_dist_id=vdist_id,
                 )
                 create_activitycodes[row_dict["activitycode"]] = activitycode
-
-        ActivityCode.objects.bulk_create(create_activitycodes.values())
-        ActivityCode.objects.bulk_update(
-            update_activitycodes,
-            [
-                "label",
-                "vertical_dist_id",
-            ],
-        )
+        if not dry_run:
+            ActivityCode.objects.bulk_create(create_activitycodes.values())
+            ActivityCode.objects.bulk_update(
+                update_activitycodes,
+                [
+                    "label",
+                    "vertical_dist_id",
+                ],
+            )
         return_dict.update(
             {
                 "activitycode": {
@@ -781,7 +857,9 @@ def import_pointsourceactivities(
     # Could be that activities are linked to previously imported pointsources,
     # or pointsources to be imported later, therefore not requiring PointSource-sheet.
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        ps = import_pointsources(filepath, srid=srid)
+        ps, return_message = import_pointsources(
+            filepath, srid=srid, return_message=return_message, dry_run=dry_run
+        )
         return_dict.update(ps)
 
     if ("Activity" in sheet_names) and ("Activity" in import_sheets):
@@ -808,20 +886,24 @@ def import_pointsourceactivities(
                 if activity_name not in create_activities:
                     create_activities[activity_name] = activity
                 else:
-                    raise ImportError(
-                        f"multiple rows for the same activity '{activity_name}'"
+                    return_message = import_error(
+                        f"multiple rows for the same activity '{activity_name}'",
+                        return_message,
+                        dry_run,
                     )
-
-        Activity.objects.bulk_create(create_activities.values())
-        Activity.objects.bulk_update(
-            update_activities,
-            [
-                "name",
-                "unit",
-            ],
-        )
-        # drop existing emfacs of activities that will be updated
-        EmissionFactor.objects.filter(pk__in=[inst.id for inst in drop_emfacs]).delete()
+        if not dry_run:
+            Activity.objects.bulk_create(create_activities.values())
+            Activity.objects.bulk_update(
+                update_activities,
+                [
+                    "name",
+                    "unit",
+                ],
+            )
+            # drop existing emfacs of activities that will be updated
+            EmissionFactor.objects.filter(
+                pk__in=[inst.id for inst in drop_emfacs]
+            ).delete()
         return_dict.update(
             {
                 "activity": {
@@ -847,9 +929,11 @@ def import_pointsourceactivities(
             try:
                 activity = activities[activity_name]
             except KeyError:
-                raise ImportError(
+                return_message = import_error(
                     f"unknown activity '{activity_name}'"
-                    + f" for emission factor on row '{row_nr}'"
+                    + f" for emission factor on row '{row_nr}'",
+                    return_message,
+                    dry_run,
                 )
             subst = df_emfac.iloc[row_nr]["substance"]
             try:
@@ -858,9 +942,11 @@ def import_pointsourceactivities(
                 if subst == "PM2.5":
                     substance = substances["PM25"]
                 else:
-                    raise ImportError(
+                    return_message = import_error(
                         f"unknown substance '{subst}'"
-                        + f" for emission factor on row '{row_nr}'"
+                        + f" for emission factor on row '{row_nr}'",
+                        return_message,
+                        dry_run,
                     )
             factor = df_emfac.iloc[row_nr]["factor"]
             factor_unit = df_emfac.iloc[row_nr]["emissionfactor_unit"]
@@ -869,9 +955,11 @@ def import_pointsourceactivities(
             if activity_quantity_unit != factor_quantity_unit:
                 # emission factor and activity need to have the same unit for quantity
                 # be it GJ, m3 pellets, number of produces bottles, it has to be same
-                raise ImportError(
+                return_message = import_error(
                     f"Units for emission factor and activity rate for '{activity_name}'"
-                    + " are inconsistent, convert units before importing."
+                    + " are inconsistent, convert units before importing.",
+                    return_message,
+                    dry_run,
                 )
             else:
                 factor = activity_ef_unit_to_si(factor, factor_unit)
@@ -888,15 +976,18 @@ def import_pointsourceactivities(
                 create_emfacs.append(emfac)
         # TODO should check uniquetogether constraint for activity and substance?
         # could be done to give more informative error than integrity error here.
-        try:
-            EmissionFactor.objects.bulk_create(create_emfacs)
-        except IntegrityError:
-            raise ImportError(
-                "Two emission factors for the same activity and substance are given. "
+        if not dry_run:
+            try:
+                EmissionFactor.objects.bulk_create(create_emfacs)
+            except IntegrityError:
+                return_message = import_error(
+                    "Two emission factors for same activity and substance are given.",
+                    return_message,
+                    dry_run,
+                )
+            EmissionFactor.objects.bulk_update(
+                update_emfacs, ["activity", "substance", "factor"]
             )
-        EmissionFactor.objects.bulk_update(
-            update_emfacs, ["activity", "substance", "factor"]
-        )
         return_dict.update(
             {
                 "emission_factors": {
@@ -934,9 +1025,11 @@ def import_pointsourceactivities(
                     try:
                         activity = activities[row["activity_name"]]
                     except KeyError:
-                        raise ImportError(
+                        return_message = import_error(
                             f"unknown activity '{activity_name}'"
-                            + f" for pointsource '{row['source_name']}'"
+                            + f" for pointsource '{row['source_name']}'",
+                            return_message,
+                            dry_run,
                         )
                     rate = activity_rate_unit_to_si(rate, activity.unit)
                     # original unit stored in activity.unit, but
@@ -953,10 +1046,11 @@ def import_pointsourceactivities(
                             activity=activity, source=pointsource, rate=rate
                         )
                         create_pointsourceactivities.append(psa)
-        PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
-        PointSourceActivity.objects.bulk_update(
-            update_pointsourceactivities, ["activity", "source", "rate"]
-        )
+        if not dry_run:
+            PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
+            PointSourceActivity.objects.bulk_update(
+                update_pointsourceactivities, ["activity", "source", "rate"]
+            )
         return_dict.update(
             {
                 "pointsourceactivity": {
@@ -966,7 +1060,7 @@ def import_pointsourceactivities(
             }
         )
 
-    return return_dict
+    return return_dict, return_message
 
     # TODO
     # add tests

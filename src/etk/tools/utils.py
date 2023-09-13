@@ -51,12 +51,14 @@ def run_aggregate_emissions(filename, db_path=None, **kwargs):
     return run("etk", "calc", db_path=db_path, *cmd_args)
 
 
-def run_import(filename, sheet, db_path=None, **kwargs):
+def run_import(filename, sheet, dry_run=False, db_path=None, **kwargs):
     """run import in a sub-process."""
     cmd_args = [str(filename), str(sheet)]
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
+    if dry_run:
+        cmd_args.append("--dryrun")
     return run("etk", "import", db_path=db_path, *cmd_args)
 
 
