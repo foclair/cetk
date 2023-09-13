@@ -23,10 +23,10 @@ log = logging.getLogger(__name__)
 settings = etk.configure()
 
 from etk.edb import importers  # noqa
+from etk.edb.const import SHEET_NAMES  # noqa
 from etk.edb.models import Substance  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
 from etk.emissions.views import create_pointsource_emis_table  # noqa
-from etk.edb.const import SHEET_NAMES  # noqa
 
 SOURCETYPES = ("point",)
 DEFAULT_EMISSION_UNIT = "kg/year"
@@ -64,7 +64,8 @@ class Editor(object):
         try:
             with transaction.atomic():
                 progress = importers.import_pointsources(filename, validation=dry_run)
-                raise DryrunAbort
+                if dry_run:
+                    raise DryrunAbort
         except DryrunAbort:
             pass
         return progress
@@ -75,7 +76,8 @@ class Editor(object):
                 progress = importers.import_pointsourceactivities(
                     filename, import_sheets=sheet, validation=dry_run
                 )
-                raise DryrunAbort
+                if dry_run:
+                    raise DryrunAbort
         except DryrunAbort:
             pass
         return progress
@@ -107,8 +109,6 @@ class Editor(object):
                 f"could not write aggregated emission to file {filename}: {str(err)}"
             )
             sys.exit(1)
-
-
 
     def export_data(self):
         print("Not implemented")
