@@ -66,7 +66,7 @@ def import_error(message, return_message="", dry_run=False):
     if not dry_run:
         raise ImportError(message)
     else:
-        return_message += "\n" + message + "\n"
+        return_message += message + "\n"
     return return_message
 
 
@@ -460,38 +460,38 @@ def import_pointsources(
             # changed by Eef, because IDs were None
             source.facility_id = Facility.objects.get(official_id=source.facility).id
 
-    if not dry_run:
-        PointSource.objects.bulk_create(create_sources.values())
-        PointSource.objects.bulk_update(
-            update_sources,
-            [
-                "name",
-                "geom",
-                "tags",
-                "chimney_gas_speed",
-                "chimney_gas_temperature",
-                "chimney_height",
-                "chimney_inner_diameter",
-                "chimney_outer_diameter",
-                "house_height",
-                "house_width",
-                "activitycode1",
-                "activitycode2",
-                "activitycode3",
-            ],
-        )
+    # if not dry_run:
+    PointSource.objects.bulk_create(create_sources.values())
+    PointSource.objects.bulk_update(
+        update_sources,
+        [
+            "name",
+            "geom",
+            "tags",
+            "chimney_gas_speed",
+            "chimney_gas_temperature",
+            "chimney_height",
+            "chimney_inner_diameter",
+            "chimney_outer_diameter",
+            "house_height",
+            "house_width",
+            "activitycode1",
+            "activitycode2",
+            "activitycode3",
+        ],
+    )
 
-        # drop existing substance emissions of point-sources that will be updated
-        PointSourceSubstance.objects.filter(
-            pk__in=[inst.id for inst in drop_substances]
-        ).delete()
+    # drop existing substance emissions of point-sources that will be updated
+    PointSourceSubstance.objects.filter(
+        pk__in=[inst.id for inst in drop_substances]
+    ).delete()
 
-        # ensure PointSourceSubstance.source_id is not None
-        for emis in create_substances:
-            emis.source_id = PointSource.objects.get(
-                name=emis.source, facility_id=emis.source.facility_id
-            ).id
-        PointSourceSubstance.objects.bulk_create(create_substances)
+    # ensure PointSourceSubstance.source_id is not None
+    for emis in create_substances:
+        emis.source_id = PointSource.objects.get(
+            name=emis.source, facility_id=emis.source.facility_id
+        ).id
+    PointSourceSubstance.objects.bulk_create(create_substances)
     return_dict = {
         "facility": {
             "updated": len(update_facilities),
@@ -901,11 +901,8 @@ def import_pointsourceactivities(
                 "unit",
             ],
         )
-        if not dry_run:
-            # drop existing emfacs of activities that will be updated
-            EmissionFactor.objects.filter(
-                pk__in=[inst.id for inst in drop_emfacs]
-            ).delete()
+        # drop existing emfacs of activities that will be updated
+        EmissionFactor.objects.filter(pk__in=[inst.id for inst in drop_emfacs]).delete()
         return_dict.update(
             {
                 "activity": {
@@ -980,18 +977,18 @@ def import_pointsourceactivities(
 
         # TODO should check uniquetogether constraint for activity and substance?
         # could be done to give more informative error than integrity error here.
-        if not dry_run:
-            try:
-                EmissionFactor.objects.bulk_create(create_emfacs)
-            except IntegrityError:
-                return_message = import_error(
-                    "Two emission factors for same activity and substance are given.",
-                    return_message,
-                    dry_run,
-                )
-            EmissionFactor.objects.bulk_update(
-                update_emfacs, ["activity", "substance", "factor"]
+        # if not dry_run:
+        try:
+            EmissionFactor.objects.bulk_create(create_emfacs)
+        except IntegrityError:
+            return_message = import_error(
+                "Two emission factors for same activity and substance are given.",
+                return_message,
+                dry_run,
             )
+        EmissionFactor.objects.bulk_update(
+            update_emfacs, ["activity", "substance", "factor"]
+        )
         return_dict.update(
             {
                 "emission_factors": {
@@ -1050,11 +1047,11 @@ def import_pointsourceactivities(
                             activity=activity, source=pointsource, rate=rate
                         )
                         create_pointsourceactivities.append(psa)
-        if not dry_run:
-            PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
-            PointSourceActivity.objects.bulk_update(
-                update_pointsourceactivities, ["activity", "source", "rate"]
-            )
+        # if not dry_run:
+        PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
+        PointSourceActivity.objects.bulk_update(
+            update_pointsourceactivities, ["activity", "source", "rate"]
+        )
         return_dict.update(
             {
                 "pointsourceactivity": {
