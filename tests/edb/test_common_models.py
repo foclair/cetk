@@ -5,6 +5,7 @@ import ast
 
 import numpy as np
 import pytest
+from django.contrib.gis.geos import GEOSGeometry
 
 from etk.edb.const import WGS84_SRID
 from etk.edb.models import source_models
@@ -66,7 +67,7 @@ class TestVerticalDist:
 
 class TestSettings:
     def test_settings(self, code_sets):
-        primary_codeset = code_sets[0]
+        codeset1 = code_sets[0]
         # Create or update the settings
         instance, created = Settings.objects.get_or_create(
             defaults={
@@ -74,7 +75,7 @@ class TestSettings:
                 "extent": "POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06,"
                 + " 10.95 69.06, 10.95 55.33))",
                 "timezone": "Europe/Stockholm",
-                "primary_codeset": primary_codeset,
+                "codeset1": codeset1,
             }
         )
         assert Settings.objects.get().srid == 4326
@@ -86,16 +87,17 @@ class TestSettings:
         assert Settings.objects.get().srid == 3006
 
     def test_settings_functions(self, code_sets):
-        primary_codeset = code_sets[0]
+        codeset2 = code_sets[1]
         # use functions defined in Settings directly
-        settings = Settings()
-        current_settings = settings.get_current()
-        assert current_settings is None
-
-        settings.update(
-            srid=WGS84_SRID,
-            extent="POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06,"
-            + " 10.95 69.06, 10.95 55.33))",
-            timezone="Europe/Stockholm",
-            primary_codeset=primary_codeset,
+        settings = Settings.get_current()
+        settings.srid = WGS84_SRID
+        settings.extent = GEOSGeometry(
+            "POLYGON ((10. 55., 24. 55., 24. 69., 10. 69., 10. 55.))"
         )
+        settings.timezone = "Europe/Oslo"
+        settings.codeset1 = codeset2
+        settings.save()
+        settings = Settings.get_current()
+        assert settings.srid == WGS84_SRID
+        assert settings.timezone == "Europe/Oslo"
+        assert settings.codeset1 == codeset2

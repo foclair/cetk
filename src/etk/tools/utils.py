@@ -33,6 +33,24 @@ def check_and_get_path(filename):
         raise ArgumentTypeError(f"Input file {filename} does not exist")
 
 
+def run_update_emission_tables(db_path=None, **kwargs):
+    """update emission tables."""
+    cmd_args = ["--update"]
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        cmd_args.append(str(v))
+    return run("etk", "calc", db_path=db_path, *cmd_args)
+
+
+def run_aggregate_emissions(filename, db_path=None, **kwargs):
+    """write aggregated emissions to file."""
+    cmd_args = [str(filename), "--aggregate"]
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        cmd_args.append(str(v))
+    return run("etk", "calc", db_path=db_path, *cmd_args)
+
+
 def run_import(filename, sheet, db_path=None, **kwargs):
     """run import in a sub-process."""
     cmd_args = [str(filename), sheet]
