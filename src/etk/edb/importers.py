@@ -797,45 +797,46 @@ def import_pointsourceactivities(
             row_dict = row.to_dict()
             try:
                 codeset = CodeSet.objects.get(slug=row_dict["codeset_slug"])
+                if row_dict["vertical_distribution_slug"] is not None:
+                    try:
+                        vdist = VerticalDist.objects.get(
+                            slug=row_dict["vertical_distribution_slug"]
+                        )
+                        vdist_id = vdist.id
+                    except VerticalDist.DoesNotExist:
+                        return_message = import_error(
+                            f"Trying to import an activity code from row '{row_key}'"
+                            + "but Vertical Distribution "
+                            + f"'{row_dict['vertical_distribution_slug']}'"
+                            + " is not defined.",
+                            return_message,
+                            dry_run,
+                        )
+                else:
+                    vdist_id = None
+                try:
+                    activitycode = ActivityCode.objects.get(
+                        code_set_id=codeset.id, code=row_dict["activitycode"]
+                    )
+                    setattr(activitycode, "label", row_dict["label"])
+                    setattr(activitycode, "vertical_dist_id", vdist_id)
+                    update_activitycodes.append(activitycode)
+                except ActivityCode.DoesNotExist:
+                    activitycode = ActivityCode(
+                        code=row_dict["activitycode"],
+                        label=row_dict["label"],
+                        code_set_id=codeset.id,
+                        vertical_dist_id=vdist_id,
+                    )
+                    create_activitycodes[row_dict["activitycode"]] = activitycode
             except CodeSet.DoesNotExist:
                 return_message = import_error(
-                    f"Trying to import an activity code from row '{row_nr}'"
+                    f"Trying to import an activity code from row '{row_key}'"
                     + f"but CodeSet '{row_dict['codeset_slug']}' is not defined.",
                     return_message,
                     dry_run,
                 )
-            if row_dict["vertical_distribution_slug"] is not None:
-                try:
-                    vdist = VerticalDist.objects.get(
-                        slug=row_dict["vertical_distribution_slug"]
-                    )
-                    vdist_id = vdist.id
-                except VerticalDist.DoesNotExist:
-                    return_message = import_error(
-                        f"Trying to import an activity code from row '{row_nr}'"
-                        + "but Vertical Distribution "
-                        + f"'{row_dict['vertical_distribution_slug']}'"
-                        + " is not defined.",
-                        return_message,
-                        dry_run,
-                    )
-            else:
-                vdist_id = None
-            try:
-                activitycode = ActivityCode.objects.get(
-                    code_set_id=codeset.id, code=row_dict["activitycode"]
-                )
-                setattr(activitycode, "label", row_dict["label"])
-                setattr(activitycode, "vertical_dist_id", vdist_id)
-                update_activitycodes.append(activitycode)
-            except ActivityCode.DoesNotExist:
-                activitycode = ActivityCode(
-                    code=row_dict["activitycode"],
-                    label=row_dict["label"],
-                    code_set_id=codeset.id,
-                    vertical_dist_id=vdist_id,
-                )
-                create_activitycodes[row_dict["activitycode"]] = activitycode
+
         if not dry_run:
             ActivityCode.objects.bulk_create(create_activitycodes.values())
             ActivityCode.objects.bulk_update(

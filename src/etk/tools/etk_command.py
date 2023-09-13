@@ -168,7 +168,7 @@ def main():
             "sheets", help="List of sheets to import, valid names {SHEET_NAMES}"
         )
         sub_parser.add_argument(
-            "dryrun",
+            "--dryrun",
             action="store_true",
             help="Do dry run to validate import file without actually importing data",
         )
