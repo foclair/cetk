@@ -215,8 +215,8 @@ def import_pointsources(
                     return_message,
                     dry_run,
                 )
-            x = float(row_dict["lat"])
-            y = float(row_dict["lon"])
+            x = float(row_dict["lon"])
+            y = float(row_dict["lat"])
         except ValueError:
             return_message = import_error(
                 f"Invalid coordinates on row {row_nr}", return_message, dry_run
