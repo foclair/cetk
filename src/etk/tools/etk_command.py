@@ -254,6 +254,8 @@ def main():
             sys.exit(1)
         if args.update:
             editor.update_emission_tables(sourcetypes=args.sourcetypes, unit=args.unit)
+            sys.stdout.write("Successfully updated tables")
+            sys.exit(0)
         if args.aggregate is not None:
             editor.aggregate_emissions(
                 args.aggregate,
@@ -261,8 +263,10 @@ def main():
                 unit=args.unit,
                 codeset=args.codeset,
             )
+            sys.stdout.write("Successfully aggregated emissions\n")
+            sys.exit(0)
 
     elif main_args.command == "export":
-        sub_parser = argparse.ArgumentParser(description="Export data to file")
+        sub_parser = argparse.ArgumentParser(description="Export data to file\n")
         args = sub_parser.parse_args(sys.argv[2:])
         editor.export_data(*args)
