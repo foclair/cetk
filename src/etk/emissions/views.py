@@ -13,7 +13,7 @@ def create_pointsource_emis_view(substances, unit="kg/year"):
     cur = connection.cursor()
     fac = emis_conversion_factor_from_si(unit)
     source_subst_cols = ",".join(
-        f'sum(coalesce(rec.emis*{fac},0)) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'  # noqa
+        f'sum(rec.emis*{fac}) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'  # noqa
         for s in substances
     )
 
@@ -40,7 +40,7 @@ def create_pointsource_emis_table(substances, unit="kg/year"):
     cur = connection.cursor()
     fac = emis_conversion_factor_from_si(unit)
     source_subst_cols = ",".join(
-        f'sum(coalesce(rec.emis*{fac},0)) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'  # noqa
+        f'sum(rec.emis*{fac}) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'  # noqa
         for s in substances
     )
 
