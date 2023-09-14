@@ -64,8 +64,5 @@ class Settings(models.Model):
         elif self.codeset3 is not None:
             if codeset == self.codeset3.slug:
                 return 3
-        # TODO this should be removed once codesets properly set in settings
-        elif CodeSet.objects.filter(slug=codeset).first() is not None:
-            return CodeSet.objects.filter(slug=codeset).first().id
         else:
             raise ValueError(f"codeset '{codeset}' not found in inventory settings")
