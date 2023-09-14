@@ -64,5 +64,7 @@ class Settings(models.Model):
         elif self.codeset3 is not None:
             if codeset == self.codeset3.slug:
                 return 3
+        elif len(CodeSet.objects.filter(slug=codeset)) > 0:
+            return CodeSet.objects.filter(slug=codeset).first().id
         else:
             raise ValueError(f"codeset '{codeset}' not found in inventory settings")
