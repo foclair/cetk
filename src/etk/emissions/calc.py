@@ -3,7 +3,7 @@
 import pandas as pd
 from django.db import connection
 
-from etk.edb.models import Settings
+from etk.edb.models import Settings, Substance
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.queries import (
     create_aggregate_emis_query,
@@ -16,7 +16,7 @@ def get_used_substances():
     """return list of substances with emissions or emission factors."""
     sql = create_used_substances_query()
     cur = connection.cursor()
-    return [rec[0] for rec in cur.execute(sql).fetchall()]
+    return [Substance.objects.get(slug=rec[0]) for rec in cur.execute(sql).fetchall()]
 
 
 def calculate_source_emissions(
