@@ -47,18 +47,24 @@ class Settings(models.Model):
                 "srid": 3857,
                 "timezone": "Europe/Stockholm",
                 "extent": GEOSGeometry(DEFAULT_EXTENT, WGS84_SRID),
+                "codeset1": CodeSet.objects.filter(id=1).first(),
+                "codeset2": CodeSet.objects.filter(id=2).first(),
+                "codeset3": CodeSet.objects.filter(id=3).first(),
             }
         )[0]
 
     def get_codeset_index(self, codeset):
         """Return index of a specific codeset."""
-        if codeset == self.codeset1:
-            return 1
-        elif codeset == self.codeset2:
-            return 2
-        elif codeset == self.codeset3:
-            return 3
+        if self.codeset1 is not None:
+            if codeset == self.codeset1.slug:
+                return 1
+        elif self.codeset2 is not None:
+            if codeset == self.codeset2.slug:
+                return 2
+        elif self.codeset3 is not None:
+            if codeset == self.codeset3.slug:
+                return 3
+        elif len(CodeSet.objects.filter(slug=codeset)) > 0:
+            return CodeSet.objects.filter(slug=codeset).first().id
         else:
-            raise ValueError(
-                f"codeset '{codeset.slug}' not found in inventory settings"
-            )
+            raise ValueError(f"codeset '{codeset}' not found in inventory settings")

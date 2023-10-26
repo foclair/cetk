@@ -5,6 +5,8 @@ import logging
 import sys
 from pathlib import Path
 
+from django.db import transaction
+
 import etk
 from etk.db import run_migrate
 from etk.tools.utils import (
@@ -21,25 +23,35 @@ log = logging.getLogger(__name__)
 settings = etk.configure()
 
 from etk.edb import importers  # noqa
+from etk.edb.const import SHEET_NAMES  # noqa
 from etk.edb.models import Substance  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
 from etk.emissions.views import create_pointsource_emis_table  # noqa
 
-# sheets in order of import
-SHEETNAMES = ("codesets", "pointsources")
 SOURCETYPES = ("point",)
 DEFAULT_EMISSION_UNIT = "kg/year"
+
+
+sheet_choices = ["All"]
+sheet_choices.extend(SHEET_NAMES)
+
+
+class DryrunAbort(Exception):
+    """Forcing abort of database changes when doing dryrun."""
+
+    pass
 
 
 class Editor(object):
     def __init__(self):
         self.db_path = settings.DATABASES["default"]["NAME"]
 
-    def migrate(self, template=False):
-        if template:
-            db_path = get_template_db()
-        else:
-            db_path = get_db()
+    def migrate(self, template=False, db_path=None):
+        if db_path is None:
+            if template:
+                db_path = get_template_db()
+            else:
+                db_path = get_db()
         log.debug(f"Running migrations for database {db_path}")
         try:
             std_out, std_err = run_migrate(db_path=db_path)
@@ -47,8 +59,28 @@ class Editor(object):
             log.error(f"Error while migrating {db_path}: {err}")
         log.debug(f"Successfully migrated database {db_path}")
 
-    def import_pointsources(self, filename, unit):
-        importers.import_pointsources(filename, unit=unit)
+    def import_pointsources(self, filename, dry_run=False):
+        # reverse all created/updated DataModels if doing dry run or error occurs.
+        try:
+            with transaction.atomic():
+                progress = importers.import_pointsources(filename, validation=dry_run)
+                if dry_run:
+                    raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
+
+    def import_pointsourceactivities(self, filename, sheet, dry_run=False):
+        try:
+            with transaction.atomic():
+                progress = importers.import_pointsourceactivities(
+                    filename, import_sheets=sheet, validation=dry_run
+                )
+                if dry_run:
+                    raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
 
     def update_emission_tables(
         self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
@@ -131,7 +163,7 @@ def main():
 
     if main_args.command == "migrate":
         sub_parser = argparse.ArgumentParser(
-            description="Migrate database {db_path}.",
+            description=f"Migrate database {db_path}.",
             usage="usage: etk migrate",
         )
         sub_parser.add_argument(
@@ -139,8 +171,12 @@ def main():
             action="store_true",
             help="Migrate the template database",
         )
+        sub_parser.add_argument(
+            "--dbpath",
+            help="Specify database path manually",
+        )
         args = sub_parser.parse_args(sys.argv[2:])
-        editor.migrate(template=args.template)
+        editor.migrate(template=args.template, db_path=args.dbpath)
     elif main_args.command == "import":
         sub_parser = argparse.ArgumentParser(
             description="Import data from an xlsx-file",
@@ -149,23 +185,33 @@ def main():
         sub_parser.add_argument(
             "filename", help="Path to xslx-file", type=check_and_get_path
         )
-        sub_parser.add_argument("sheet", help="Sheet to import", choices=SHEETNAMES)
-        pointsource_grp = sub_parser.add_argument_group(
-            "pointsources", description="Options for pointsource import"
+        sub_parser.add_argument(
+            "sheets", help="List of sheets to import, valid names {SHEET_NAMES}"
         )
-        pointsource_grp.add_argument(
-            "--unit",
-            default="ton/year",
-            help="Unit of emissions to be imported, default=%(default)s",
+        sub_parser.add_argument(
+            "--dryrun",
+            action="store_true",
+            help="Do dry run to validate import file without actually importing data",
         )
+        # pointsource_grp = sub_parser.add_argument_group(
+        #     "pointsources", description="Options for pointsource import"
+        # )
         args = sub_parser.parse_args(sys.argv[2:])
         if not Path(db_path).exists():
             sys.stderr.write(
-                "Database does not exist, first run " "'etk create' or 'etk migrate'\n"
+                "Database " + db_path + " does not exist, first run "
+                "'etk create' or 'etk migrate'\n"
             )
             sys.exit(1)
-        if args.sheet == "pointsources":
-            editor.import_pointsources(args.filename, unit=args.unit)
+        if args.sheets == "PointSource":
+            status = editor.import_pointsources(args.filename, dry_run=args.dryrun)
+        else:
+            status = editor.import_pointsourceactivities(
+                args.filename, sheet=args.sheets, dry_run=args.dryrun
+            )
+        log.debug("Imported data from '{args.filename}' to '{db_path}")
+        sys.stdout.write(str(status))
+        sys.exit(0)
 
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(
@@ -208,6 +254,8 @@ def main():
             sys.exit(1)
         if args.update:
             editor.update_emission_tables(sourcetypes=args.sourcetypes, unit=args.unit)
+            sys.stdout.write("Successfully updated tables")
+            sys.exit(0)
         if args.aggregate is not None:
             editor.aggregate_emissions(
                 args.aggregate,
@@ -215,8 +263,10 @@ def main():
                 unit=args.unit,
                 codeset=args.codeset,
             )
+            sys.stdout.write("Successfully aggregated emissions\n")
+            sys.exit(0)
 
     elif main_args.command == "export":
-        sub_parser = argparse.ArgumentParser(description="Export data to file")
+        sub_parser = argparse.ArgumentParser(description="Export data to file\n")
         args = sub_parser.parse_args(sys.argv[2:])
         editor.export_data(*args)

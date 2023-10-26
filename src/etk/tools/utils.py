@@ -44,19 +44,21 @@ def run_update_emission_tables(db_path=None, **kwargs):
 
 def run_aggregate_emissions(filename, db_path=None, **kwargs):
     """write aggregated emissions to file."""
-    cmd_args = [str(filename), "--aggregate"]
+    cmd_args = ["--aggregate", str(filename)]
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
     return run("etk", "calc", db_path=db_path, *cmd_args)
 
 
-def run_import(filename, sheet, db_path=None, **kwargs):
+def run_import(filename, sheet, dry_run=False, db_path=None, **kwargs):
     """run import in a sub-process."""
-    cmd_args = [str(filename), sheet]
+    cmd_args = [str(filename), str(sheet)]
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
+    if dry_run:
+        cmd_args.append("--dryrun")
     return run("etk", "import", db_path=db_path, *cmd_args)
 
 
@@ -69,6 +71,7 @@ def run(*args, db_path=None):
     env = (
         os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
     )
+    print(args)
     proc = subprocess.run(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=env
     )

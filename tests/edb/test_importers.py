@@ -48,7 +48,7 @@ class TestImport:
         cs2.codes.create(code="A", label="Bla bla")
         cs2.save()
         # create pointsources
-        import_pointsources(pointsource_csv, unit="ton/year")
+        import_pointsources(pointsource_csv)
 
         assert PointSource.objects.all().count()
         source1 = PointSource.objects.get(name="source1")
@@ -66,10 +66,7 @@ class TestImport:
         source1.tags["test_tag"] = "test"
         source1.save()
         # update pointsources from xlsx
-        import_pointsources(
-            pointsource_xlsx,
-            unit="ton/year",
-        )
+        import_pointsources(pointsource_xlsx)
 
         # check that source has been overwritten
         source1 = PointSource.objects.get(name="source1")

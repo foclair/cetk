@@ -50,14 +50,19 @@ def create_pointsource_emis_table(substances, unit="kg/year"):
         substances=substances,
     )
     cur.execute("DROP TABLE IF EXISTS pointsource_emissions")
-    table_sql = f"""\
-CREATE TABLE pointsource_emissions AS
-  SELECT source_id,
-    {source_subst_cols}
+    table_sql = "CREATE TABLE pointsource_emissions AS SELECT source_id, " + ", ".join(
+        [f"cast({s.slug} as real) as {s.slug}" for s in substances]
+    )
+    table_sql += f"""
   FROM (
-{sql}
-  ) as rec
-  GROUP BY source_id"""
+     SELECT source_id,
+      {source_subst_cols}
+      FROM (
+      {sql}
+    ) as rec
+  GROUP BY source_id
+  )
+"""
     cur.execute(table_sql)
     cur.execute(
         "CREATE INDEX pointsource_emis_idx ON pointsource_emissions (source_id)"
