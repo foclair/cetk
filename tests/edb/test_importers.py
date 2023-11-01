@@ -7,12 +7,13 @@ import pytest
 
 from etk.edb.importers import (  # , import_timevars
     import_eea_emfacs,
-    import_pointsourceactivities,
+    import_sourceactivities,
     import_sources,
 )
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     AreaSource,
+    AreaSourceActivity,
     CodeSet,
     PointSource,
     PointSourceActivity,
@@ -120,11 +121,11 @@ class TestImport:
         # create pointsources
         filepath = resources.files("edb.data") / "pointsourceactivities.xlsx"
         # test if create pointsourceactivities works
-        psa = import_pointsourceactivities(filepath)
+        psa = import_sourceactivities(filepath)
         print(psa)
         assert PointSourceActivity.objects.all().count()
         # test if update also works
-        psa = import_pointsourceactivities(filepath)
+        psa = import_sourceactivities(filepath)
         print(psa)
         assert PointSourceActivity.objects.all().count()
 
@@ -141,3 +142,22 @@ class TestImport:
         assert source1.name == "source1"
         assert source1.timevar is None
         assert source1.substances.all().count() == 1
+
+        # test if update also works
+        import_sources(areasource_xlsx, type="area")
+        assert AreaSource.objects.all().count()
+
+    def test_import_areasourceactivities(self, vertical_dist):
+        vdist = vertical_dist  # noqa
+
+        # create pointsources
+        filepath = resources.files("edb.data") / "areasourceactivities.xlsx"
+        # test if create pointsourceactivities works
+        psa = import_sourceactivities(filepath)
+        print(psa)
+
+        assert AreaSourceActivity.objects.all().count()
+        # test if update also works
+        psa = import_sourceactivities(filepath)
+        print(psa)
+        assert AreaSourceActivity.objects.all().count()

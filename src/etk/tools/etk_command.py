@@ -75,8 +75,8 @@ class Editor(object):
     def import_pointsourceactivities(self, filename, sheet, dry_run=False):
         try:
             with transaction.atomic():
-                progress = importers.import_pointsourceactivities(
-                    filename, import_sheets=sheet, validation=dry_run
+                progress = importers.import_sourceactivities(
+                    filename, import_sheets=sheet, validation=dry_run, type="point"
                 )
                 if dry_run:
                     raise DryrunAbort
@@ -210,8 +210,8 @@ def main():
                 args.filename, dry_run=args.dryrun, type="point"
             )
         else:
-            status = editor.import_pointsourceactivities(
-                args.filename, sheet=args.sheets, dry_run=args.dryrun
+            status = editor.import_sourceactivities(
+                args.filename, sheet=args.sheets, dry_run=args.dryrun, type="point"
             )
         log.debug("Imported data from '{args.filename}' to '{db_path}")
         sys.stdout.write(str(status))

@@ -16,6 +16,7 @@ from etk.edb.models.source_models import (
     Activity,
     ActivityCode,
     AreaSource,
+    AreaSourceActivity,
     AreaSourceSubstance,
     CodeSet,
     EmissionFactor,
@@ -486,10 +487,16 @@ def import_sources(
                 setattr(source, key, val)
             update_sources.append(source)
             drop_substances += list(source.substances.all())
-            create_substances += [
-                PointSourceSubstance(source=source, **emis)
-                for emis in emissions.values()
-            ]
+            if type == "point":
+                create_substances += [
+                    PointSourceSubstance(source=source, **emis)
+                    for emis in emissions.values()
+                ]
+            elif type == "area":
+                create_substances += [
+                    AreaSourceSubstance(source=source, **emis)
+                    for emis in emissions.values()
+                ]
         except KeyError:
             if type == "point":
                 source = PointSource(name=source_name, **source_data)
@@ -822,7 +829,7 @@ def import_eea_emfacs(filepath, encoding=None):
     return create_eea_emfac
 
 
-def import_pointsourceactivities(
+def import_sourceactivities(
     filepath,
     encoding=None,
     srid=None,
@@ -1000,6 +1007,16 @@ def import_pointsourceactivities(
             return_message=return_message,
             validation=validation,
             type="point",
+        )
+        return_dict.update(ps)
+
+    if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
+        ps, return_message = import_sources(
+            filepath,
+            srid=srid,
+            return_message=return_message,
+            validation=validation,
+            type="area",
         )
         return_dict.update(ps)
 
@@ -1191,6 +1208,63 @@ def import_pointsourceactivities(
                 "pointsourceactivity": {
                     "updated": len(update_pointsourceactivities),
                     "created": len(create_pointsourceactivities),
+                }
+            }
+        )
+
+    if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
+        areasourceactivities = cache_queryset(
+            AreaSourceActivity.objects.all(), ["activity", "source"]
+        )
+        # TODO check unique activity for source
+        data = workbook["AreaSource"].values
+        df_areasource = worksheet_to_dataframe(data)
+        activities = cache_queryset(Activity.objects.all(), "name")
+        areasources = cache_sources(
+            AreaSource.objects.select_related("facility")
+            .prefetch_related("substances")
+            .all()
+        )
+        create_areasourceactivities = []
+        update_areasourceactivities = []
+        for row_key, row in df_areasource.iterrows():
+            if "activity_name" in row:
+                if row["activity_name"] is not None:
+                    rate = row["activity_rate"]
+                    try:
+                        activity = activities[row["activity_name"]]
+                    except KeyError:
+                        return_message = import_error(
+                            f"unknown activity '{activity_name}'"
+                            + f" for areasource '{row['source_name']}'",
+                            return_message,
+                            validation,
+                        )
+                    rate = activity_rate_unit_to_si(rate, activity.unit)
+                    # original unit stored in activity.unit, but
+                    # areasourceactivity.rate stored as activity / s.
+                    areasource = areasources[
+                        str(row["facility_id"]), row["source_name"]
+                    ]
+                    try:
+                        psa = areasourceactivities[activity, areasource]
+                        setattr(psa, "rate", rate)
+                        update_areasourceactivities.append(psa)
+                    except KeyError:
+                        psa = AreaSourceActivity(
+                            activity=activity, source=areasource, rate=rate
+                        )
+                        create_areasourceactivities.append(psa)
+
+        AreaSourceActivity.objects.bulk_create(create_areasourceactivities)
+        AreaSourceActivity.objects.bulk_update(
+            update_areasourceactivities, ["activity", "source", "rate"]
+        )
+        return_dict.update(
+            {
+                "areasourceactivity": {
+                    "updated": len(update_areasourceactivities),
+                    "created": len(create_areasourceactivities),
                 }
             }
         )
