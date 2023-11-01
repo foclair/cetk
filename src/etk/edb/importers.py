@@ -324,9 +324,10 @@ def import_sources(
                     f"Invalid geometry on row {row_nr}", return_message, validation
                 )
             # create geometry
-            # WKT representation of the polygon, if including EPGS
-            # wkt_polygon = "SRID=EPSG:XXXX;POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))"
-            source_data["geom"] = GEOSGeometry(wkt_polygon)
+            EPSG = row_dict["EPSG"]
+            if pd.isnull(EPSG):
+                EPSG = 4326
+            source_data["geom"] = GEOSGeometry(f"SRID={int(EPSG)};" + wkt_polygon)
         else:
             return_message = import_error(
                 "this sourcetype is not implemented",

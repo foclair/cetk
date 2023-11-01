@@ -72,11 +72,25 @@ class Editor(object):
             pass
         return progress
 
-    def import_pointsourceactivities(self, filename, sheet, dry_run=False):
+    def import_areasources(self, filename, dry_run=False):
+        # reverse all created/updated DataModels if doing dry run or error occurs.
+        try:
+            with transaction.atomic():
+                progress = importers.import_sources(
+                    filename, validation=dry_run, type="area"
+                )
+                if dry_run:
+                    raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
+
+    def import_sourceactivities(self, filename, sheet, dry_run=False):
+        # works for point and area, recognizes from tab name which one.
         try:
             with transaction.atomic():
                 progress = importers.import_sourceactivities(
-                    filename, import_sheets=sheet, validation=dry_run, type="point"
+                    filename, import_sheets=sheet, validation=dry_run
                 )
                 if dry_run:
                     raise DryrunAbort
@@ -209,9 +223,13 @@ def main():
             status = editor.import_sources(
                 args.filename, dry_run=args.dryrun, type="point"
             )
+        if args.sheets == "AreaSource":
+            status = editor.import_sources(
+                args.filename, dry_run=args.dryrun, type="area"
+            )
         else:
             status = editor.import_sourceactivities(
-                args.filename, sheet=args.sheets, dry_run=args.dryrun, type="point"
+                args.filename, sheet=args.sheets, dry_run=args.dryrun
             )
         log.debug("Imported data from '{args.filename}' to '{db_path}")
         sys.stdout.write(str(status))
