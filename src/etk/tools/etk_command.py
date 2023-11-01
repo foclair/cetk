@@ -63,7 +63,9 @@ class Editor(object):
         # reverse all created/updated DataModels if doing dry run or error occurs.
         try:
             with transaction.atomic():
-                progress = importers.import_pointsources(filename, validation=dry_run)
+                progress = importers.import_sources(
+                    filename, validation=dry_run, type="point"
+                )
                 if dry_run:
                     raise DryrunAbort
         except DryrunAbort:
@@ -204,7 +206,9 @@ def main():
             )
             sys.exit(1)
         if args.sheets == "PointSource":
-            status = editor.import_pointsources(args.filename, dry_run=args.dryrun)
+            status = editor.import_sources(
+                args.filename, dry_run=args.dryrun, type="point"
+            )
         else:
             status = editor.import_pointsourceactivities(
                 args.filename, sheet=args.sheets, dry_run=args.dryrun

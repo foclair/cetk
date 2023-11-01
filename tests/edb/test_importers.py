@@ -8,10 +8,15 @@ import pytest
 from etk.edb.importers import (  # , import_timevars
     import_eea_emfacs,
     import_pointsourceactivities,
-    import_pointsources,
+    import_sources,
 )
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
-from etk.edb.models.source_models import CodeSet, PointSource, PointSourceActivity
+from etk.edb.models.source_models import (
+    AreaSource,
+    CodeSet,
+    PointSource,
+    PointSourceActivity,
+)
 from etk.edb.units import emis_conversion_factor_from_si
 
 
@@ -23,6 +28,11 @@ def pointsource_csv(tmpdir, settings):
 @pytest.fixture
 def pointsource_xlsx(tmpdir, settings):
     return resources.files("edb.data") / "pointsources.xlsx"
+
+
+@pytest.fixture
+def areasource_xlsx(tmpdir, settings):
+    return resources.files("edb.data") / "areasources.xlsx"
 
 
 class TestImport:
@@ -48,7 +58,7 @@ class TestImport:
         cs2.codes.create(code="A", label="Bla bla")
         cs2.save()
         # create pointsources
-        import_pointsources(pointsource_csv)
+        import_sources(pointsource_csv, type="point")
 
         assert PointSource.objects.all().count()
         source1 = PointSource.objects.get(name="source1")
@@ -66,7 +76,7 @@ class TestImport:
         source1.tags["test_tag"] = "test"
         source1.save()
         # update pointsources from xlsx
-        import_pointsources(pointsource_xlsx)
+        import_sources(pointsource_xlsx, type="point")
 
         # check that source has been overwritten
         source1 = PointSource.objects.get(name="source1")
@@ -117,3 +127,17 @@ class TestImport:
         psa = import_pointsourceactivities(filepath)
         print(psa)
         assert PointSourceActivity.objects.all().count()
+
+    def test_import_areasources(self, vertical_dist, areasource_xlsx):
+
+        # similar to base_set in gadget
+        cs1 = CodeSet.objects.create(name="SNAP", slug="SNAP")
+        cs1.codes.create(code="1.3", label="Energy", vertical_dist=vertical_dist)
+        cs1.save()
+        # create areasources
+        import_sources(areasource_xlsx, type="area")
+        assert AreaSource.objects.all().count()
+        source1 = AreaSource.objects.get(name="source1")
+        assert source1.name == "source1"
+        assert source1.timevar is None
+        assert source1.substances.all().count() == 1

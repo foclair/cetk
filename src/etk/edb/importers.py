@@ -5,7 +5,7 @@ from itertools import islice
 
 import numpy as np
 import pandas as pd
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db import IntegrityError
 from openpyxl import load_workbook
 
@@ -15,6 +15,8 @@ from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     Activity,
     ActivityCode,
+    AreaSource,
+    AreaSourceSubstance,
     CodeSet,
     EmissionFactor,
     Facility,
@@ -33,7 +35,15 @@ from etk.edb.units import (
 from etk.tools.utils import cache_queryset
 
 # column facility and name are used as index and is therefore not included here
-REQUIRED_COLUMNS = {
+REQUIRED_COLUMNS_AREA = {
+    "facility_id": np.str_,
+    "geometry": np.str_,
+    "facility_name": np.str_,
+    "source_name": np.str_,
+    "timevar": np.str_,
+}
+
+REQUIRED_COLUMNS_POINT = {
     "facility_id": np.str_,
     "lat": float,
     "lon": float,
@@ -70,7 +80,7 @@ def import_error(message, return_message="", validation=False):
     return return_message
 
 
-def cache_pointsources(queryset):
+def cache_sources(queryset):
     """Return dict of model instances with (facility__official_id, name): instance"""
     sources = {}
     for source in queryset:
@@ -108,8 +118,13 @@ def worksheet_to_dataframe(data):
     return df
 
 
-def import_pointsources(
-    filepath, return_message="", validation=False, encoding=None, srid=None
+def import_sources(
+    filepath,
+    return_message="",
+    validation=False,
+    encoding=None,
+    srid=None,
+    type="point",
 ):
     """Import point-sources from xlsx or csv-file.
 
@@ -129,11 +144,25 @@ def import_pointsources(
     substances = cache_queryset(Substance.objects.all(), "slug")
     timevars = cache_queryset(Timevar.objects.all(), "name")
     facilities = cache_queryset(Facility.objects.all(), "official_id")
-    pointsources = cache_pointsources(
-        PointSource.objects.select_related("facility")
-        .prefetch_related("substances")
-        .all()
-    )
+
+    if type == "point":
+        sources = cache_sources(
+            PointSource.objects.select_related("facility")
+            .prefetch_related("substances")
+            .all()
+        )
+    elif type == "area":
+        sources = cache_sources(
+            AreaSource.objects.select_related("facility")
+            .prefetch_related("substances")
+            .all()
+        )
+    else:
+        return_message = import_error(
+            "this sourcetype is not implemented",
+            return_message,
+            validation,
+        )
 
     # using filter.first() here, not get() because code_set{i} does not have to exist
     code_sets = [
@@ -143,15 +172,26 @@ def import_pointsources(
     extension = filepath.suffix
     if extension == ".csv":
         # read csv-file
-        with open(filepath, encoding=encoding or "utf-8") as csvfile:
-            log.debug("reading point-sources from csv-file")
-            df = pd.read_csv(
-                csvfile,
-                sep=";",
-                skip_blank_lines=True,
-                comment="#",
-                dtype=REQUIRED_COLUMNS,
-            )
+        if type == "point":
+            with open(filepath, encoding=encoding or "utf-8") as csvfile:
+                log.debug("reading point-sources from csv-file")
+                df = pd.read_csv(
+                    csvfile,
+                    sep=";",
+                    skip_blank_lines=True,
+                    comment="#",
+                    dtype=REQUIRED_COLUMNS_POINT,
+                )
+        else:
+            with open(filepath, encoding=encoding or "utf-8") as csvfile:
+                log.debug("reading area-sources from csv-file")
+                df = pd.read_csv(
+                    csvfile,
+                    sep=";",
+                    skip_blank_lines=True,
+                    comment="#",
+                    dtype=REQUIRED_COLUMNS_AREA,
+                )
     elif extension == ".xlsx":
         # read spreadsheet
         try:
@@ -160,12 +200,23 @@ def import_pointsources(
             return_message = import_error(str(exc), return_message, validation)
         worksheet = workbook.worksheets[0]
         if len(workbook.worksheets) > 1:
-            log.debug("Multiple sheets in spreadsheet, importing sheet 'PointSource'.")
-            data = workbook["PointSource"].values
+            if type == "point":
+                log.debug(
+                    "Multiple sheets in spreadsheet, importing sheet 'PointSource'."
+                )
+                data = workbook["PointSource"].values
+            else:
+                log.debug(
+                    "Multiple sheets in spreadsheet, importing sheet 'PointSource'."
+                )
+                data = workbook["AreaSource"].values
         else:
             data = worksheet.values
         df = worksheet_to_dataframe(data)
-        df = df.astype(dtype=REQUIRED_COLUMNS)
+        if type == "point":
+            df = df.astype(dtype=REQUIRED_COLUMNS_POINT)
+        else:
+            df = df.astype(dtype=REQUIRED_COLUMNS_AREA)
         # below is necessary not to create facilities with name 'None'
         df = df.replace(to_replace="None", value=None)
     else:
@@ -174,11 +225,18 @@ def import_pointsources(
             return_message,
             validation,
         )
-    for col in REQUIRED_COLUMNS.keys():
-        if col not in df.columns:
-            return_message = import_error(
-                f"Missing required column '{col}'", return_message, validation
-            )
+    if type == "point":
+        for col in REQUIRED_COLUMNS_POINT.keys():
+            if col not in df.columns:
+                return_message = import_error(
+                    f"Missing required column '{col}'", return_message, validation
+                )
+    else:
+        for col in REQUIRED_COLUMNS_AREA.keys():
+            if col not in df.columns:
+                return_message = import_error(
+                    f"Missing required column '{col}'", return_message, validation
+                )
 
     # set dataframe index
     try:
@@ -209,48 +267,71 @@ def import_pointsources(
             "activitycode3": None,
         }
 
-        # get pointsource coordinates
-        try:
-            if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
+        if type == "point":
+            # get pointsource coordinates
+            try:
+                if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
+                    return_message = import_error(
+                        f"missing coordinates for source '{row_key}'",
+                        return_message,
+                        validation,
+                    )
+                x = float(row_dict["lon"])
+                y = float(row_dict["lat"])
+            except ValueError:
                 return_message = import_error(
-                    f"missing coordinates for source '{row_key}'",
-                    return_message,
-                    validation,
+                    f"Invalid coordinates on row {row_nr}", return_message, validation
                 )
-            x = float(row_dict["lon"])
-            y = float(row_dict["lat"])
-        except ValueError:
-            return_message = import_error(
-                f"Invalid coordinates on row {row_nr}", return_message, validation
+            # create geometry
+            source_data["geom"] = Point(x, y, srid=srid or project_srid).transform(
+                4326, clone=True
             )
+            # get chimney properties
+            for attr, key in {
+                "chimney_height": "chimney_height",
+                "chimney_inner_diameter": "inner_diameter",
+                "chimney_outer_diameter": "outer_diameter",
+                "chimney_gas_speed": "gas_speed",
+                "chimney_gas_temperature": "gas_temperature",
+            }.items():
+                if pd.isna(row_dict[key]):
+                    return_message = import_error(
+                        f"Missing value for {key} on row {row_nr}",
+                        return_message,
+                        validation,
+                    )
+                else:
+                    source_data[attr] = row_dict[key]
 
-        # create geometry
-        source_data["geom"] = Point(x, y, srid=srid or project_srid).transform(
-            4326, clone=True
-        )
-
-        # get chimney properties
-        for attr, key in {
-            "chimney_height": "chimney_height",
-            "chimney_inner_diameter": "inner_diameter",
-            "chimney_outer_diameter": "outer_diameter",
-            "chimney_gas_speed": "gas_speed",
-            "chimney_gas_temperature": "gas_temperature",
-        }.items():
-            if pd.isna(row_dict[key]):
+            # get downdraft parameters
+            if not pd.isnull(row_dict["house_width"]):
+                source_data["house_width"] = row_dict["house_width"]
+            if not pd.isnull(row_dict["house_height"]):
+                source_data["house_height"] = row_dict["house_height"]
+        elif type == "area":
+            try:
+                if pd.isnull(row_dict["geometry"]):
+                    return_message = import_error(
+                        f"missing area polygon for source '{row_key}'",
+                        return_message,
+                        validation,
+                    )
+                wkt_polygon = row_dict["geometry"]
+                # TODO add check that valid WKT polygon
+            except ValueError:
                 return_message = import_error(
-                    f"Missing value for {key} on row {row_nr}",
-                    return_message,
-                    validation,
+                    f"Invalid geometry on row {row_nr}", return_message, validation
                 )
-            else:
-                source_data[attr] = row_dict[key]
-
-        # get downdraft parameters
-        if not pd.isnull(row_dict["house_width"]):
-            source_data["house_width"] = row_dict["house_width"]
-        if not pd.isnull(row_dict["house_height"]):
-            source_data["house_height"] = row_dict["house_height"]
+            # create geometry
+            # WKT representation of the polygon, if including EPGS
+            # wkt_polygon = "SRID=EPSG:XXXX;POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))"
+            source_data["geom"] = GEOSGeometry(wkt_polygon)
+        else:
+            return_message = import_error(
+                "this sourcetype is not implemented",
+                return_message,
+                validation,
+            )
 
         # get activitycodes
         for code_ind, code_set in enumerate(code_sets, 1):
@@ -371,7 +452,7 @@ def import_pointsources(
 
         if pd.isna(source_name):
             return_message = import_error(
-                f"No name specified for point-source on row {row_nr}",
+                f"No name specified for source on row {row_nr}",
                 return_message,
                 validation,
             )
@@ -400,7 +481,7 @@ def import_pointsources(
         source_data["facility"] = facility
         source_key = (official_facility_id, source_name)
         try:
-            source = pointsources[source_key]
+            source = sources[source_key]
             for key, val in source_data.items():
                 setattr(source, key, val)
             update_sources.append(source)
@@ -410,19 +491,34 @@ def import_pointsources(
                 for emis in emissions.values()
             ]
         except KeyError:
-            source = PointSource(name=source_name, **source_data)
-            if source_key not in create_sources:
-                create_sources[source_key] = source
-                create_substances += [
-                    PointSourceSubstance(source=source, **emis)
-                    for emis in emissions.values()
-                ]
+            if type == "point":
+                source = PointSource(name=source_name, **source_data)
+                if source_key not in create_sources:
+                    create_sources[source_key] = source
+                    create_substances += [
+                        PointSourceSubstance(source=source, **emis)
+                        for emis in emissions.values()
+                    ]
+                else:
+                    return_message = import_error(
+                        f"multiple rows for the same point-source '{source_name}'",
+                        return_message,
+                        validation,
+                    )
             else:
-                return_message = import_error(
-                    f"multiple rows for the same point-source '{source_name}'",
-                    return_message,
-                    validation,
-                )
+                source = AreaSource(name=source_name, **source_data)
+                if source_key not in create_sources:
+                    create_sources[source_key] = source
+                    create_substances += [
+                        AreaSourceSubstance(source=source, **emis)
+                        for emis in emissions.values()
+                    ]
+                else:
+                    return_message = import_error(
+                        f"multiple rows for the same area-source '{source_name}'",
+                        return_message,
+                        validation,
+                    )
         row_nr += 1
 
     existing_facility_names = set([f.name for f in facilities.values()])
@@ -463,44 +559,83 @@ def import_pointsources(
             # changed by Eef, because IDs were None
             source.facility_id = Facility.objects.get(official_id=source.facility).id
 
-    PointSource.objects.bulk_create(create_sources.values())
-    PointSource.objects.bulk_update(
-        update_sources,
-        [
-            "name",
-            "geom",
-            "tags",
-            "chimney_gas_speed",
-            "chimney_gas_temperature",
-            "chimney_height",
-            "chimney_inner_diameter",
-            "chimney_outer_diameter",
-            "house_height",
-            "house_width",
-            "activitycode1",
-            "activitycode2",
-            "activitycode3",
-        ],
-    )
+    if type == "point":
+        PointSource.objects.bulk_create(create_sources.values())
+        PointSource.objects.bulk_update(
+            update_sources,
+            [
+                "name",
+                "geom",
+                "tags",
+                "chimney_gas_speed",
+                "chimney_gas_temperature",
+                "chimney_height",
+                "chimney_inner_diameter",
+                "chimney_outer_diameter",
+                "house_height",
+                "house_width",
+                "activitycode1",
+                "activitycode2",
+                "activitycode3",
+            ],
+        )
 
-    # drop existing substance emissions of point-sources that will be updated
-    PointSourceSubstance.objects.filter(
-        pk__in=[inst.id for inst in drop_substances]
-    ).delete()
+        # drop existing substance emissions of point-sources that will be updated
+        PointSourceSubstance.objects.filter(
+            pk__in=[inst.id for inst in drop_substances]
+        ).delete()
 
-    # ensure PointSourceSubstance.source_id is not None
-    for emis in create_substances:
-        emis.source_id = PointSource.objects.get(
-            name=emis.source, facility_id=emis.source.facility_id
-        ).id
-    PointSourceSubstance.objects.bulk_create(create_substances)
-    return_dict = {
-        "facility": {
-            "updated": len(update_facilities),
-            "created": len(create_facilities),
-        },
-        "pointsource": {"updated": len(update_sources), "created": len(create_sources)},
-    }
+        # ensure PointSourceSubstance.source_id is not None
+        for emis in create_substances:
+            emis.source_id = PointSource.objects.get(
+                name=emis.source, facility_id=emis.source.facility_id
+            ).id
+        PointSourceSubstance.objects.bulk_create(create_substances)
+        return_dict = {
+            "facility": {
+                "updated": len(update_facilities),
+                "created": len(create_facilities),
+            },
+            "pointsource": {
+                "updated": len(update_sources),
+                "created": len(create_sources),
+            },
+        }
+    if type == "area":
+        AreaSource.objects.bulk_create(create_sources.values())
+        AreaSource.objects.bulk_update(
+            update_sources,
+            [
+                "name",
+                "geom",
+                "tags",
+                "activitycode1",
+                "activitycode2",
+                "activitycode3",
+            ],
+        )
+
+        # drop existing substance emissions of point-sources that will be updated
+        AreaSourceSubstance.objects.filter(
+            pk__in=[inst.id for inst in drop_substances]
+        ).delete()
+
+        # ensure PointSourceSubstance.source_id is not None
+        for emis in create_substances:
+            emis.source_id = AreaSource.objects.get(
+                name=emis.source, facility_id=emis.source.facility_id
+            ).id
+        AreaSourceSubstance.objects.bulk_create(create_substances)
+        return_dict = {
+            "facility": {
+                "updated": len(update_facilities),
+                "created": len(create_facilities),
+            },
+            "areasource": {
+                "updated": len(update_sources),
+                "created": len(create_sources),
+            },
+        }
     return return_dict, return_message
 
 
@@ -859,8 +994,12 @@ def import_pointsourceactivities(
     # Could be that activities are linked to previously imported pointsources,
     # or pointsources to be imported later, therefore not requiring PointSource-sheet.
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        ps, return_message = import_pointsources(
-            filepath, srid=srid, return_message=return_message, validation=validation
+        ps, return_message = import_sources(
+            filepath,
+            srid=srid,
+            return_message=return_message,
+            validation=validation,
+            type="point",
         )
         return_dict.update(ps)
 
@@ -1007,7 +1146,7 @@ def import_pointsourceactivities(
         data = workbook["PointSource"].values
         df_pointsource = worksheet_to_dataframe(data)
         activities = cache_queryset(Activity.objects.all(), "name")
-        pointsources = cache_pointsources(
+        pointsources = cache_sources(
             PointSource.objects.select_related("facility")
             .prefetch_related("substances")
             .all()
