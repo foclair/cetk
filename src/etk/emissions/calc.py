@@ -75,10 +75,11 @@ def aggregate_emissions(
     cur = connection.cursor()
     cur.execute(sql)
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
-    try:
-        codeset = CodeSet.objects.get(slug=codeset)
-    except CodeSet.DoesNotExist:
-        raise ValueError(f"Codeset {codeset} does not exist, choose valid slug.")
+    if codeset is not None:
+        try:
+            codeset = CodeSet.objects.get(slug=codeset)
+        except CodeSet.DoesNotExist:
+            raise ValueError(f"Codeset {codeset} does not exist, choose valid slug.")
     if codeset is not None:
         # add code labels to dataframe
         df.insert(1, "activity", "")
