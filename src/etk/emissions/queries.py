@@ -18,7 +18,8 @@ def load_sql(filename):
     return resources.files("etk.emissions").joinpath(filename).read_text()
 
 
-def create_pointsource_emis_query(
+def create_source_emis_query(
+    sourcetype="point",  # or "area"
     srid=None,
     name=None,
     ids=None,
@@ -46,11 +47,7 @@ def create_pointsource_emis_query(
     #        ac3: iterable of activitycode instances
     """
 
-    sql = load_sql("pointsource_emissions.sql")
-    # ac_filter, ac_params = create_activitycode_where_clauses(
-    #    ac1, ac2, ac3, first_cond=False
-    # )
-    # source filters
+    sql = load_sql(sourcetype + "source_emissions.sql")
     source_filters = []
     if tags is not None:
         source_filters.append(create_tag_where_clause(tags))
@@ -59,6 +56,7 @@ def create_pointsource_emis_query(
     if name is not None:
         source_filters.append(create_name_where_clause(name))
     if polygon is not None:
+        # NB "point" here works for point and areasources
         source_filters.append(create_polygon_where_clause("point", polygon))
     if len(source_filters) > 0:
         source_filter_sql = "WHERE " + " AND ".join(source_filters)

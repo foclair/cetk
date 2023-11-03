@@ -4,7 +4,7 @@ from django.db import connection
 
 from etk.edb.models import Settings
 from etk.edb.units import emis_conversion_factor_from_si
-from etk.emissions.queries import create_pointsource_emis_query
+from etk.emissions.queries import create_source_emis_query
 
 
 def create_pointsource_emis_view(substances, unit="kg/year"):
@@ -18,8 +18,9 @@ def create_pointsource_emis_view(substances, unit="kg/year"):
     )
 
     # create point source emission view
-    sql = create_pointsource_emis_query(
-        settings.srid,
+    sql = create_source_emis_query(
+        sourcetype="point",
+        srid=settings.srid,
         substances=substances,
     )
     cur.execute("DROP VIEW IF EXISTS pointsource_emissions")
@@ -45,8 +46,9 @@ def create_pointsource_emis_table(substances, unit="kg/year"):
     )
 
     # create point source emission view
-    sql = create_pointsource_emis_query(
-        settings.srid,
+    sql = create_source_emis_query(
+        sourcetype="point",
+        srid=settings.srid,
         substances=substances,
     )
     cur.execute("DROP TABLE IF EXISTS pointsource_emissions")
