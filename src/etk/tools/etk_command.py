@@ -26,9 +26,12 @@ from etk.edb import importers  # noqa
 from etk.edb.const import SHEET_NAMES  # noqa
 from etk.edb.models import Substance  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
-from etk.emissions.views import create_pointsource_emis_table  # noqa
+from etk.emissions.views import (  # noqa
+    create_areasource_emis_table,
+    create_pointsource_emis_table,
+)
 
-SOURCETYPES = ("point",)
+SOURCETYPES = ("point", "area")
 DEFAULT_EMISSION_UNIT = "kg/year"
 
 
@@ -105,6 +108,8 @@ class Editor(object):
         substances = substances or get_used_substances()
         if "point" in sourcetypes:
             create_pointsource_emis_table(substances=substances, unit=unit)
+        if "area" in sourcetypes:
+            create_areasource_emis_table(substances=substances, unit=unit)
 
     def aggregate_emissions(
         self,
@@ -276,7 +281,7 @@ def main():
             sys.exit(1)
         if args.update:
             editor.update_emission_tables(sourcetypes=args.sourcetypes, unit=args.unit)
-            sys.stdout.write("Successfully updated tables")
+            sys.stdout.write("Successfully updated tables\n")
             sys.exit(0)
         if args.aggregate is not None:
             editor.aggregate_emissions(
