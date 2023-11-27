@@ -901,7 +901,7 @@ def import_sourceactivities(
                 setattr(codeset, "description", df_codeset["description"][row_nr])
                 update_codesets.append(codeset)
             except CodeSet.DoesNotExist:
-                if nr_codesets < 4:
+                if nr_codesets + len(create_codesets) < 3:
                     codeset = CodeSet(
                         name=df_codeset["name"][row_nr],
                         slug=slug,

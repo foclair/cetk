@@ -85,6 +85,7 @@ def aggregate_emissions(
         df.insert(1, "activity", "")
         code_labels = dict(codeset.codes.values_list("code", "label"))
         for ind in df.index:
+            # breakpoint()
             code = df.loc[ind, "activitycode"]
             if code is not None:
                 df.loc[ind, "activity"] = code_labels[code]
