@@ -8,6 +8,8 @@ from argparse import ArgumentTypeError
 from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError  # noqa
 
+from django.contrib.gis.geos import GEOSGeometry
+
 log = logging.getLogger(__name__)
 
 
@@ -97,3 +99,22 @@ def cache_codeset(code_set):
     if code_set is None:
         return {}
     return cache_queryset(code_set.codes.all(), "code")
+
+
+def get_nodes_from_wkt(wkt):
+    """Extract list of nodes (x, y) from WKT.
+
+    geom_type: 'POINT', 'LINESTRING' or 'POLYGON'
+
+    """
+    geom = GEOSGeometry(wkt)
+    if geom.geom_type == "Point":
+        return (geom.coords,)
+    if geom.geom_type == "LineString":
+        return geom.coords
+    if geom.geom_type == "Polygon":
+        return geom.coords[0]
+
+    raise NotImplementedError(
+        f'Geometry type specified in WKT not implemented: "{wkt}"'
+    )

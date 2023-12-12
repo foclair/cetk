@@ -345,10 +345,30 @@ def get_normalization_constant(typeday, month, timezone):
     return len(values) / values.sum()
 
 
-def normalize(timevar, timezone=None):
+def timevar_to_series(time_index, *timevars, timezone=None):
+    """Produce normalized time series from one or more timevar instances."""
+    if not timevars:
+        raise TypeError("at least one timevar must be given")
+    if timezone is None:
+        timezone = TIME_ZONE  # TODO or Settings.timezone?!
+    typeday = np.multiply.reduce([t.typeday for t in timevars])
+    month = np.multiply.reduce([t.month for t in timevars])
+    if len(timevars) > 1:
+        normalization_constant = get_normalization_constant(typeday, month, timezone)
+    else:
+        normalization_constant = timevars[0].normalization_constant
+    local_time_index = time_index.tz_convert(timezone)
+    values = (
+        typeday[local_time_index.hour, local_time_index.weekday]
+        * month[local_time_index.month - 1]
+    )
+    return pd.Series(normalization_constant * values, index=time_index)
+
+
+def timevar_normalize(timevar, timezone=None):
     """Set the normalization constants on a timevar instance."""
     if timezone is None:
-        timezone = TIME_ZONE
+        timezone = TIME_ZONE  # or Settings.timezone?
     typeday = np.array(ast.literal_eval(timevar.typeday))
     month = np.array(ast.literal_eval(timevar.month))
     timevar.typeday_sum = typeday.sum()
@@ -386,12 +406,12 @@ class TimevarBase(models.Model):
     @property
     def normalization_constant(self):
         if self._normalization_constant is None:
-            normalize(self)
+            timevar_normalize(self)
         return self._normalization_constant
 
     def save(self, *args, **kwargs):
         """Overloads save to ensure normalizing factors are calculated."""
-        normalize(self)
+        timevar_normalize(self)
         super(TimevarBase, self).save(*args, **kwargs)
 
 
