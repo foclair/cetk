@@ -1,15 +1,19 @@
 """Rasterization of emission sources."""
 
 import datetime
+import logging
 from copy import copy
 from math import ceil
 
+import netCDF4 as nc
 import numpy as np
 import pandas as pd
+import rasterio as rio
 from django.contrib.gis.geos import Polygon
 from rastafari import even_odd_polygon_fill
 
 # TODO EmissionCache needs to be updated when road and grid sources introduced
+from etk import __version__
 from etk.edb.cache import EmissionCache, NotInCacheError
 from etk.edb.models.common_models import Settings
 from etk.edb.models.source_models import (
@@ -24,19 +28,11 @@ from etk.emissions.calc import calculate_source_emissions
 from etk.tools.utils import get_nodes_from_wkt
 
 # short  source type identifiers for conveniency
-POINT = PointSource.sourcetype
+POINT = PointSource.sourcetype  # equal to 'point'
 AREA = AreaSource.sourcetype
 
 # supported source types
 SOURCETYPES = (POINT, AREA)
-
-
-class Field2D:
-    pass
-
-
-class Field3D:
-    pass
 
 
 class EmissionRasterizer:
@@ -57,7 +53,7 @@ class EmissionRasterizer:
         args
             output: output.path: path to store NetCDF files
                     output.extent: extent of the raster (x1, y1, x2, y2)
-                    output.srid: SRID of output
+                    output.srid: SRID of output, as int of 4 numbers (ex. 3006)
                     output.timezone: timezone of output
             nx: raster dimension in x-direction
             ny: raster dimension in y-direction
@@ -66,6 +62,7 @@ class EmissionRasterizer:
         self.level_weights = {}
         self.output = output
         self.extent = output.extent
+        self.crs = rio.crs.CRS.from_epsg(output.srid)
         self._cache = None
         self.nx = nx
         self.ny = ny
@@ -73,6 +70,8 @@ class EmissionRasterizer:
 
         # querysets for emission
         self.querysets = {}
+
+        self.log = logging.getLogger(__name__)
 
     def reset(self):
         """Reset attributes.
@@ -122,7 +121,7 @@ class EmissionRasterizer:
 
     def _get_level_weights(self):
         """redistribute vertical distr. into levels of result dataset."""
-        # don't use levels yet
+        # TODO don't use levels yet
         if Settings.get_current().codeset1 is None:
             self.log.warning(
                 "inventory has no primary code-set - "
@@ -190,7 +189,7 @@ class EmissionRasterizer:
             {
                 tvar.id
                 or "default": timevar_to_series(
-                    shifted_index, tvar, timezone=self.timezone
+                    shifted_index, tvar, timezone=self.output.timezone
                 ).to_numpy()
                 for tvar in self.timevars.values()
             },
@@ -349,7 +348,7 @@ class EmissionRasterizer:
                 even_odd_polygon_fill(
                     nodes,
                     source_weights,
-                    self.dataset.extent,
+                    self.extent,
                     self.nx,
                     self.ny,
                     subgridcells=2,
@@ -380,39 +379,48 @@ class EmissionRasterizer:
         """create netCDF variables."""
 
         if timeseries:
-            time_unit = "hours"
-            time_step = "1H"
+            cell_methods = "1H-mean"
+            time = True
+            self.time_step = "1H"
         else:
-            time_unit = None
-            time_step = None
+            cell_methods = None
+            time = False
+            self.time_step = None
 
         self.variables = {}
         for substance in substances:
-            subst_vars = self.variables.setdefault(substance.slug, {})
-            # create dataset variables for storage
-            if any(
-                self._cache.has_substance(sourcetype, substance.id)
-                for sourcetype in self.sourcetypes
-            ):
-                param = Parameter.objects.get(quantity="emission", substance=substance)
-                # TODO function create_field2d not implemented yet,
-                # this should be replaced by solweig alternative?
-                # should not create table Field2D like in gadget, we do not
-                # want the fields in database.
-                subst_vars[Field2D.VARIABLE_TYPE] = {
-                    "emission": self.dataset.create_field2d(
-                        parameter=param,
-                        name=f"Emission of {substance.name}",
-                        unit=self.unit,
-                        time_unit=time_unit,
-                        time_step=time_step,
-                        aggregation=self.aggregation,
-                        instance=self.instance,
-                        nx=self.nx,
-                        ny=self.ny,
+            # TODO should check if path exists before starting rasterizer?
+            result_file = self.output.path + substance.name + ".nc"
+            with nc.Dataset(result_file, "w", format="NETCDF4") as dset:
+                write_general_attrs(dset)
+                grid_mapping_var = create_gridmapping_variable(dset, self.crs)
+                time_var, time_bounds_var = create_time_variable(dset)
+                create_xy_variables(dset, self.extent, self.crs, self.nx, self.ny)
+                subst_vars = self.variables.setdefault(substance.slug, {})
+                # create variables for storage
+                if any(
+                    self._cache.has_substance(sourcetype, substance.id)
+                    for sourcetype in self.sourcetypes
+                ):
+                    param = Parameter.objects.get(
+                        quantity="emission", substance=substance
+                    )
+                    chunking = self.calc_chunking(
                         chunk_cache=1e8,
                     )
-                }
+                    subst_vars["field2d"] = {
+                        "emission": create_variable(
+                            dset,
+                            grid_mapping_var,
+                            name=f"Emission of {substance.name}",
+                            unit=self.unit,
+                            instance=self.instance,
+                            cell_methods=cell_methods,
+                            parameter=param.name,
+                            time=time,
+                            chunksizes=chunking,
+                        )
+                    }
         ncreated = 0
         for subst_vars in self.variables.values():
             for sourcetype_vars in subst_vars.values():
@@ -554,14 +562,13 @@ class EmissionRasterizer:
             # get average emissions (without time-dimension)
             for sourcetype_vars in subst_vars.values():
                 for var in sourcetype_vars.values():
-                    if isinstance(var, (Field2D, Field3D)):
-                        chunk = self._rasterize_average_chunk(
-                            substance, self.sourcetypes_as_raster
-                        )
-                    else:
-                        chunk = self._timeseries_average_chunk(
-                            substance, var.feature_type
-                        )
+                    # TODO isnt it always Field2D without levels and discrete sources?
+                    # if var isinstance(var, Field2D):
+                    chunk = self._rasterize_average_chunk(substance, self.sourcetypes)
+                    # else:
+                    #     chunk = self._timeseries_average_chunk(
+                    #         substance, var.feature_type
+                    #     )
 
                     if self.unit_conversion_factor != 1.0:
                         chunk *= self.unit_conversion_factor
@@ -608,37 +615,30 @@ class EmissionRasterizer:
                     except KeyError:
                         # no emissions for sourcetype
                         continue
-                    # TODO how is this done without Field2D class?
-                    if isinstance(var, (Field2D, Field3D)):
-                        # add raster timeseries
-                        emis_chunk = self._rasterize_chunk(
-                            substance,
-                            chunk_begin,
-                            chunk_end,
-                            self.sourcetypes,
-                        )
-                    else:
-                        # add point or road timeseries
-                        emis_chunk = self._timeseries_emis(
-                            substance, chunk_begin, chunk_end, var.feature_type
-                        )
+                    # TODO isnt it always Field2D without levels and discrete sources?
+                    # if isinstance(var, Field2D):
+                    # add raster timeseries
+                    emis_chunk = self._rasterize_chunk(
+                        substance,
+                        chunk_begin,
+                        chunk_end,
+                        self.sourcetypes,
+                    )
+                    # else:
+                    #     # add point or road timeseries
+                    #     emis_chunk = self._timeseries_emis(
+                    #         substance, chunk_begin, chunk_end, var.feature_type
+                    #     )
 
                     if self.unit_conversion_factor != 1.0:
                         emis_chunk *= self.unit_conversion_factor
+
                     with var.open("a"):
-                        if isinstance(var, Field3D):
-                            var.set_data(
-                                emis_chunk,
-                                timestamps=[chunk_begin, chunk_end],
-                                contiguous=True,
-                                sparse=False,
-                            )
-                        else:
-                            var.set_data(
-                                emis_chunk,
-                                timestamps=[chunk_begin, chunk_end],
-                                contiguous=True,
-                            )
+                        var.set_data(
+                            emis_chunk,
+                            timestamps=[chunk_begin, chunk_end],
+                            contiguous=True,
+                        )
                         # update time-span of variable and dataset
                         var.save()
 
@@ -820,30 +820,9 @@ class EmissionRasterizer:
                     timevar_scalings = self.source_timevar_scalings[
                         timevar_id or "default"
                     ]
-                    if (
-                        sourcetype == POINT
-                        and rec[col_map.temperature_variation_id] is not None
-                    ):
-                        # temperature variation scaling must be done per record,
-                        # since it depends on coordinates of point (through T2m)
-                        if self.t2m_field2d is not None:
-                            temperature_variation_scalings = (
-                                self._get_pointsource_tempvar_weights(
-                                    begin, end, rec, col_map
-                                )
-                            )
-                            # making sure yearly total is conserved, varied to T2m
-                            emis_ts = temperature_variation_scalings.to_numpy() * emis
-                        else:
-                            # TODO give error instead of warning!
-                            raise RuntimeError(
-                                f"Dataset has no temperature - "
-                                f"cannot apply temperature-based variation for "
-                                f"source {source_id}"
-                            )
-                    else:
-                        # calculate emission timeseries scaled by timevar
-                        emis_ts = timevar_scalings.to_numpy() * emis
+
+                    # calculate emission timeseries scaled by timevar
+                    emis_ts = timevar_scalings.to_numpy() * emis
 
                     # get cell indices and weights for source
                     index_array, source_weights = weights[source_id]
@@ -865,3 +844,204 @@ class EmissionRasterizer:
                     # add emissions to chunk at each index
                     chunk[index_array] += emis_array
         return chunk
+
+    def _calc_chunking(
+        self, time_chunksize=None, spatial_chunksize=None, chunk_cache=1e7
+    ):
+        """Return chunksizes for variable dimensions."""
+
+        # if there is no time-dimension, chunking is not needed
+        # for grids smaller than 100 x 100, chunksize covers the whole grid
+        if not self.supports_time():
+            return None
+
+        # ensure chunk size is not larger than grid
+        chunk_nx = min(self.nx, spatial_chunksize or 5)
+        chunk_ny = min(self.ny, spatial_chunksize or 5)
+        chunk_nz = 1  # self.nz if isinstance(self, Field3D) else 1
+
+        if time_chunksize is None:
+            # assumes single precision (4 bytes per value)
+            # max estimate based on full grid rather than limiting to spatial chunks,
+            # (more practical if full grid fits in memory...)
+
+            field_size_bytes = self.nx * self.ny * chunk_nz * 4
+            max_time_chunksize = int(chunk_cache / field_size_bytes)
+
+            if self.time_step is not None:
+                time_chunksize = int(
+                    datetime.timedelta(hours=366 * 24) / self.delta_t()
+                )
+            else:
+                time_chunksize = 366
+
+            time_chunksize = min(time_chunksize, max_time_chunksize)
+
+        if chunk_nz > 1:
+            return (time_chunksize, chunk_ny, chunk_nx)
+
+        return (time_chunksize, chunk_nz, chunk_ny, chunk_nx)
+
+
+def create_variable(
+    dset: nc.Dataset,
+    grid_mapping: nc.Variable,
+    name: str,
+    unit: str | None = None,
+    quantity: str | None = None,
+    instance: str | None = None,
+    cell_methods: str | None = None,
+    parameter: str | None = None,
+    height: float | None = None,
+    time: bool = True,
+    chunksizes: tuple[int, ...] | None = None,
+):
+    """create 2D variable."""
+    if time:
+        var = dset.createVariable(
+            name,
+            "f4",
+            (TIME_NAME, Y_NAME, X_NAME),
+            fill_value=np.nan,
+            zlib=True,
+            chunksizes=chunksizes,
+        )
+    else:
+        var = dset.createVariable(
+            name, "f4", (Y_NAME, X_NAME), fill_value=np.nan, zlib=True
+        )
+
+    var.units = unit or "unknown"
+    var.grid_mapping = grid_mapping.name
+    if parameter is not None:
+        var.parameter = parameter
+    if quantity is not None:
+        var.quantity = quantity
+    if instance is not None:
+        var.instance = instance
+    if cell_methods is not None:
+        var.cell_methods = cell_methods
+    if height is not None:
+        var.height = height
+    return var
+
+
+GENERAL_ATTRIBUTES = [("Created_using_etk", __version__)]
+
+
+def write_general_attrs(dset: nc.Dataset):
+    """add some global attributes."""
+    for name, attr in GENERAL_ATTRIBUTES:
+        if not hasattr(dset, name):
+            setattr(dset, name, attr)
+
+    if not hasattr(dset, "history"):
+        timestamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime(
+            "%Y%m%d %H:%M"
+        )
+        dset.history = f"{timestamp} created dataset"
+
+
+def create_gridmapping_variable(self, dset: nc.Dataset, crs: rio.CRS):
+    name = f"EPSG_{crs.to_epsg()}"
+    grid_mapping = dset.createVariable(name, "i")
+    epsg = crs.to_epsg()
+    if epsg is None:
+        epsg = crs.to_epsg(confidence_threshold=30)
+        self.log.info(
+            f"No exact match for EPSG and spatial reference, using best guess: {epsg}"
+        )
+        grid_mapping.srid = epsg
+    grid_mapping.crs_wkt = crs.to_wkt()  # for CF Conventions 1.7
+    return grid_mapping
+
+
+# name of time-dimension and time-variable
+TIME_NAME = "time"
+X_NAME = "x"
+Y_NAME = "y"
+# name of time-bounds dimension and time-bounds variable
+TIME_BOUNDS_NAME = "time_bounds"
+# name of second dimension for bounds variables
+BOUNDS_DIMENSION = "bounds_dim"
+# netCDF reference time
+TIME_ZERO = datetime.datetime(
+    year=1970, month=1, day=1, hour=0, minute=0, second=0, tzinfo=datetime.timezone.utc
+)
+
+
+def create_time_variable(dset: nc.Dataset):
+    """create time variable."""
+
+    times = dset.createDimension(TIME_NAME, None)
+    dset.createDimension(BOUNDS_DIMENSION, 2)
+    times = dset.createVariable(TIME_NAME, "f8", (TIME_NAME,))
+    times.calendar = "gregorian"
+    times.units = f"hours since {TIME_ZERO:%Y-%m-%d %H:%M:%S}"
+    times.bounds = TIME_BOUNDS_NAME
+    times.long_name = "time"
+    times.axis = "T"
+    time_bounds = dset.createVariable(
+        TIME_BOUNDS_NAME, "f8", (TIME_NAME, BOUNDS_DIMENSION)
+    )
+    return times, time_bounds
+
+
+def create_xy_variables(
+    dset: nc.Dataset, extent: tuple, crs: rio.CRS, nx: int, ny: int
+):
+    """Create a netCDF dataset with dimensions and metadata for 2D fields."""
+
+    x1, y1, x2, y2 = extent
+    dx = (x2 - x1) / nx
+    dy = (y2 - y1) / ny
+
+    dset.createDimension(X_NAME, nx)
+    # create projected coordinate variables
+    x = dset.createVariable(X_NAME, "f4", (X_NAME,))
+    x.standard_name = "projection_x_coordinate"
+    x.units = "m"
+    x.axis = "X"
+    x.description = "center of cell"
+    x[:] = np.linspace(x1 + 0.5 * dx, x2 - 0.5 * dx, nx)
+
+    dset.createDimension(Y_NAME, ny)
+    y = dset.createVariable(Y_NAME, "f4", (Y_NAME,))
+    y.standard_name = "projection_y_coordinate"
+    y.units = "m"
+    y.axis = "Y"
+    y.description = "center of cell"
+    y[:] = np.linspace(y1 + 0.5 * dy, y2 - 0.5 * dy, ny)
+    return x, y
+
+
+def make_naive_in_utc(time: datetime.datetime):
+    """convert time to utc and make naive."""
+    if time.tzinfo is not None:
+        time_utc = time.astimezone(datetime.timezone.utc)
+        time_utc.replace(tzinfo=None)
+    else:
+        time_utc = time
+    return time_utc
+
+
+def write_time(
+    time_var: nc.Variable, time_bounds_var: nc.Variable, time_utc: datetime.datetime
+):
+    """write timestamp to file and return time-index"""
+
+    left_bound = time_utc - datetime.timedelta(hours=1)
+    # get index of time in netCDF
+    if len(time_var) == 0:
+        time_index = 0
+    else:
+        time_index = nc.date2index(time_utc, time_var, select="before") + 1
+
+    # write time to netCDF (in numerical format)
+    nc_time = nc.date2num(time_utc, time_var.units)
+    nc_left_time_bound = nc.date2num(left_bound, time_var.units)
+    nc_right_time_bound = nc_time
+
+    time_bounds_var[time_index, :] = [nc_left_time_bound, nc_right_time_bound]
+    time_var[time_index] = nc_time
+    return time_index
