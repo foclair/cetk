@@ -1,8 +1,8 @@
 """Global pytest configuration."""
 
-# import numpy as np
 import sys
 
+import numpy as np
 import pytest
 from django.contrib.gis.geos import GEOSGeometry
 
@@ -13,7 +13,7 @@ if sys.argv[0] != "pytest" and "--help" not in sys.argv:
 # from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.geos import Point, Polygon
 
-from etk.edb.models import Substance
+from etk.edb.models.source_models import Substance, Timevar
 from etk.edb.units import (
     activity_ef_unit_to_si,
     activity_rate_unit_to_si,
@@ -71,6 +71,15 @@ def vertical_dist(db):
         name="vdist1", weights="[[5.0, 0.4], [10.0, 0.6]]"
     )
     return vdist
+
+
+@pytest.fixture()
+def test_timevar(db):
+    # array representing daytime activity
+    daytime_profile = np.ones((24, 7)) * 100
+    daytime_profile[:7, :] = 0
+    daytime_profile[23:, :] = 0
+    return Timevar(name="daytime", typeday=daytime_profile.tolist())
 
 
 @pytest.fixture()

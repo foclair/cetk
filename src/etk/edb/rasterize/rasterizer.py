@@ -4,6 +4,8 @@ import datetime
 import logging
 from copy import copy
 from math import ceil
+from pathlib import Path
+from typing import Optional
 
 import netCDF4 as nc
 import numpy as np
@@ -33,6 +35,18 @@ AREA = AreaSource.sourcetype
 
 # supported source types
 SOURCETYPES = (POINT, AREA)
+
+# TODO update requirements; rasterio and netcdf4
+
+
+class Output:
+    def __init__(
+        self, extent: tuple, path: Path, srid: int, timezone: datetime.timezone
+    ):
+        self.extent = extent
+        self.path = path
+        self.srid = srid
+        self.timezone = timezone
 
 
 class EmissionRasterizer:
@@ -887,14 +901,14 @@ def create_variable(
     dset: nc.Dataset,
     grid_mapping: nc.Variable,
     name: str,
-    unit: str | None = None,
-    quantity: str | None = None,
-    instance: str | None = None,
-    cell_methods: str | None = None,
-    parameter: str | None = None,
-    height: float | None = None,
+    unit: Optional[str] = None,
+    quantity: Optional[str] = None,
+    instance: Optional[str] = None,
+    cell_methods: Optional[str] = None,
+    parameter: Optional[str] = None,
+    height: Optional[float] = None,
     time: bool = True,
-    chunksizes: tuple[int, ...] | None = None,
+    chunksizes: Optional[tuple[int, ...]] = None,
 ):
     """create 2D variable."""
     if time:

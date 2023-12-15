@@ -1,1 +1,1 @@
-from .rasterizer import EmissionRasterizer  # noqa: F401
+from .rasterizer import EmissionRasterizer, Output  # noqa: F401
