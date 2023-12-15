@@ -12,5 +12,6 @@ from .source_models import (  # noqa
     PointSourceActivity,
     PointSourceSubstance,
     Substance,
+    Timevar,
     VerticalDist,
 )

@@ -351,12 +351,15 @@ def timevar_to_series(time_index, *timevars, timezone=None):
         raise TypeError("at least one timevar must be given")
     if timezone is None:
         timezone = TIME_ZONE  # TODO or Settings.timezone?!
-    typeday = np.multiply.reduce([t.typeday for t in timevars])
-    month = np.multiply.reduce([t.month for t in timevars])
+    # TODO why does timevars sometimes become query set instead of tuple of timevars?
+    # try:
+    typeday = np.multiply.reduce([ast.literal_eval(t.typeday) for t in timevars])
+    month = np.multiply.reduce([ast.literal_eval(t.month) for t in timevars])
     if len(timevars) > 1:
         normalization_constant = get_normalization_constant(typeday, month, timezone)
     else:
         normalization_constant = timevars[0].normalization_constant
+
     local_time_index = time_index.tz_convert(timezone)
     values = (
         typeday[local_time_index.hour, local_time_index.weekday]

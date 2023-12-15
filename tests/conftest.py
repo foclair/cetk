@@ -13,7 +13,7 @@ if sys.argv[0] != "pytest" and "--help" not in sys.argv:
 # from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.geos import Point, Polygon
 
-from etk.edb.models.source_models import Substance, Timevar
+from etk.edb.models.source_models import Substance
 from etk.edb.units import (
     activity_ef_unit_to_si,
     activity_rate_unit_to_si,
@@ -79,7 +79,10 @@ def test_timevar(db):
     daytime_profile = np.ones((24, 7)) * 100
     daytime_profile[:7, :] = 0
     daytime_profile[23:, :] = 0
-    return Timevar(name="daytime", typeday=daytime_profile.tolist())
+    test_timevar = models.Timevar.objects.create(
+        name="daytime", typeday=str(daytime_profile.tolist())
+    )
+    return test_timevar
 
 
 @pytest.fixture()

@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+import os
 from copy import copy
 from math import ceil
 from pathlib import Path
@@ -128,9 +129,10 @@ class EmissionRasterizer:
         self.timevars = {}
 
         if POINT in sourcetypes or AREA in sourcetypes:
-            for tvar in self.timevars.all():
+            for tvar in Timevar.objects.all():
                 self.timevars[tvar.id] = tvar
-            default = Timevar
+            # TODO, should this be created for empty inventory already?
+            default = Timevar()
             self.timevars["default"] = default
 
     def _get_level_weights(self):
@@ -320,8 +322,8 @@ class EmissionRasterizer:
             source_id = rec[col_map.source_id]
 
             if source_id not in self._cache.gridded_sources[POINT]:
-                x = rec[col_map.x]
-                y = rec[col_map.y]
+                [[x, y]] = np.array(get_nodes_from_wkt(rec[col_map.wkt]))
+
                 # check if source is within bounds
                 if (x < self.x1 or y < self.y1) or (x > self.x2 or y > self.y2):
                     continue
@@ -391,7 +393,6 @@ class EmissionRasterizer:
         self, substances, *, timeseries=True
     ):
         """create netCDF variables."""
-
         if timeseries:
             cell_methods = "1H-mean"
             time = True
@@ -404,7 +405,7 @@ class EmissionRasterizer:
         self.variables = {}
         for substance in substances:
             # TODO should check if path exists before starting rasterizer?
-            result_file = self.output.path + substance.name + ".nc"
+            result_file = os.path.join(self.output.path, substance.name + ".nc")
             with nc.Dataset(result_file, "w", format="NETCDF4") as dset:
                 write_general_attrs(dset)
                 grid_mapping_var = create_gridmapping_variable(dset, self.crs)
@@ -419,7 +420,7 @@ class EmissionRasterizer:
                     param = Parameter.objects.get(
                         quantity="emission", substance=substance
                     )
-                    chunking = self.calc_chunking(
+                    chunking = self._calc_chunking(
                         chunk_cache=1e8,
                     )
                     subst_vars["field2d"] = {
@@ -541,10 +542,7 @@ class EmissionRasterizer:
                 self.log.debug("creating result variables")
                 # TODO, how should this be done when we don't have traffic work
                 # and thus no substances with extras?
-                # created = self._create_variables(self.substances, timeseries=True) ?
-                created = self._create_variables(
-                    self.substances_with_extras, timeseries=True
-                )
+                created = self._create_variables(self.substances, timeseries=True)
                 # if no variables are created, skip out
                 if not created:
                     self.reset()
@@ -570,37 +568,31 @@ class EmissionRasterizer:
 
     def _process_average_emissions(self):
         """Calculate average emission intensity for all substances and source-types."""
-
         for substance in self.substances:
-            subst_vars = self.variables[substance.slug]
-            # get average emissions (without time-dimension)
-            for sourcetype_vars in subst_vars.values():
-                for var in sourcetype_vars.values():
-                    # TODO isnt it always Field2D without levels and discrete sources?
-                    # if var isinstance(var, Field2D):
-                    chunk = self._rasterize_average_chunk(substance, self.sourcetypes)
-                    # else:
-                    #     chunk = self._timeseries_average_chunk(
-                    #         substance, var.feature_type
-                    #     )
+            chunk = self._rasterize_average_chunk(substance, self.sourcetypes)
 
-                    if self.unit_conversion_factor != 1.0:
-                        chunk *= self.unit_conversion_factor
-                    with var.open("a"):
-                        var.set_data(chunk)
-                        var.save()
+            if self.unit_conversion_factor != 1.0:
+                chunk *= self.unit_conversion_factor
+            result_file = os.path.join(self.output.path, substance.name + ".nc")
+            with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
+                dset.set_data(chunk)
+                dset.save()
 
     def _process_timeseries(self, begin, end):  # noqa: C901, PLR0912
         # how many hours that will be processed in the same chunk
         # this is a compromise between required memory, execution time
         # the minimum chunk size of the netcdf variables is used
         min_time_chunksize = 1e9
-        for substance_vars in self.variables.values():
-            for vartypes in substance_vars.values():
-                for v in vartypes.values():
-                    with v.open("r"):
-                        if v.get_time_chunksize() < min_time_chunksize:
-                            min_time_chunksize = v.get_time_chunksize()
+        for substance in self.substances:
+            result_file = os.path.join(self.output.path, substance.name + ".nc")
+            with nc.Dataset(result_file, "r", format="NETCDF4") as dset:
+                # variable_name = 'Emission of '+substance.name
+                # or x, y, time
+                # TODO, dset has no data for time variable yet, is it really meant
+                # to take chunking from here or was that specific to NARC?
+                time_chunking = dset.variables["time"].chunking()
+                if time_chunking[0] < min_time_chunksize:
+                    min_time_chunksize = time_chunking[0]
 
         # rasterizing chunks and writing to dataset
         chunk_begin = begin
@@ -622,39 +614,28 @@ class EmissionRasterizer:
 
             for substance in self.substances:
                 self.log.debug(f"substance: {substance.slug}")
-                subst_vars = self.variables[substance.slug]
-                for sourcetype_vars in subst_vars.values():
-                    try:
-                        var = sourcetype_vars["emission"]
-                    except KeyError:
-                        # no emissions for sourcetype
-                        continue
-                    # TODO isnt it always Field2D without levels and discrete sources?
-                    # if isinstance(var, Field2D):
-                    # add raster timeseries
-                    emis_chunk = self._rasterize_chunk(
-                        substance,
-                        chunk_begin,
-                        chunk_end,
-                        self.sourcetypes,
+                # add raster timeseries
+                emis_chunk = self._rasterize_chunk(
+                    substance,
+                    chunk_begin,
+                    chunk_end,
+                    self.sourcetypes,
+                )
+
+                if self.unit_conversion_factor != 1.0:
+                    emis_chunk *= self.unit_conversion_factor
+
+                result_file = os.path.join(self.output.path, substance.name + ".nc")
+                with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
+                    # TODO set_data is function in inspector class Field2D.set_data()
+                    # is there a function in solweig that does this?
+                    dset.set_data(
+                        emis_chunk,
+                        timestamps=[chunk_begin, chunk_end],
+                        contiguous=True,
                     )
-                    # else:
-                    #     # add point or road timeseries
-                    #     emis_chunk = self._timeseries_emis(
-                    #         substance, chunk_begin, chunk_end, var.feature_type
-                    #     )
-
-                    if self.unit_conversion_factor != 1.0:
-                        emis_chunk *= self.unit_conversion_factor
-
-                    with var.open("a"):
-                        var.set_data(
-                            emis_chunk,
-                            timestamps=[chunk_begin, chunk_end],
-                            contiguous=True,
-                        )
-                        # update time-span of variable and dataset
-                        var.save()
+                    # update time-span of variable and dataset
+                    dset.save()
 
             # update chunk time interval
             chunk_begin = chunk_end + datetime.timedelta(hours=1)
@@ -866,7 +847,7 @@ class EmissionRasterizer:
 
         # if there is no time-dimension, chunking is not needed
         # for grids smaller than 100 x 100, chunksize covers the whole grid
-        if not self.supports_time():
+        if len(self.timevars) == 0:
             return None
 
         # ensure chunk size is not larger than grid

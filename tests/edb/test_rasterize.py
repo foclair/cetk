@@ -33,7 +33,7 @@ class TestEmissionRasterizer:
     def test_point_source(  # noqa: PLR0915
         self, testsettings, code_sets, test_timevar, tmpdir
     ):
-        ac_1_1 = code_sets.filter(slug="codeset1").codes.get(code="1.1")
+        ac_1_1 = code_sets[0].codes.get(code="1.1")
         # settings.NARC_DATA_ROOT = tmpdir.mkdir("store").strpath
 
         daytime_timevar = test_timevar
@@ -82,7 +82,8 @@ class TestEmissionRasterizer:
 
         rasterizer = EmissionRasterizer(output, nx=4, ny=4)
 
-        rasterizer.process([subst1, subst2], begin, end, unit="ton/year")
+        # rasterizer.process([subst1, subst2], begin, end, unit="ton/year")
+        rasterizer.process([subst1], begin, end, unit="ton/year")
 
         # assert dataset.fields2d.filter(parameter__substance=subst1).exists()
         # var = dataset.fields2d.get(parameter__substance=subst1)

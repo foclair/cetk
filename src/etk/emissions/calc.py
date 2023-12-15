@@ -39,7 +39,7 @@ def calculate_source_emissions(
             name=name,
             ids=ids,
             tags=tags,
-            polygon=polygon,
+            # polygon=polygon, TODO ST_GeomFromEWKT is PostGIS specific!
         )
     else:
         raise NotImplementedError("only implemented for point and area-sources")
