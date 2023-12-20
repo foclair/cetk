@@ -360,6 +360,18 @@ class EmissionRasterizer:
                 wkt = rec[col_map.wkt]
                 nodes = np.array(get_nodes_from_wkt(wkt))
 
+                is_within_extent = any(
+                    self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2
+                    for x, y in nodes
+                )
+                if not is_within_extent:
+                    self.log.error(
+                        "No nodes within extent, gives error in rastafari"
+                        + " provide extent in Settings or to rasterize command"
+                        + " in order to run rasterizer."
+                    )
+                    exit()
+
                 even_odd_polygon_fill(
                     nodes,
                     source_weights,
@@ -643,7 +655,17 @@ class EmissionRasterizer:
     def set_data(self, dset, substance, data, timestamps=None):  # noqa: C901, PLR0912
         """Add chunk of data to variable."""
         # dset.variables.keys()
-        var = dset["Emission of " + substance.name]
+        try:
+            var = dset["Emission of " + substance.name]
+        except Exception:
+            # variable not created yet
+            self.log.error(
+                f"this should not happen, did not create variable {substance.name}"
+            )
+            exit()
+            # TODO fix this, seems to be related to a substance existing as pointsource
+            # but not areasource and viceversa?
+            # are point and areasources even properly added?
         if timestamps is None:
             # map_oriented, np.flipud flips 2d data along second dimension
             var[:, :] = np.flipud(data)

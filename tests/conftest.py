@@ -13,6 +13,7 @@ if sys.argv[0] != "pytest" and "--help" not in sys.argv:
 # from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.geos import Point, Polygon
 
+from etk.edb.const import WGS84_SRID
 from etk.edb.models.source_models import Substance
 from etk.edb.units import (
     activity_ef_unit_to_si,
@@ -20,14 +21,9 @@ from etk.edb.units import (
     emission_unit_to_si,
 )
 
-# SPEEDS = ["20", "30", "40", "50", "60", "70", "80", "90", "100", "110", "120", "130"]
-# ROADTYPES = ["highway", "primary", "secondary", "tertiary", "residential", "busway"]
-# SWEREF99_TM_SRID = 3006
-WGS84_SRID = 4326
-# DUMMY_SRID = 3857
 EXTENT = GEOSGeometry(
     "POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06, 10.95 69.06, 10.95 55.33))",
-    srid=4326,
+    srid=WGS84_SRID,
 )
 
 

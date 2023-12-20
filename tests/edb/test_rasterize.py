@@ -7,6 +7,7 @@ import pytest
 # from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.geos import Point, Polygon
 
+from etk.edb.const import WGS84_SRID
 from etk.edb.models.source_models import AreaSource, PointSource, Substance
 from etk.edb.rasterize import EmissionRasterizer, Output
 from etk.edb.units import emission_unit_to_si
@@ -16,10 +17,6 @@ from etk.edb.units import emission_unit_to_si
 
 
 # from django.db import IntegrityError
-
-
-WGS84_SRID = 4326
-DUMMY_SRID = 3857
 
 
 class TestEmissionRasterizer:

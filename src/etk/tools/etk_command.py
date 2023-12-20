@@ -1,10 +1,14 @@
 """Command line interface for managing a Clair emission inventory offline."""
 
 import argparse
+import datetime
 import logging
 import sys
+
+# import traceback
 from pathlib import Path
 
+# from django.contrib.gis.geos import Polygon
 from django.db import transaction
 
 import etk
@@ -23,8 +27,9 @@ log = logging.getLogger(__name__)
 settings = etk.configure()
 
 from etk.edb import importers  # noqa
-from etk.edb.const import SHEET_NAMES  # noqa
-from etk.edb.models import Substance  # noqa
+from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
+from etk.edb.models import Settings, Substance  # noqa
+from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
 from etk.emissions.views import (  # noqa
     create_areasource_emis_table,
@@ -129,6 +134,50 @@ class Editor(object):
             log.error(
                 f"could not write aggregated emission to file {filename}: {str(err)}"
             )
+            sys.exit(1)
+
+    def rasterize_emissions(
+        self,
+        outputpath,
+        nx,
+        ny,
+        sourcetypes=None,
+        unit=DEFAULT_EMISSION_UNIT,
+        codeset=None,
+        substances=None,
+        begin=None,
+        end=None,
+        extent=None,
+        srid=None,
+        timezone=None,
+    ):
+        substances = substances or get_used_substances()
+        timezone = timezone or datetime.timezone.utc
+        extent = extent or Settings.get_current().extent.extent
+        # test for debugging TODO fix this!!
+        # extent = (2049702,5008151,2549702,5108151)
+        # Settings.extent is a Polygon, Settings.extent.extent a tuple (x1, y1, x2, y2)
+        if extent is None:
+            log.error(
+                f"could not rasterize emissions to path {outputpath}: extent not set"
+                + " for database nor rasterizer"
+            )
+        srid = srid or DEFAULT_SRID
+        begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
+        try:
+            output = Output(
+                extent=extent, timezone=timezone, path=outputpath, srid=srid
+            )
+            rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
+            # TODO check if this if-condition is necessary, maybe works if begin=None?
+            if (begin is not None) and (end is not None):
+                rasterizer.process(substances, begin, end, unit=unit)
+            else:
+                rasterizer.process(substances, unit=unit)
+        except Exception as err:
+            log.error(f"could not rasterize emissions to path {outputpath}: {str(err)}")
+            # log.error(traceback.print_exc())
             sys.exit(1)
 
     def export_data(self):
@@ -273,6 +322,27 @@ def main():
         aggregate_grp.add_argument(
             "--codeset", help="Aggregate emissions by codeset", metavar="SLUG"
         )
+        calc_grp.add_argument(
+            "--rasterize", help="Rasterize emissions", metavar="OUTPUTPATH"
+        )
+        rasterize_grp = sub_parser.add_argument_group(
+            "rasterize emissions", description="Settings to rasterize emissions"
+        )
+        rasterize_grp.add_argument(
+            "--nx",
+            help="Number of cells in x-direction in output raster",
+            metavar="int",
+        )
+        rasterize_grp.add_argument(
+            "--ny",
+            help="Number of cells in y-direction in output raster",
+            metavar="int",
+        )
+        rasterize_grp.add_argument(
+            "--extent",
+            help="Extent of output raster. Settings.extent is taken otherwise",
+            metavar="x1,y1,x2,y2",
+        )
         # TODO add argument to aggregate emissions within polygon
 
         args = sub_parser.parse_args(sys.argv[2:])
@@ -291,6 +361,21 @@ def main():
                 codeset=args.codeset,
             )
             sys.stdout.write("Successfully aggregated emissions\n")
+            sys.exit(0)
+        if args.rasterize is not None:
+            if args.extent is not None:
+                x1, y1, x2, y2 = map(float, args.extent.split(","))
+                # Create the extent tuple
+                args.extent = (x1, y1, x2, y2)
+            editor.rasterize_emissions(
+                args.rasterize,
+                int(args.nx),
+                int(args.ny),
+                sourcetypes=args.sourcetypes,
+                unit=args.unit,
+                extent=args.extent,
+            )
+            sys.stdout.write("Successfully rasterized emissions\n")
             sys.exit(0)
 
     elif main_args.command == "export":
