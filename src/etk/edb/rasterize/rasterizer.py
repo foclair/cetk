@@ -408,7 +408,7 @@ class EmissionRasterizer:
             result_file = os.path.join(self.output.path, substance.name + ".nc")
             with nc.Dataset(result_file, "w", format="NETCDF4") as dset:
                 write_general_attrs(dset)
-                grid_mapping_var = create_gridmapping_variable(dset, self.crs)
+                grid_mapping_var = self.create_gridmapping_variable(dset, self.crs)
                 time_var, time_bounds_var = create_time_variable(dset)
                 create_xy_variables(dset, self.extent, self.crs, self.nx, self.ny)
                 subst_vars = self.variables.setdefault(substance.slug, {})
@@ -575,6 +575,9 @@ class EmissionRasterizer:
                 chunk *= self.unit_conversion_factor
             result_file = os.path.join(self.output.path, substance.name + ".nc")
             with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
+                # TODO set_data is function in inspector class Field2D.set_data()
+                # is there a function in solweig that does this?
+                # breakpoint()
                 dset.set_data(chunk)
                 dset.save()
 
@@ -627,18 +630,33 @@ class EmissionRasterizer:
 
                 result_file = os.path.join(self.output.path, substance.name + ".nc")
                 with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
-                    # TODO set_data is function in inspector class Field2D.set_data()
-                    # is there a function in solweig that does this?
-                    dset.set_data(
+                    self.set_data(
+                        dset,
+                        substance,
                         emis_chunk,
                         timestamps=[chunk_begin, chunk_end],
-                        contiguous=True,
                     )
                     # update time-span of variable and dataset
-                    dset.save()
 
             # update chunk time interval
             chunk_begin = chunk_end + datetime.timedelta(hours=1)
+
+    def set_data(self, dset, substance, data, timestamps=None):  # noqa: C901, PLR0912
+        """Add chunk of data to variable."""
+        # dset.variables.keys()
+        var = dset["Emission of " + substance.name]
+        if timestamps is None:
+            # map_oriented, np.flipud flips 2d data along second dimension
+            var[:, :] = np.flipud(data)
+        else:
+            time_var = dset["time"]
+            # map_oriented, np.fliplr flips 3d data along second dimension
+            var[:, :, :] = np.fliplr(data)
+            times = pd.date_range(timestamps[0], timestamps[1], freq=self.time_step)
+            hours_since_1970 = (
+                times - pd.to_datetime("1970-01-01").tz_localize(self.timezone)
+            ).total_seconds() / 3600
+            time_var[:] = hours_since_1970
 
     def _timeseries_emis(  # noqa: C901, PLR0912, PLR0915
         self, substance, begin, end, sourcetype
@@ -877,6 +895,19 @@ class EmissionRasterizer:
 
         return (time_chunksize, chunk_nz, chunk_ny, chunk_nx)
 
+    def create_gridmapping_variable(self, dset: nc.Dataset, crs: rio.CRS):
+        name = f"EPSG_{crs.to_epsg()}"
+        grid_mapping = dset.createVariable(name, "i")
+        epsg = crs.to_epsg()
+        if epsg is None:
+            epsg = crs.to_epsg(confidence_threshold=30)
+            self.log.info(
+                f"No exact match for EPSG and spatial ref, using best guess: {epsg}"
+            )
+            grid_mapping.srid = epsg
+        grid_mapping.crs_wkt = crs.to_wkt()  # for CF Conventions 1.7
+        return grid_mapping
+
 
 def create_variable(
     dset: nc.Dataset,
@@ -935,20 +966,6 @@ def write_general_attrs(dset: nc.Dataset):
             "%Y%m%d %H:%M"
         )
         dset.history = f"{timestamp} created dataset"
-
-
-def create_gridmapping_variable(self, dset: nc.Dataset, crs: rio.CRS):
-    name = f"EPSG_{crs.to_epsg()}"
-    grid_mapping = dset.createVariable(name, "i")
-    epsg = crs.to_epsg()
-    if epsg is None:
-        epsg = crs.to_epsg(confidence_threshold=30)
-        self.log.info(
-            f"No exact match for EPSG and spatial reference, using best guess: {epsg}"
-        )
-        grid_mapping.srid = epsg
-    grid_mapping.crs_wkt = crs.to_wkt()  # for CF Conventions 1.7
-    return grid_mapping
 
 
 # name of time-dimension and time-variable

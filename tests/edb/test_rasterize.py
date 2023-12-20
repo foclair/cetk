@@ -1,5 +1,9 @@
 import datetime
 
+import netCDF4 as nc
+import numpy as np
+import pytest
+
 # from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.geos import Point
 
@@ -9,10 +13,6 @@ from etk.edb.models.source_models import (  # AreaSource,; CodeSet,; Parameter,
 )
 from etk.edb.rasterize import EmissionRasterizer, Output
 from etk.edb.units import emission_unit_to_si
-
-# import numpy as np
-# import pytest
-
 
 # from importlib import resources
 # from operator import itemgetter
@@ -82,17 +82,10 @@ class TestEmissionRasterizer:
 
         rasterizer = EmissionRasterizer(output, nx=4, ny=4)
 
-        # rasterizer.process([subst1, subst2], begin, end, unit="ton/year")
-        rasterizer.process([subst1], begin, end, unit="ton/year")
-
-        # assert dataset.fields2d.filter(parameter__substance=subst1).exists()
-        # var = dataset.fields2d.get(parameter__substance=subst1)
-        # with var.open("r"):
-        #     data1 = var.get_data([begin])
-        #     # TODO: should we use timezone-aware datetimes or not?
-        #     assert var.get_time_variable().size == 3
-        # assert data1.sum() == pytest.approx(1000, 1e-6)
-        # var = dataset.fields2d.get(parameter__substance=subst3)
-        # with var.open("r"):
-        #     tempvar_series = var.get_timeseries(4, 4)
-        # assert tempvar_series.emission_PM10_field2d_1H[-1] == 0
+        rasterizer.process([subst1, subst2], begin, end, unit="ton/year")
+        # rasterizer.process([subst1], begin, end, unit="ton/year")
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert dset["time"][0] == 368160
+            assert dset["Emission of NOx"].shape == (3, 4, 4)
+            assert np.sum(dset["Emission of NOx"]) == pytest.approx(3000, 1e-6)
+            assert dset["Emission of NOx"][0, 0, 0] == pytest.approx(1000, 1e-6)
