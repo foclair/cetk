@@ -5,12 +5,9 @@ import numpy as np
 import pytest
 
 # from django.contrib.gis.gdal import GDALRaster
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, Polygon
 
-from etk.edb.models.source_models import (  # AreaSource,; CodeSet,; Parameter,
-    PointSource,
-    Substance,
-)
+from etk.edb.models.source_models import AreaSource, PointSource, Substance
 from etk.edb.rasterize import EmissionRasterizer, Output
 from etk.edb.units import emission_unit_to_si
 
@@ -89,3 +86,49 @@ class TestEmissionRasterizer:
             assert dset["Emission of NOx"].shape == (3, 4, 4)
             assert np.sum(dset["Emission of NOx"]) == pytest.approx(3000, 1e-6)
             assert dset["Emission of NOx"][0, 0, 0] == pytest.approx(1000, 1e-6)
+
+    def test_area_source(self, testsettings, test_timevar, tmpdir):
+        daytime_timevar = test_timevar
+
+        subst1 = Substance.objects.get(slug="NOx")
+        subst2 = Substance.objects.get(slug="SOx")
+
+        extent = (0.0, 0.0, 100.0, 100.0)
+        srid = 3006
+        # testing with one point just within the dataset extent
+        llcorner = Point(x=extent[0] + 5, y=extent[1] + 5, z=None, srid=srid)
+        llcorner.transform(WGS84_SRID)
+        geom = Polygon(((10, 10), (90, 10), (90, 90), (10, 90), (10, 10)), srid=srid)
+        geom.transform(4326)
+
+        src1 = AreaSource.objects.create(name="areasource1", geom=geom)
+
+        src2 = AreaSource.objects.create(
+            name="areasource2", geom=geom, timevar=daytime_timevar
+        )
+
+        # some substance emissions with varying attributes
+        src1.substances.create(
+            substance=subst1, value=emission_unit_to_si(1000, "ton/year")
+        )
+
+        src2.substances.create(
+            substance=subst2, value=emission_unit_to_si(2000, "ton/year")
+        )
+
+        output = Output(
+            extent=extent, timezone=datetime.timezone.utc, path=tmpdir, srid=srid
+        )
+
+        rasterizer = EmissionRasterizer(output, nx=4, ny=4)
+
+        begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
+
+        rasterizer.process([subst1, subst2], begin, end, unit="g/s")
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert dset["time"][0] == 368160
+            assert dset["Emission of NOx"].shape == (3, 4, 4)
+            assert np.sum(dset["Emission of NOx"][0, :, :]) == pytest.approx(
+                31.6880878, 1e-6
+            )
