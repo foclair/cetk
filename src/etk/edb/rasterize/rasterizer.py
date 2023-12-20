@@ -12,7 +12,7 @@ import netCDF4 as nc
 import numpy as np
 import pandas as pd
 import rasterio as rio
-from django.contrib.gis.geos import Polygon
+from django.contrib.gis.geos import GEOSGeometry, Polygon
 from rastafari import even_odd_polygon_fill
 
 # TODO EmissionCache needs to be updated when road and grid sources introduced
@@ -28,7 +28,6 @@ from etk.edb.models.source_models import (
 )
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.calc import calculate_source_emissions
-from etk.tools.utils import get_nodes_from_wkt
 
 # short  source type identifiers for conveniency
 POINT = PointSource.sourcetype  # equal to 'point'
@@ -1057,3 +1056,22 @@ def write_time(
     time_bounds_var[time_index, :] = [nc_left_time_bound, nc_right_time_bound]
     time_var[time_index] = nc_time
     return time_index
+
+
+def get_nodes_from_wkt(wkt):
+    """Extract list of nodes (x, y) from WKT.
+
+    geom_type: 'POINT', 'LINESTRING' or 'POLYGON'
+
+    """
+    geom = GEOSGeometry(wkt)
+    if geom.geom_type == "Point":
+        return (geom.coords,)
+    if geom.geom_type == "LineString":
+        return geom.coords
+    if geom.geom_type == "Polygon":
+        return geom.coords[0]
+
+    raise NotImplementedError(
+        f'Geometry type specified in WKT not implemented: "{wkt}"'
+    )
