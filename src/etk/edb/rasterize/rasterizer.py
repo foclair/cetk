@@ -592,11 +592,7 @@ class EmissionRasterizer:
                 chunk *= self.unit_conversion_factor
             result_file = os.path.join(self.output.path, substance.name + ".nc")
             with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
-                # TODO set_data is function in inspector class Field2D.set_data()
-                # is there a function in solweig that does this?
-                # breakpoint()
-                dset.set_data(chunk)
-                dset.save()
+                self.set_data(dset, substance, chunk)
 
     def _process_timeseries(self, begin, end):  # noqa: C901, PLR0912
         # how many hours that will be processed in the same chunk
