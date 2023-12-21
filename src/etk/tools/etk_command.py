@@ -166,14 +166,7 @@ class Editor(object):
                 extent=extent, timezone=timezone, path=outputpath, srid=srid
             )
             rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
-            # NOTE bug exists, may have to specify begin an end to get any raster
-            # begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
-            # end = datetime.datetime(2012, 1, 1, 12, tzinfo=datetime.timezone.utc)
-            # TODO check if this if-condition is necessary, maybe works if begin=None?
-            if (begin is not None) and (end is not None):
-                rasterizer.process(substances, begin, end, unit=unit)
-            else:
-                rasterizer.process(substances, unit=unit)
+            rasterizer.process(substances, unit=unit)
         except Exception as err:
             log.error(f"could not rasterize emissions to path {outputpath}: {str(err)}")
             # log.error(traceback.print_exc())
