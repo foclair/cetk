@@ -257,3 +257,67 @@ class TestEmissionRasterizer:
             assert np.sum(dset["Emission of SOx"][12, :, :]) == pytest.approx(
                 3000, 1e-6
             )
+
+    # ac-filtering not implemented yet!
+    # def test_point_source_filter(  # noqa: PLR0915
+    #     self, testsettings, code_sets, test_timevar, tmpdir
+    # ):
+    #     ac_1_1 = code_sets[0].codes.get(code="1.1")
+    #     ac_1_2 = code_sets[0].codes.get(code="1.2")
+    #     # settings.NARC_DATA_ROOT = tmpdir.mkdir("store").strpath
+
+    #     daytime_timevar = test_timevar
+
+    #     subst1 = Substance.objects.get(slug="NOx")
+    #     subst2 = Substance.objects.get(slug="SOx")
+
+    #     extent = (0.0, 0.0, 100.0, 100.0)
+    #     srid = 3006
+
+    #     # testing with a single point source within the dataset extent
+    #     llcorner = Point(x=extent[0] + 5, y=extent[1] + 5, z=None, srid=srid)
+    #     llcorner.transform(WGS84_SRID)
+
+    #     src1 = PointSource.objects.create(
+    #         name="pointsource1",
+    #         geom=Point(x=llcorner.coords[0], y=llcorner.coords[1], srid=WGS84_SRID),
+    #         chimney_height=10.0,
+    #         activitycode1=ac_1_1,
+    #     )
+
+    #     src2 = PointSource.objects.create(
+    #         name="pointsource2",
+    #         geom=Point(x=llcorner.coords[0], y=llcorner.coords[1], srid=WGS84_SRID),
+    #         chimney_height=10.0,
+    #         activitycode1=ac_1_2,
+    #     )
+
+    #     # some substance emissions with varying attributes
+    #     src1.substances.create(
+    #         substance=subst1, value=emission_unit_to_si(1000, "ton/year")
+    #     )
+
+    #     src2.substances.create(
+    #         substance=subst2, value=emission_unit_to_si(2000, "ton/year")
+    #     )
+
+    #     begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
+    #     end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
+    #     # timestamps = [begin, end]
+
+    #     output = Output(
+    #         extent=extent, timezone=datetime.timezone.utc, path=tmpdir, srid=srid
+    #     )
+
+    #     rasterizer = EmissionRasterizer(output, nx=4, ny=4)
+    #     rasterizer.process([subst1, subst2], begin, end, unit="ton/year", ac1=["1.1"])
+
+    #     with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+    #         assert dset["time"][0] == 368160
+    #         assert dset["Emission of NOx"].shape == (3, 4, 4)
+    #         assert np.sum(dset["Emission of NOx"]) == pytest.approx(3000, 1e-6)
+    #         assert dset["Emission of NOx"][0, 0, 0] == pytest.approx(1000, 1e-6)
+
+    #     with nc.Dataset(tmpdir + "/SOx.nc", "r", format="NETCDF4") as dset:
+    #         assert np.sum(dset["Emission of SOx"]) == pytest.approx(0, 1e-6)
+    #         # should be 0 since ac 1.2

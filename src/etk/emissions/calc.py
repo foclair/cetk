@@ -22,6 +22,7 @@ def get_used_substances():
 def calculate_source_emissions(
     sourcetype,
     substances=None,
+    srid=None,
     name=None,
     ids=None,
     tags=None,
@@ -30,11 +31,12 @@ def calculate_source_emissions(
 ):
     cur = connection.cursor()
     settings = Settings.get_current()
+    srid = srid or settings.srid
     if (sourcetype == "point") or (sourcetype == "area"):
         # create point source emission view
         sql = create_source_emis_query(
             sourcetype=sourcetype,
-            srid=settings.srid,
+            srid=srid,
             substances=substances,
             name=name,
             ids=ids,

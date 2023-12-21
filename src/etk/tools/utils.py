@@ -51,6 +51,15 @@ def run_aggregate_emissions(filename, db_path=None, **kwargs):
     return run("etk", "calc", db_path=db_path, *cmd_args)
 
 
+def run_rasterize_emissions(outputpath, db_path=None, **kwargs):
+    """rasterize emissions and store as NetCDF."""
+    cmd_args = ["--rasterize", str(outputpath)]
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        cmd_args.append(str(v))
+    return run("etk", "calc", db_path=db_path, *cmd_args)
+
+
 def run_import(filename, sheet, dry_run=False, db_path=None, **kwargs):
     """run import in a sub-process."""
     cmd_args = [str(filename), str(sheet)]

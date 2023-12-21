@@ -154,8 +154,6 @@ class Editor(object):
         substances = substances or get_used_substances()
         timezone = timezone or datetime.timezone.utc
         extent = extent or Settings.get_current().extent.extent
-        # test for debugging TODO fix this!!
-        # extent = (2049702,5008151,2549702,5108151)
         # Settings.extent is a Polygon, Settings.extent.extent a tuple (x1, y1, x2, y2)
         if extent is None:
             log.error(
@@ -163,13 +161,13 @@ class Editor(object):
                 + " for database nor rasterizer"
             )
         srid = srid or DEFAULT_SRID
-        begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
-        end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
         try:
             output = Output(
                 extent=extent, timezone=timezone, path=outputpath, srid=srid
             )
             rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
+            begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
+            end = datetime.datetime(2012, 1, 1, 12, tzinfo=datetime.timezone.utc)
             # TODO check if this if-condition is necessary, maybe works if begin=None?
             if (begin is not None) and (end is not None):
                 rasterizer.process(substances, begin, end, unit=unit)
@@ -343,6 +341,12 @@ def main():
             help="Extent of output raster. Settings.extent is taken otherwise",
             metavar="x1,y1,x2,y2",
         )
+        rasterize_grp.add_argument(
+            "--srid",
+            help="EPSG of output raster. 4-5 digits integer",
+            metavar="EPSG",
+        )
+        # TODO add argument begin/end for rasterize
         # TODO add argument to aggregate emissions within polygon
 
         args = sub_parser.parse_args(sys.argv[2:])
@@ -374,7 +378,9 @@ def main():
                 sourcetypes=args.sourcetypes,
                 unit=args.unit,
                 extent=args.extent,
-            )
+                srid=args.srid,
+            )  # TODO add arguments for codeset, substances, begin/end, timezone!
+            # could also add for polygon, but this filtering is not implemented yet!!
             sys.stdout.write("Successfully rasterized emissions\n")
             sys.exit(0)
 

@@ -232,6 +232,10 @@ class EmissionRasterizer:
         sourcetypes = sourcetypes or SOURCETYPES
         # not used; srid = Settings.get_current().srid
 
+        if ac1 is not None or ac2 is not None or ac3 is not None:
+            raise ValueError(
+                "filtering for ac not implemented in source_emissions_query yet!"
+            )
         # if activity codes are given as strings, get the corresponding
         # activity code instances
         if ac1 is not None and len(ac1) > 0 and isinstance(ac1[0], str):
@@ -293,6 +297,7 @@ class EmissionRasterizer:
             self.querysets[sourcetype] = calculate_source_emissions(
                 sourcetype,
                 substances=substances,
+                srid=self.output.srid,
                 name=name,
                 ids=ids,
                 tags=tags,
@@ -365,12 +370,13 @@ class EmissionRasterizer:
                     for x, y in nodes
                 )
                 if not is_within_extent:
-                    self.log.error(
-                        "No nodes within extent, gives error in rastafari"
+                    raise ValueError(
+                        f"No nodes within extent {self.extent} for srid "
+                        + f"{self.output.srid}, gives error in rastafari"
                         + " provide extent in Settings or to rasterize command"
-                        + " in order to run rasterizer."
+                        + " in order to run rasterizer.?n"
+                        + f"nodes: {nodes}"
                     )
-                    exit()
 
                 even_odd_polygon_fill(
                     nodes,
