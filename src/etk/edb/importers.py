@@ -440,7 +440,7 @@ def import_sources(
                     )
                 else:
                     return_message = import_error(
-                        f"No unit specified for {type} emissions on {row_nr}",
+                        f"No unit specified for {type} emissions on row {row_nr}",
                         return_message,
                         validation,
                     )

@@ -365,19 +365,6 @@ class EmissionRasterizer:
                 wkt = rec[col_map.wkt]
                 nodes = np.array(get_nodes_from_wkt(wkt))
 
-                is_within_extent = any(
-                    self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2
-                    for x, y in nodes
-                )
-                if not is_within_extent:
-                    raise ValueError(
-                        f"No nodes within extent {self.extent} for srid "
-                        + f"{self.output.srid}, gives error in rastafari"
-                        + " provide extent in Settings or to rasterize command"
-                        + " in order to run rasterizer.?n"
-                        + f"nodes: {nodes}"
-                    )
-
                 even_odd_polygon_fill(
                     nodes,
                     source_weights,

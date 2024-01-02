@@ -151,6 +151,7 @@ class Editor(object):
         srid=None,
         timezone=None,
     ):
+        # TODO souretypes and codeset not actually given as arguments to rasterizer yet!
         substances = substances or get_used_substances()
         timezone = timezone or datetime.timezone.utc
         extent = extent or Settings.get_current().extent.extent
@@ -166,7 +167,7 @@ class Editor(object):
                 extent=extent, timezone=timezone, path=outputpath, srid=srid
             )
             rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
-            rasterizer.process(substances, unit=unit)
+            rasterizer.process(substances, begin=begin, end=end, unit=unit)
         except Exception as err:
             log.error(f"could not rasterize emissions to path {outputpath}: {str(err)}")
             # log.error(traceback.print_exc())
@@ -340,6 +341,18 @@ def main():
             help="EPSG of output raster. 4-5 digits integer",
             metavar="EPSG",
         )
+        rasterize_grp.add_argument(
+            "--begin",
+            help="when hourly rasters are desired, specify begin date."
+            + " Time 00:00 assumed",
+            metavar="2022-01-01",
+        )
+        rasterize_grp.add_argument(
+            "--end",
+            help="when hourly rasters are desired, specify end date"
+            + " Time 00:00 assumed",
+            metavar="2023-01-01",
+        )
         # TODO add argument begin/end for rasterize
         # TODO add argument to aggregate emissions within polygon
 
@@ -365,6 +378,19 @@ def main():
                 x1, y1, x2, y2 = map(float, args.extent.split(","))
                 # Create the extent tuple
                 args.extent = (x1, y1, x2, y2)
+            if args.begin is not None:
+                args.begin = datetime.datetime.strptime(args.begin, "%Y-%m-%d").replace(
+                    tzinfo=datetime.timezone.utc
+                )
+                if args.end is not None:
+                    args.end = datetime.datetime.strptime(args.end, "%Y-%m-%d").replace(
+                        tzinfo=datetime.timezone.utc
+                    )
+                else:
+                    sys.stderr.write(
+                        "If begin is specified," + " end has to be specified too.\n"
+                    )
+                    sys.exit(1)
             editor.rasterize_emissions(
                 args.rasterize,
                 int(args.nx),
@@ -373,6 +399,8 @@ def main():
                 unit=args.unit,
                 extent=args.extent,
                 srid=args.srid,
+                begin=args.begin,
+                end=args.end,
             )  # TODO add arguments for codeset, substances, begin/end, timezone!
             # could also add for polygon, but this filtering is not implemented yet!!
             sys.stdout.write("Successfully rasterized emissions\n")
