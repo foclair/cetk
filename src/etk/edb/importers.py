@@ -127,7 +127,7 @@ def import_sources(
     srid=None,
     type="point",
 ):
-    """Import point-sources from xlsx or csv-file.
+    """Import point- or area-sources from xlsx or csv-file.
 
     args
         filepath: path to file
@@ -281,7 +281,9 @@ def import_sources(
                 y = float(row_dict["lat"])
             except ValueError:
                 return_message = import_error(
-                    f"Invalid coordinates on row {row_nr}", return_message, validation
+                    f"Invalid {type} coordinates on row {row_nr}",
+                    return_message,
+                    validation,
                 )
             # create geometry
             source_data["geom"] = Point(x, y, srid=srid or project_srid).transform(
@@ -297,7 +299,7 @@ def import_sources(
             }.items():
                 if pd.isna(row_dict[key]):
                     return_message = import_error(
-                        f"Missing value for {key} on row {row_nr}",
+                        f"Missing value in PointSource sheet for {key} on row {row_nr}",
                         return_message,
                         validation,
                     )
@@ -321,7 +323,9 @@ def import_sources(
                 # TODO add check that valid WKT polygon
             except ValueError:
                 return_message = import_error(
-                    f"Invalid geometry on row {row_nr}", return_message, validation
+                    f"Invalid polygon geometry in AreaSource sheet on row {row_nr}",
+                    return_message,
+                    validation,
                 )
             # create geometry
             EPSG = row_dict["EPSG"]
@@ -346,7 +350,7 @@ def import_sources(
                         if code is not None and code is not np.nan:
                             return_message = import_error(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
-                                + f" on row {row_nr}",
+                                + f" for {type} source on row {row_nr}",
                                 return_message,
                                 validation,
                             )
@@ -360,7 +364,7 @@ def import_sources(
                         except KeyError:
                             return_message = import_error(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
-                                + f" on row {row_nr}",
+                                + f" for {type} source on row {row_nr}",
                                 return_message,
                                 validation,
                             )
@@ -379,7 +383,7 @@ def import_sources(
                                 return_message = import_error(
                                     f"Specified activitycode {row_dict[column]} for "
                                     + f" unknown codeset {codeset_slug[index]}"
-                                    + f" on row {row_nr}",
+                                    + f" for {type} source on row {row_nr}",
                                     return_message,
                                     validation,
                                 )
@@ -400,7 +404,8 @@ def import_sources(
                 source_data["timevar"] = timevars[timevar_name]
             except KeyError:
                 return_message = import_error(
-                    f"Timevar '{timevar_name}' " f"on row {row_nr} does not exist",
+                    f"Timevar '{timevar_name}' "
+                    f"on row {row_nr} for {type} source does not exist",
                     return_message,
                     validation,
                 )
@@ -435,13 +440,14 @@ def import_sources(
                     )
                 else:
                     return_message = import_error(
-                        f"No unit specified for emissions on {row_nr}",
+                        f"No unit specified for {type} emissions on {row_nr}",
                         return_message,
                         validation,
                     )
             except ValueError:
                 return_message = import_error(
-                    f"Invalid emission value {row_dict[subst_key]} on row {row_nr}",
+                    f"Invalid {type} emission value {row_dict[subst_key]}"
+                    + f" on row {row_nr}",
                     return_message,
                     validation,
                 )
@@ -454,7 +460,7 @@ def import_sources(
 
         if pd.isna(source_name):
             return_message = import_error(
-                f"No name specified for source on row {row_nr}",
+                f"No name specified for {type} source on row {row_nr}",
                 return_message,
                 validation,
             )
