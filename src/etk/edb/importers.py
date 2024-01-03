@@ -10,7 +10,8 @@ from django.db import IntegrityError
 from openpyxl import load_workbook
 
 from etk.edb.const import SHEET_NAMES, WGS84_SRID
-from etk.edb.models.common_models import Settings
+
+# from etk.edb.models.common_models import Settings
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     Activity,
@@ -136,11 +137,10 @@ def import_sources(
         encoding: encoding of file (default is utf-8)
         srid: srid of file, default is same srid as domain
     """
-    # or change to user defined SRID?
-    try:
-        project_srid = Settings.objects.get().srid
-    except Settings.DoesNotExist:
-        project_srid = WGS84_SRID
+    # user defined SRID for import or WGS84 if nothing specified
+    # as long as we do not have functions in Eclair to edit the "settings_SRID"
+    # it does not make sense to use that SRID as default for import.
+    srid = srid or WGS84_SRID
     # cache related models
     substances = cache_queryset(Substance.objects.all(), "slug")
     timevars = cache_queryset(Timevar.objects.all(), "name")
@@ -286,9 +286,7 @@ def import_sources(
                     validation,
                 )
             # create geometry
-            source_data["geom"] = Point(x, y, srid=srid or project_srid).transform(
-                4326, clone=True
-            )
+            source_data["geom"] = Point(x, y, srid=srid).transform(4326, clone=True)
             # get chimney properties
             for attr, key in {
                 "chimney_height": "chimney_height",
