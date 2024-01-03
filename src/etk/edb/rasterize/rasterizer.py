@@ -365,14 +365,20 @@ class EmissionRasterizer:
                 wkt = rec[col_map.wkt]
                 nodes = np.array(get_nodes_from_wkt(wkt))
 
-                even_odd_polygon_fill(
-                    nodes,
-                    source_weights,
-                    self.extent,
-                    self.nx,
-                    self.ny,
-                    subgridcells=2,
+                is_within_extent = any(
+                    self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2
+                    for x, y in nodes
                 )
+
+                if is_within_extent:
+                    even_odd_polygon_fill(
+                        nodes,
+                        source_weights,
+                        self.extent,
+                        self.nx,
+                        self.ny,
+                        subgridcells=2,
+                    )
 
                 if len(source_weights) > 0:
                     indices = list(zip(*source_weights.keys()))
@@ -416,30 +422,28 @@ class EmissionRasterizer:
                 time_var, time_bounds_var = create_time_variable(dset)
                 create_xy_variables(dset, self.extent, self.crs, self.nx, self.ny)
                 subst_vars = self.variables.setdefault(substance.slug, {})
-                # create variables for storage
-                if any(
-                    self._cache.has_substance(sourcetype, substance.id)
-                    for sourcetype in self.sourcetypes
-                ):
-                    param = Parameter.objects.get(
-                        quantity="emission", substance=substance
+                # create variables for storage, also without emission in extent
+                # if any(
+                #     self._cache.has_substance(sourcetype, substance.id)
+                #     for sourcetype in self.sourcetypes
+                # ):
+                param = Parameter.objects.get(quantity="emission", substance=substance)
+                chunking = self._calc_chunking(
+                    chunk_cache=1e8,
+                )
+                subst_vars["field2d"] = {
+                    "emission": create_variable(
+                        dset,
+                        grid_mapping_var,
+                        name=f"Emission of {substance.name}",
+                        unit=self.unit,
+                        instance=self.instance,
+                        cell_methods=cell_methods,
+                        parameter=param.name,
+                        time=time,
+                        chunksizes=chunking,
                     )
-                    chunking = self._calc_chunking(
-                        chunk_cache=1e8,
-                    )
-                    subst_vars["field2d"] = {
-                        "emission": create_variable(
-                            dset,
-                            grid_mapping_var,
-                            name=f"Emission of {substance.name}",
-                            unit=self.unit,
-                            instance=self.instance,
-                            cell_methods=cell_methods,
-                            parameter=param.name,
-                            time=time,
-                            chunksizes=chunking,
-                        )
-                    }
+                }
         ncreated = 0
         for subst_vars in self.variables.values():
             for sourcetype_vars in subst_vars.values():
@@ -532,6 +536,7 @@ class EmissionRasterizer:
             ac3=ac3,
             cur=cur,
         )
+
         with EmissionCache(self.querysets) as cache:
             self._cache = cache
 
@@ -544,14 +549,7 @@ class EmissionRasterizer:
 
             if begin is not None and end is not None:
                 self.log.debug("creating result variables")
-                # TODO, how should this be done when we don't have traffic work
-                # and thus no substances with extras?
                 created = self._create_variables(self.substances, timeseries=True)
-                # if no variables are created, skip out
-                if not created:
-                    self.reset()
-                    self.log.debug("no emissions found within requested extent")
-                    return
 
                 # get time-variation profiles
                 self._get_timevars(sourcetypes or SOURCETYPES)
@@ -591,8 +589,6 @@ class EmissionRasterizer:
             with nc.Dataset(result_file, "r", format="NETCDF4") as dset:
                 # variable_name = 'Emission of '+substance.name
                 # or x, y, time
-                # TODO, dset has no data for time variable yet, is it really meant
-                # to take chunking from here or was that specific to NARC?
                 time_chunking = dset.variables["time"].chunking()
                 if time_chunking[0] < min_time_chunksize:
                     min_time_chunksize = time_chunking[0]
