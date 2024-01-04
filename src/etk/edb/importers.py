@@ -724,6 +724,7 @@ def import_eea_emfacs(filepath, encoding=None):
     extension = filepath.suffix
     if extension == ".csv":
         # read csv-file
+        print("Warning, this is not as much tested as xlsx!")
         with open(filepath, encoding=encoding or "utf-8") as csvfile:
             log.debug("reading point-sources from csv-file")
             df = pd.read_csv(
@@ -824,7 +825,8 @@ def import_eea_emfacs(filepath, encoding=None):
         eea_emfac = EEAEmissionFactor()
         for key, val in emfac_data.items():
             setattr(eea_emfac, key, val)
-        create_eea_emfac.append(eea_emfac)
+        if not pd.isnull(eea_emfac.value):
+            create_eea_emfac.append(eea_emfac)
         row_nr += 1
 
     EEAEmissionFactor.objects.bulk_create(create_eea_emfac)
