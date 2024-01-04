@@ -71,6 +71,15 @@ def run_import(filename, sheet, dry_run=False, db_path=None, **kwargs):
     return run("etk", "import", db_path=db_path, *cmd_args)
 
 
+def run_export(filename, db_path=None, **kwargs):
+    """run export in a sub-process, arguments to be added are unit and srid."""
+    cmd_args = [str(filename)]
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        cmd_args.append(str(v))
+    return run("etk", "export", db_path=db_path, *cmd_args)
+
+
 def create_from_template(filename):
     """create from template."""
     shutil.copyfile(get_template_db(), filename)

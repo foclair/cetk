@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import logging
+import os
 import sys
 
 # import traceback
@@ -26,7 +27,7 @@ log = logging.getLogger(__name__)
 
 settings = etk.configure()
 
-from etk.edb import importers  # noqa
+from etk.edb import exporters, importers  # noqa
 from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
 from etk.edb.models import Settings, Substance  # noqa
 from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
@@ -173,8 +174,9 @@ class Editor(object):
             # log.error(traceback.print_exc())
             sys.exit(1)
 
-    def export_data(self):
-        print("Not implemented")
+    def export_data(self, filename):
+        exporters.export_sources(filename)
+        return True
 
 
 def main():
@@ -407,6 +409,29 @@ def main():
             sys.exit(0)
 
     elif main_args.command == "export":
-        sub_parser = argparse.ArgumentParser(description="Export data to file\n")
+        sub_parser = argparse.ArgumentParser(
+            description="Export data to xlsx-file",
+            usage="etk export <filename> [options]",
+        )
+        sub_parser.add_argument("filename", help="Path to xslx-file")
+        if not Path(db_path).exists():
+            sys.stderr.write(
+                "Database " + db_path + " does not exist, first run "
+                "'etk create' or 'etk migrate'\n"
+            )
+            sys.exit(1)
+
         args = sub_parser.parse_args(sys.argv[2:])
-        editor.export_data(*args)
+        try:
+            # Check if the file can be created at the given path
+            os.access(args.filename, os.W_OK | os.X_OK)
+        except Exception as e:
+            sys.stderr.write(f"File {args.filename} cannot be created: \n {e} ")
+            sys.exit(1)
+        status = editor.export_data(args.filename)
+        if status:
+            sys.stdout.write(f"Exported data from {db_path} to {args.filename}.\n")
+            sys.exit(0)
+        else:
+            sys.stderr.write("Did not export data, something went wrong.")
+            sys.exit(1)

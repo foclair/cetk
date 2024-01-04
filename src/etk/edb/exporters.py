@@ -19,13 +19,6 @@ from etk.edb.models.source_models import (
 )
 from etk.edb.units import activity_rate_unit_from_si, emis_conversion_factor_from_si
 
-# sheets:
-# "Timevar",
-# "Activity",
-# "EmissionFactor",
-# "ActivityCode",
-# "CodeSet",
-
 
 def export_sources(export_filepath, srid=WGS84_SRID, unit="ton/year"):
     # Create a new Excel workbook and remove standard first Sheet
