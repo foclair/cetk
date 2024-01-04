@@ -9,6 +9,7 @@ from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db import IntegrityError
 from openpyxl import load_workbook
 
+from etk.edb.cache import cache_queryset
 from etk.edb.const import SHEET_NAMES, WGS84_SRID
 
 # from etk.edb.models.common_models import Settings
@@ -34,7 +35,6 @@ from etk.edb.units import (
     activity_rate_unit_to_si,
     emission_unit_to_si,
 )
-from etk.tools.utils import cache_queryset
 
 # column facility and name are used as index and is therefore not included here
 REQUIRED_COLUMNS_AREA = {

@@ -99,23 +99,3 @@ def run(*args, db_path=None):
     #     log.debug(f"command {'_'.join(args)} failed with error {error}")
     log.debug(f"command {'_'.join(args)} finished with status code {proc.returncode}")
     return proc.stdout, proc.stderr
-
-
-def cache_queryset(queryset, fields):
-    """Return dict of model instances with fields as key
-    If several fields are specified, a tuple of the fields is used as key
-    """
-
-    def fields2key(inst, fields):
-        if hasattr(fields, "__iter__") and not isinstance(fields, str):
-            return tuple([getattr(inst, field) for field in fields])
-        else:
-            return getattr(inst, fields)
-
-    return dict(((fields2key(instance, fields), instance) for instance in queryset))
-
-
-def cache_codeset(code_set):
-    if code_set is None:
-        return {}
-    return cache_queryset(code_set.codes.all(), "code")

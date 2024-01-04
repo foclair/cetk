@@ -231,3 +231,17 @@ class EmissionCache:
             raise NotInCacheError(f"file {page_file_name} not found in cache")
         with page_file_name.open("rb") as page_file:
             return pickle.load(page_file)
+
+
+def cache_queryset(queryset, fields):
+    """Return dict of model instances with fields as key
+    If several fields are specified, a tuple of the fields is used as key
+    """
+
+    def fields2key(inst, fields):
+        if hasattr(fields, "__iter__") and not isinstance(fields, str):
+            return tuple([getattr(inst, field) for field in fields])
+        else:
+            return getattr(inst, fields)
+
+    return dict(((fields2key(instance, fields), instance) for instance in queryset))

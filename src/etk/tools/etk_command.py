@@ -14,16 +14,6 @@ from django.db import transaction
 
 import etk
 from etk.db import run_migrate
-from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
-from etk.edb.exporters import export_sources
-from etk.edb.importers import import_sourceactivities, import_sources
-from etk.edb.models import Settings, Substance  # noqa
-from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
-from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
-from etk.emissions.views import (  # noqa
-    create_areasource_emis_table,
-    create_pointsource_emis_table,
-)
 from etk.tools.utils import (
     CalledProcessError,
     SubprocessError,
@@ -36,6 +26,17 @@ from etk.tools.utils import (
 log = logging.getLogger(__name__)
 
 settings = etk.configure()
+
+from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
+from etk.edb.exporters import export_sources  # noqa
+from etk.edb.importers import import_sourceactivities, import_sources  # noqa
+from etk.edb.models import Settings, Substance  # noqa
+from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
+from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
+from etk.emissions.views import (  # noqa
+    create_areasource_emis_table,
+    create_pointsource_emis_table,
+)
 
 SOURCETYPES = ("point", "area")
 DEFAULT_EMISSION_UNIT = "kg/year"
