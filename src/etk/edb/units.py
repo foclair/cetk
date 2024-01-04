@@ -95,6 +95,16 @@ def activity_rate_unit_to_si(value, unit):
         raise KeyError(f"no conversion factor defined for time-unit {time_unit}")
 
 
+def activity_rate_unit_from_si(value, unit):
+    """convert activity rate from si-units [s⁻¹]."""
+
+    activity_unit, time_unit = unit.split("/")
+    try:
+        return value * TIME_UNIT_TO_SECONDS[time_unit]
+    except KeyError:
+        raise KeyError(f"no conversion factor defined for time-unit {time_unit}")
+
+
 def activity_ef_unit_to_si(value, unit):
     """convert activity emission factor unit to si-units [kg]."""
 

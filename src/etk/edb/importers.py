@@ -39,22 +39,20 @@ from etk.tools.utils import cache_queryset
 # column facility and name are used as index and is therefore not included here
 REQUIRED_COLUMNS_AREA = {
     "facility_id": np.str_,
-    "geometry": np.str_,
     "facility_name": np.str_,
     "source_name": np.str_,
+    "geometry": np.str_,
+    "EPSG": int,
     "timevar": np.str_,
 }
 
 REQUIRED_COLUMNS_POINT = {
     "facility_id": np.str_,
-    "lat": float,
-    "lon": float,
     "facility_name": np.str_,
     "source_name": np.str_,
+    "lat": float,
+    "lon": float,
     "timevar": np.str_,
-    # "activitycode1": np.str_,
-    # "activitycode2": np.str_,
-    # "activitycode3": np.str_,
     "chimney_height": float,
     "outer_diameter": float,
     "inner_diameter": float,
