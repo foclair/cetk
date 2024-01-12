@@ -63,3 +63,16 @@ LOGGING = {
     },
     "loggers": {"etk": etk_logger},
 }
+
+if os.name == 'nt':
+    import platform
+    OSGEO4W = r"C:\OSGeo4W"
+    # if '64' in platform.architecture()[0]:
+    #     OSGEO4W += "64"
+    assert os.path.isdir(OSGEO4W), "Directory does not exist: " + OSGEO4W
+    os.environ['OSGEO4W_ROOT'] = OSGEO4W
+    os.environ['GDAL_DATA'] = OSGEO4W + r"\share\gdal"
+    os.environ['PROJ_LIB'] = OSGEO4W + r"\share\proj"
+    # TODO this should look for which gdal version is located here, not hardcoded!
+    # os.environ['GDAL_LIBRARY_PATH'] = OSGEO4W + r"\bin\gdal308"
+    os.environ['PATH'] = OSGEO4W + r"\bin;" + os.environ['PATH']
