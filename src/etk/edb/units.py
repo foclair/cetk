@@ -30,6 +30,13 @@ TIME_UNIT_TO_SECONDS = {
     "yr": 3600 * 24 * 365.25,
 }
 
+ENERGY_UNIT_TO_GIGAJOULES = {
+    "J": 1.0e-39,
+    "kWh": 3.6e-3,
+    "MWh": 3.6,
+    "GJ": 1.0,
+}
+
 LENGTH_UNIT_TO_METERS = {"km": 1000, "m": 1.0}
 
 
@@ -113,3 +120,41 @@ def activity_ef_unit_to_si(value, unit):
         return value * MASS_UNIT_TO_KILOGRAMS[mass_unit]
     except KeyError:
         raise KeyError(f"no conversion factor defined for mass-unit {mass_unit}")
+
+
+def heating_demand_unit_to_si(value, unit):
+    """convert heating demand unit to (almost) si-units [GJ s⁻¹]."""
+
+    energy_unit, time_unit = unit.split("/")
+    try:
+        return (
+            value
+            * ENERGY_UNIT_TO_GIGAJOULES[energy_unit]
+            / TIME_UNIT_TO_SECONDS[time_unit]
+        )
+    except KeyError:
+        if time_unit not in TIME_UNIT_TO_SECONDS:
+            raise KeyError(f"no conversion factor defined for time-unit {time_unit}")
+        else:
+            raise KeyError(
+                f"no conversion factor defined for energy-unit {energy_unit}"
+            )
+
+
+def heating_ef_unit_to_si(value, unit):
+    """convert heating emission factor unit to (almost) si-units [kg/GJ]."""
+
+    mass_unit, energy_unit = unit.split("/")
+    try:
+        return (
+            value
+            * MASS_UNIT_TO_KILOGRAMS[mass_unit]
+            / ENERGY_UNIT_TO_GIGAJOULES[energy_unit]
+        )
+    except KeyError:
+        if mass_unit not in MASS_UNIT_TO_KILOGRAMS:
+            raise KeyError(f"no conversion factor defined for mass-unit {mass_unit}")
+        else:
+            raise KeyError(
+                f"no conversion factor defined for energy-unit {energy_unit}"
+            )
