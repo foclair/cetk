@@ -164,3 +164,4 @@ class TestImport:
 
 
 # TODO test_import_residentialheating
+# difficulty is that eea emission factors need to be imported first, too big file?

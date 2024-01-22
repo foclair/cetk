@@ -30,6 +30,7 @@ settings = etk.configure()
 from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
 from etk.edb.exporters import export_sources  # noqa
 from etk.edb.importers import (  # noqa
+    import_eea_emfacs,
     import_residentialheating,
     import_sourceactivities,
     import_sources,
@@ -121,6 +122,10 @@ class Editor(object):
             pass
         return progress
 
+    def import_eea_emfacs(self, filename):
+        progress = import_eea_emfacs(filename)
+        return progress
+
     def update_emission_tables(
         self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
     ):
@@ -200,8 +205,10 @@ def main():
         usage=f"""etk <command> [<args>]
 
         Main commands are:
+        create   create an sqlite inventory
         migrate  migrate an sqlite inventory
         import   import data
+        import_eea_emfacs   import emission factors from EEA/EMEP database
         export   export data
         calc     calculate emissions
 
@@ -211,7 +218,7 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "import", "export", "calc"),
+        choices=("migrate", "create", "import", "import_eea_emfacs", "export", "calc"),
     )
     main_args = parser.parse_args(args=sys.argv[1:2])
 
@@ -308,9 +315,21 @@ def main():
                 args.filename, sheet=args.sheets, dry_run=args.dryrun
             )
         log.debug("Imported data from '{args.filename}' to '{db_path}")
-        sys.stdout.write(str(status))
+        sys.stdout.write(str(status) + "\n")
         sys.exit(0)
-
+    elif main_args.command == "import_eea_emfacs":
+        sub_parser = argparse.ArgumentParser(
+            description="Import EEA emission factors from an xlsx-file",
+            usage="etk import_eea_emfacs <filename> ",
+        )
+        sub_parser.add_argument(
+            "filename", help="Path to xslx-file", type=check_and_get_path
+        )
+        args = sub_parser.parse_args(sys.argv[2:])
+        status = editor.import_eea_emfacs(args.filename)
+        log.debug("Imported emfacs from '{args.filename}' to '{db_path}")
+        sys.stdout.write(str(status) + "\n")
+        sys.exit(0)
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(
             description="Calculate emissions",

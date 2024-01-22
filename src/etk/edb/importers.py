@@ -834,7 +834,10 @@ def import_eea_emfacs(filepath, encoding=None):
 
     EEAEmissionFactor.objects.bulk_create(create_eea_emfac)
     # TODO check for existing emfac and do not create twice, or only update
-    return create_eea_emfac
+    # a bit challenging since database itself has duplicates.
+    return_dict = {}
+    return_dict["eea_emfacs_created"] = len(create_eea_emfac)
+    return return_dict
 
 
 def import_timevarsheet(workbook, return_message, return_dict, validation):
@@ -1545,7 +1548,7 @@ def import_residentialheating(
                 ):
                     # duplicates in EEA
                     continue
-                if isinstance(substance, None):
+                if isinstance(substance, type(None)):
                     # skip unknown substance, substance in EEA not contained in edb.
                     continue
                 if any(
