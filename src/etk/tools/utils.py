@@ -51,13 +51,13 @@ def run_aggregate_emissions(filename, db_path=None, **kwargs):
     return run("etk", "calc", db_path=db_path, *cmd_args)
 
 
-def run_rasterize_emissions(outputpath, db_path=None, **kwargs):
+def run_rasterize_emissions(outputpath, **kwargs):
     """rasterize emissions and store as NetCDF."""
     cmd_args = ["--rasterize", str(outputpath)]
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
-    return run("etk", "calc", db_path=db_path, *cmd_args)
+    return run("etk", "calc", *cmd_args)
 
 
 def run_import(filename, sheet, dry_run=False, db_path=None, **kwargs):
@@ -70,19 +70,23 @@ def run_import(filename, sheet, dry_run=False, db_path=None, **kwargs):
         cmd_args.append(str(v))
     if dry_run:
         cmd_args.append("--dryrun")
-    return run("etk", "import", db_path=db_path, *cmd_args)
+    return run("etk", "import", *cmd_args)
 
 
-def run_import_residential_heating(filename, dry_run=False, db_path=None, **kwargs):
-    """run import in a sub-process."""
+def run_import_residential_heating(filename, dry_run=False, **kwargs):
+    """run import residential heating in a sub-process."""
     cmd_args = [str(filename)]
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
     if dry_run:
         cmd_args.append("--dryrun")
-    cmd_args.append("--residential_heating")
-    return run("etk", "import", db_path=db_path, *cmd_args)
+    cmd_args.append("--residential-heating")
+    return run("etk", "import", *cmd_args)
+
+
+def run_import_eea_emfacs(filename):
+    return run("etk", "import_eea_emfacs", filename)
 
 
 def run_export(filename, db_path=None, **kwargs):
