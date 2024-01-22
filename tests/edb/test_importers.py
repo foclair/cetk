@@ -161,3 +161,6 @@ class TestImport:
         psa = import_sourceactivities(filepath)
         print(psa)
         assert AreaSourceActivity.objects.all().count()
+
+
+# TODO test_import_residentialheating

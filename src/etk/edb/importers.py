@@ -943,6 +943,8 @@ def import_activitycodesheet(workbook, return_message, return_dict, validation):
                             return_message,
                             validation,
                         )
+                else:
+                    vdist_id = None
             else:
                 vdist_id = None
             try:

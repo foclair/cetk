@@ -62,12 +62,26 @@ def run_rasterize_emissions(outputpath, db_path=None, **kwargs):
 
 def run_import(filename, sheet, dry_run=False, db_path=None, **kwargs):
     """run import in a sub-process."""
-    cmd_args = [str(filename), str(sheet)]
+    cmd_args = [str(filename)]
+    cmd_args.append("--sheets")
+    cmd_args.append(str(sheet))
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
     if dry_run:
         cmd_args.append("--dryrun")
+    return run("etk", "import", db_path=db_path, *cmd_args)
+
+
+def run_import_residential_heating(filename, dry_run=False, db_path=None, **kwargs):
+    """run import in a sub-process."""
+    cmd_args = [str(filename)]
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        cmd_args.append(str(v))
+    if dry_run:
+        cmd_args.append("--dryrun")
+    cmd_args.append("--residential_heating")
     return run("etk", "import", db_path=db_path, *cmd_args)
 
 

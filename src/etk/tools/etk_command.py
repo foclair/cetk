@@ -29,7 +29,11 @@ settings = etk.configure()
 
 from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
 from etk.edb.exporters import export_sources  # noqa
-from etk.edb.importers import import_sourceactivities, import_sources  # noqa
+from etk.edb.importers import (  # noqa
+    import_residentialheating,
+    import_sourceactivities,
+    import_sources,
+)
 from etk.edb.models import Settings, Substance  # noqa
 from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
@@ -97,6 +101,19 @@ class Editor(object):
             with transaction.atomic():
                 progress = import_sourceactivities(
                     filename, import_sheets=sheet, validation=dry_run
+                )
+                if dry_run:
+                    raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
+
+    def import_residentialheating(self, filename, substance=None, dry_run=False):
+        # works for point and area, recognizes from tab name which one.
+        try:
+            with transaction.atomic():
+                progress = import_residentialheating(
+                    filename, import_substances=substance, validation=dry_run
                 )
                 if dry_run:
                     raise DryrunAbort
@@ -242,18 +259,27 @@ def main():
     elif main_args.command == "import":
         sub_parser = argparse.ArgumentParser(
             description="Import data from an xlsx-file",
-            usage="etk import <filename> <sheet> [options]",
+            usage="etk import <filename> [options]",
         )
         sub_parser.add_argument(
             "filename", help="Path to xslx-file", type=check_and_get_path
         )
         sub_parser.add_argument(
-            "sheets", help="List of sheets to import, valid names {SHEET_NAMES}"
+            "--sheets", help=f"List of sheets to import, valid names {SHEET_NAMES}"
         )
         sub_parser.add_argument(
             "--dryrun",
             action="store_true",
             help="Do dry run to validate import file without actually importing data",
+        )
+        sub_parser.add_argument(
+            "--residential-heating",
+            action="store_true",
+            help="Import file with energy demand for residential heating",
+        )
+        sub_parser.add_argument(
+            "--heating-substances",
+            help="Only import residential heating emissions for these substances",
         )
         # pointsource_grp = sub_parser.add_argument_group(
         #     "pointsources", description="Options for pointsource import"
@@ -265,11 +291,15 @@ def main():
                 "'etk create' or 'etk migrate'\n"
             )
             sys.exit(1)
-        if args.sheets == "PointSource":
+        if args.residential_heating:
+            status = editor.import_residentialheating(
+                args.filename, substance=args.heating_substances, dry_run=args.dryrun
+            )
+        elif args.sheets == "PointSource":
             status = editor.import_sources(
                 args.filename, dry_run=args.dryrun, type="point"
             )
-        if args.sheets == "AreaSource":
+        elif args.sheets == "AreaSource":
             status = editor.import_sources(
                 args.filename, dry_run=args.dryrun, type="area"
             )
