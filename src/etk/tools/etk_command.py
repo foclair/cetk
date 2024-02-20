@@ -285,8 +285,12 @@ def main():
             help="Import file with energy demand for residential heating",
         )
         sub_parser.add_argument(
-            "--heating-substances",
-            help="Only import residential heating emissions for these substances",
+            "--substances",
+            nargs="*",
+            help="Only import residential heating emissions for these substances"
+            + " (default is all with emissions)",
+            choices=Substance.objects.values_list("slug", flat=True),
+            metavar=("NOx", "PM10"),
         )
         # pointsource_grp = sub_parser.add_argument_group(
         #     "pointsources", description="Options for pointsource import"
@@ -300,7 +304,7 @@ def main():
             sys.exit(1)
         if args.residential_heating:
             status = editor.import_residentialheating(
-                args.filename, substance=args.heating_substances, dry_run=args.dryrun
+                args.filename, substance=args.substances, dry_run=args.dryrun
             )
         elif args.sheets == "PointSource":
             status = editor.import_sources(

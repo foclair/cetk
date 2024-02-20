@@ -168,12 +168,13 @@ def create_source_sheet(
         set([ss.substance.slug for ss in SourceSubstanceModel.objects.all()])
     )
     substance_columns = [f"subst:{subst}" for subst in substance_slugs]
-    header = (
-        header
-        + codeset_columns
-        + substance_columns
-        + ["unit", "activity_name", "activity_rate", "activity_unit"]
-    )
+    header = header + codeset_columns + substance_columns + ["unit"]
+    activities = Activity.objects.all()
+    if len(activities) > 0:
+        activity_names = [activity.name for activity in activities]
+        activity_columns = [f"act:{name}" for name in activity_names]
+        header = header + activity_columns
+
     # Write the header to the worksheet
     worksheet.append(header)
     # Iterate through features and add data to the worksheet
@@ -227,20 +228,22 @@ def create_source_sheet(
         emis_row = [emis * emis_conversion_factor for emis in emis_row]
         row_data = row_data + emis_row + [unit]
 
-        if len(source.activities.all()) > 0:
-            if len(source.activities.all()) > 1:
-                raise ValueError("cannot export more than one activity per row")
-            source_activity = source.activities.first()
-            activity_unit = Activity.objects.get(id=source_activity.activity_id).unit
-            activity_rate = activity_rate_unit_from_si(
-                source_activity.rate, activity_unit
-            )
-            row_data = row_data + [
-                str(Activity.objects.get(id=source_activity.activity_id).name),
-                activity_rate,
-                activity_unit,
+        if len(activities) > 0:
+            source_activities = [
+                Activity.objects.get(id=sa.activity_id).name
+                for sa in source.activities.all()
             ]
-        else:
-            row_data = row_data + ["", "", ""]
+            source_activity_rates = dict()
+            for act in source.activities.all():
+                activity_unit = Activity.objects.get(id=act.activity_id).unit
+                activity_rate = activity_rate_unit_from_si(act.rate, activity_unit)
+                source_activity_rates[
+                    Activity.objects.get(id=act.activity_id).name
+                ] = activity_rate
+            act_row = [
+                source_activity_rates[name] if name in source_activities else 0
+                for name in activity_names
+            ]
+            row_data = row_data + act_row
 
         worksheet.append(row_data)

@@ -1197,11 +1197,13 @@ def import_sourceactivities(
         create_pointsourceactivities = []
         update_pointsourceactivities = []
         for row_key, row in df_pointsource.iterrows():
-            if "activity_name" in row:
-                if row["activity_name"] is not None:
-                    rate = row["activity_rate"]
+            # NB: does not work if column header starts with space, but same for subst:
+            activity_keys = [k for k in row.keys() if k.startswith("act:")]
+            for activity_key in activity_keys:
+                if not pd.isnull(row[activity_key]):
+                    rate = row[activity_key]
                     try:
-                        activity = activities[row["activity_name"]]
+                        activity = activities[activity_key[4:]]
                     except KeyError:
                         return_message = import_error(
                             f"unknown activity '{activity_name}'"
@@ -1254,11 +1256,13 @@ def import_sourceactivities(
         create_areasourceactivities = []
         update_areasourceactivities = []
         for row_key, row in df_areasource.iterrows():
-            if "activity_name" in row:
-                if row["activity_name"] is not None:
-                    rate = row["activity_rate"]
+            # NB: does not work if column header starts with space, but same for subst:
+            activity_keys = [k for k in row.keys() if k.startswith("act:")]
+            for activity_key in activity_keys:
+                if not pd.isnull(row[activity_key]):
+                    rate = row[activity_key]
                     try:
-                        activity = activities[row["activity_name"]]
+                        activity = activities[activity_key[4:]]
                     except KeyError:
                         return_message = import_error(
                             f"unknown activity '{activity_name}'"
@@ -1481,7 +1485,7 @@ def import_residentialheating(
     drop_emfacs = []
     for fuel in fuel_types:
         for appliance in fuel_appliance_weights[fuel].keys():
-            activity_name = fuel + "_" + appliance  # + facility?!
+            activity_name = fuel + "_" + appliance  # + facility?! + NFR
             try:
                 activity = activities[activity_name]
                 setattr(activity, "name", activity_name)
@@ -1535,6 +1539,9 @@ def import_residentialheating(
             )
             for eea_emfac in eea_emfacs:
                 substance = eea_emfac.substance
+                if isinstance(substance, type(None)):
+                    # skip unknown substance, substance in EEA not contained in edb.
+                    continue
                 if import_substances is not None:
                     if substance.name not in import_substances:
                         # only import substances in import_substances
@@ -1547,9 +1554,6 @@ def import_residentialheating(
                     ]
                 ):
                     # duplicates in EEA
-                    continue
-                if isinstance(substance, type(None)):
-                    # skip unknown substance, substance in EEA not contained in edb.
                     continue
                 if any(
                     (ef_overwrite["fuel"] == fuel)

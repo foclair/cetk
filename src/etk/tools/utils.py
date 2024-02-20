@@ -78,7 +78,11 @@ def run_import_residential_heating(filename, dry_run=False, **kwargs):
     cmd_args = [str(filename)]
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
-        cmd_args.append(str(v))
+        if k == "substances":
+            for substance in v:
+                cmd_args.append(substance)
+        else:
+            cmd_args.append(str(v))
     if dry_run:
         cmd_args.append("--dryrun")
     cmd_args.append("--residential-heating")
