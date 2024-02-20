@@ -53,7 +53,7 @@ def create_pointsource_emis_table(substances, unit="kg/year"):
     )
     cur.execute("DROP TABLE IF EXISTS pointsource_emissions")
     table_sql = "CREATE TABLE pointsource_emissions AS SELECT source_id, " + ", ".join(
-        [f"cast({s.slug} as real) as {s.slug}" for s in substances]
+        [f'cast("{s.slug}" as real) as "{s.slug}"' for s in substances]
     )
     table_sql += f"""
   FROM (
@@ -117,7 +117,7 @@ def create_areasource_emis_table(substances, unit="kg/year"):
     )
     cur.execute("DROP TABLE IF EXISTS areasource_emissions")
     table_sql = "CREATE TABLE areasource_emissions AS SELECT source_id, " + ", ".join(
-        [f"cast({s.slug} as real) as {s.slug}" for s in substances]
+        [f'cast("{s.slug}" as real) as "{s.slug}"' for s in substances]
     )
     table_sql += f"""
   FROM (

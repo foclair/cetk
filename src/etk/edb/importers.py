@@ -1215,7 +1215,7 @@ def import_sourceactivities(
                     # original unit stored in activity.unit, but
                     # pointsourceactivity.rate stored as activity / s.
                     pointsource = pointsources[
-                        str(row["facility_id"]), row["source_name"]
+                        str(row["facility_id"]), str(row["source_name"])
                     ]
                     try:
                         psa = pointsourceactivities[activity, pointsource]
@@ -1274,7 +1274,7 @@ def import_sourceactivities(
                     # original unit stored in activity.unit, but
                     # areasourceactivity.rate stored as activity / s.
                     areasource = areasources[
-                        str(row["facility_id"]), row["source_name"]
+                        str(row["facility_id"]), str(row["source_name"])
                     ]
                     try:
                         psa = areasourceactivities[activity, areasource]
