@@ -5,10 +5,10 @@ import ast
 
 import numpy as np
 import pytest
-from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import GEOSGeometry, Polygon
 
 from etk.edb.const import WGS84_SRID
-from etk.edb.models import source_models
+from etk.edb.models import AreaSource, source_models
 from etk.edb.models.common_models import Settings
 
 
@@ -101,3 +101,106 @@ class TestSettings:
         assert settings.srid == WGS84_SRID
         assert settings.timezone == "Europe/Oslo"
         assert settings.codeset1 == codeset2
+
+
+# class TestInventoryAreaSources:
+#     POLYGON_WKT = (
+#         "SRID=4326;POLYGON((17.8 52.0, 17.0 52.0, 17.0 51.0, 17.8 51.0, 17.8 52.0))"
+#     )
+
+#     @pytest.mark.usefixtures("areasources")
+#     def test_sources(self):
+#         """Test filtering and listing sources."""
+
+
+#         # test filtering name using regexp
+#         assert inv1.sources("area", name=".*1").count() == 1
+
+#         # test filtering on tags
+#         assert inv1.sources("area", tags={"tag2": "B"}).count() == 1
+
+#         assert inv1.sources("area", polygon=self.POLYGON_WKT).count() == 4
+
+#     @pytest.mark.usefixtures("areasources")
+#     def test_source_emissions(self, inventories, source_ef_sets):
+#         """Test to aggregate emissions from area or area sources."""
+
+#         SOx = Substance.objects.get(slug="SOx")
+#         NOx = Substance.objects.get(slug="NOx")
+#         inv1 = inventories[0]
+#         source_ef_set = source_ef_sets[0]
+#         ac1 = {ac.code: ac for ac in inv1.base_set.code_set1.codes.all()}
+#         srid = inv1.project.domain.srid
+
+#         # test without filtering
+#         emis = dictfetchall(inv1.emissions("area", source_ef_set, srid))
+#         emis_SOx = sum([e["emis"] for e in emis if e["substance_id"] == SOx.pk])
+#         emis_NOx = sum([e["emis"] for e in emis if e["substance_id"] == NOx.pk])
+#         verif_SOx = sum_source_emissions(inv1, SOx)
+#         verif_NOx = sum_source_emissions(inv1, NOx)
+#         assert emis_SOx == pytest.approx(verif_SOx, 1e-6)
+#         assert emis_NOx == pytest.approx(verif_NOx, 1e-6)
+
+#         # test filtering emissions by name
+#         assert (len(emissions("area", source_ef_set, name=".*1").fetchall())) == 2
+
+#         # test filtering emissions by substance
+#         assert (
+#             len(inv1.emissions("area", source_ef_set, substances=SOx).fetchall())
+#         ) == 2
+
+#         # test filtering by ac1 level1
+#         assert len(emissions("area", source_ef_set, ac1=ac1["1"]).fetchall()) == 2
+
+#         # test filtering emissions by ac1 level2
+#         assert (
+#             len(inv1.emissions("area", source_ef_set, ac1=ac1["1.2"]).fetchall()) == 2
+#         )
+
+#         # test filtering by polygon
+#         assert (
+#             len(
+#                 inv1.emissions(
+#                     "area", source_ef_set, polygon=self.POLYGON_WKT
+#                 ).fetchall()
+#             )
+#             == 4
+#         )
+
+#         # test filtering by tags
+#         assert (
+#             len(inv1.emissions("area", source_ef_set, tags={"tag1": "A"}).fetchall())
+#             == 4
+#         )
+#         assert (
+#             len(
+#                 inv1.emissions(
+#                     "area", source_ef_set, tags={"tag1": "A", "tag2": "!=B"}
+#                 ).fetchall()
+#             )
+#             == 2
+#         )
+
+
+class TestAreaSource:
+    def test_areasource_manager_create(self, code_sets):
+        """
+        Creating a new areasource
+        """
+        # not used, just to enable fixtures
+        ac1 = code_sets[0]  # noqa
+
+        src1 = AreaSource.objects.create(
+            name="ps1",
+            geom=Polygon(
+                ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
+                srid=WGS84_SRID,
+            ),
+        )
+
+        sources = list(AreaSource.objects.all())
+        assert src1 == sources[0]
+
+    def test_str(self, areasources):
+        src1 = areasources[0]
+        assert str(src1) == src1.name

@@ -11,8 +11,9 @@ if sys.argv[0] != "pytest" and "--help" not in sys.argv:
 
 # from django.contrib.auth import get_user_model
 # from django.contrib.gis.gdal import GDALRaster
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, Polygon
 
+from etk.edb.models import Substance
 from etk.edb.units import (
     activity_ef_unit_to_si,
     activity_rate_unit_to_si,
@@ -348,96 +349,88 @@ def pointsources(activities, code_sets, testsettings):
     return (src1, src2, src3, src4)
 
 
-# @pytest.fixture()
-# def areasources(source_ef_sets, inventories, activities):
-#     inv1, inv2, inv3, inv4 = inventories[:4]
-#     NOx = Substance.objects.get(slug="NOx")
-#     SOx = Substance.objects.get(slug="SOx")
+@pytest.fixture()
+def areasources(activities, code_sets):
+    NOx = Substance.objects.get(slug="NOx")
+    SOx = Substance.objects.get(slug="SOx")
 
-#     ac1 = dict([(ac.code, ac) for ac in inv1.base_set.code_set1.codes.all()])
+    # ac1 = dict([(ac.code, ac) for ac in inv1.base_set.code_set1.codes.all()])
+    ac1 = code_sets[0]
 
-#     src1 = models.AreaSource.objects.create(
-#         name="areasource1",
-#         inventory=inv1,
-#         geom=Polygon(
-#             ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
-#             srid=WGS84_SRID,
-#         ),
-#         tags={"tag1": "A", "tag2": "B"},
-#         activitycode1=ac1["1.2"],
-#     )
+    src1 = models.AreaSource.objects.create(
+        name="areasource1",
+        geom=Polygon(
+            ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
+            srid=WGS84_SRID,
+        ),
+        tags={"tag1": "A", "tag2": "B"},
+        activitycode1=ac1.codes.get(code="1.2"),
+    )
 
-#     # some substance emissions with varying attributes
-#     src1.substances.create(substance=NOx, value=emission_unit_to_si(1000, "ton/year"))
-#     src1.substances.create(substance=SOx, value=emission_unit_to_si(2000, "ton/year"))
+    # some substance emissions with varying attributes
+    src1.substances.create(substance=NOx, value=emission_unit_to_si(1000, "ton/year"))
+    src1.substances.create(substance=SOx, value=emission_unit_to_si(2000, "ton/year"))
 
-#     src2 = models.AreaSource.objects.create(
-#         name="areasource2",
-#         inventory=inv1,
-#         geom=Polygon(
-#             ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
-#             srid=WGS84_SRID,
-#         ),
-#         tags={"tag1": "A"},
-#         activitycode1=ac1["2.2"],
-#     )
+    src2 = models.AreaSource.objects.create(
+        name="areasource2",
+        geom=Polygon(
+            ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
+            srid=WGS84_SRID,
+        ),
+        tags={"tag1": "A"},
+        activitycode1=ac1.codes.get(code="2.2"),
+    )
 
-#     # some emission factor emissions
-#     src2.activities.create(
-#         activity=activities[0], rate=activity_rate_unit_to_si(1000, "m3/year")
-#     )
+    # some emission factor emissions
+    src2.activities.create(
+        activity=activities[0], rate=activity_rate_unit_to_si(1000, "m3/year")
+    )
 
-#     src3 = models.AreaSource.objects.create(
-#         name="areasource3",
-#         inventory=inv2,
-#         geom=Polygon(
-#             ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
-#             srid=WGS84_SRID,
-#         ),
-#     )
-#     src4 = models.AreaSource.objects.create(
-#         name="areasource4",
-#         inventory=inv1,
-#         geom=Polygon(
-#             ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
-#             srid=WGS84_SRID,
-#         ),
-#     )
-#     src5 = models.AreaSource.objects.create(
-#         name="areasource5",
-#         inventory=inv1,
-#         geom=Polygon(
-#             ((18.7, 51.1), (18.8, 51.1), (18.8, 51.0), (18.7, 51.0), (18.7, 51.1)),
-#             srid=WGS84_SRID,
-#         ),
-#     )
-#     src6 = models.AreaSource.objects.create(
-#         name="areasource6",
-#         inventory=inv1,
-#         geom=Polygon(
-#             ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
-#             srid=WGS84_SRID,
-#         ),
-#     )
-#     src7 = models.AreaSource.objects.create(
-#         name="areasource7",
-#         inventory=inv4,
-#         geom=Polygon(
-#             ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
-#             srid=WGS84_SRID,
-#         ),
-#     )
+    src3 = models.AreaSource.objects.create(
+        name="areasource3",
+        geom=Polygon(
+            ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
+            srid=WGS84_SRID,
+        ),
+    )
+    src4 = models.AreaSource.objects.create(
+        name="areasource4",
+        geom=Polygon(
+            ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
+            srid=WGS84_SRID,
+        ),
+    )
+    src5 = models.AreaSource.objects.create(
+        name="areasource5",
+        geom=Polygon(
+            ((18.7, 51.1), (18.8, 51.1), (18.8, 51.0), (18.7, 51.0), (18.7, 51.1)),
+            srid=WGS84_SRID,
+        ),
+    )
+    src6 = models.AreaSource.objects.create(
+        name="areasource6",
+        geom=Polygon(
+            ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
+            srid=WGS84_SRID,
+        ),
+    )
+    src7 = models.AreaSource.objects.create(
+        name="areasource7",
+        geom=Polygon(
+            ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
+            srid=WGS84_SRID,
+        ),
+    )
 
-#     # inv3 is related to source ef set 2
-#     src8 = models.AreaSource.objects.create(
-#         name="areasource8",
-#         inventory=inv3,
-#         geom=Polygon(
-#             ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
-#             srid=WGS84_SRID,
-#         ),
-#     )
-#     return (src1, src2, src3, src4, src5, src6, src7, src8)
+    # inv3 is related to source ef set 2
+    src8 = models.AreaSource.objects.create(
+        name="areasource8",
+        geom=Polygon(
+            ((17.7, 51.1), (17.8, 51.1), (17.8, 51.0), (17.7, 51.0), (17.7, 51.1)),
+            srid=WGS84_SRID,
+        ),
+    )
+    return (src1, src2, src3, src4, src5, src6, src7, src8)
 
 
 # @pytest.fixture()

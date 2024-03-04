@@ -1,4 +1,4 @@
-from etk.emissions.calc import aggregate_emissions
+from etk.emissions.calc import aggregate_emissions  # noqa
 
 
 def test_aggregate_emissions(pointsources):

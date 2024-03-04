@@ -569,3 +569,40 @@ class EmissionFactor(models.Model):
             ),
         ]
         default_related_name = "emissionfactors"
+
+
+class AreaSource(PointAreaGridSourceBase):
+    """An area source."""
+
+    sourcetype = "area"
+
+    geom = models.PolygonField(
+        "the extent of the area source", srid=WGS84_SRID, geography=True, db_index=True
+    )
+    facility = models.ForeignKey(
+        "Facility", on_delete=models.SET_NULL, null=True, blank=True
+    )
+
+    class Meta(PointAreaGridSourceBase.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=("facility", "name"),
+                name="areasource_unique_facility_and_name",
+            ),
+        ]
+        default_related_name = "areasources"
+
+
+class AreaSourceActivity(SourceActivity):
+    """An emitting activity of an area source."""
+
+    source = models.ForeignKey("AreaSource", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.activity.name}"
+
+
+class AreaSourceSubstance(SourceSubstance):
+    """An area-source substance emission."""
+
+    source = models.ForeignKey("AreaSource", on_delete=models.CASCADE)

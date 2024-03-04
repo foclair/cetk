@@ -26,9 +26,12 @@ from etk.edb import importers  # noqa
 from etk.edb.const import SHEET_NAMES  # noqa
 from etk.edb.models import Substance  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
-from etk.emissions.views import create_pointsource_emis_table  # noqa
+from etk.emissions.views import (  # noqa
+    create_areasource_emis_table,
+    create_pointsource_emis_table,
+)
 
-SOURCETYPES = ("point",)
+SOURCETYPES = ("point", "area")
 DEFAULT_EMISSION_UNIT = "kg/year"
 
 
@@ -63,17 +66,33 @@ class Editor(object):
         # reverse all created/updated DataModels if doing dry run or error occurs.
         try:
             with transaction.atomic():
-                progress = importers.import_pointsources(filename, validation=dry_run)
+                progress = importers.import_sources(
+                    filename, validation=dry_run, type="point"
+                )
                 if dry_run:
                     raise DryrunAbort
         except DryrunAbort:
             pass
         return progress
 
-    def import_pointsourceactivities(self, filename, sheet, dry_run=False):
+    def import_areasources(self, filename, dry_run=False):
+        # reverse all created/updated DataModels if doing dry run or error occurs.
         try:
             with transaction.atomic():
-                progress = importers.import_pointsourceactivities(
+                progress = importers.import_sources(
+                    filename, validation=dry_run, type="area"
+                )
+                if dry_run:
+                    raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
+
+    def import_sourceactivities(self, filename, sheet, dry_run=False):
+        # works for point and area, recognizes from tab name which one.
+        try:
+            with transaction.atomic():
+                progress = importers.import_sourceactivities(
                     filename, import_sheets=sheet, validation=dry_run
                 )
                 if dry_run:
@@ -89,6 +108,8 @@ class Editor(object):
         substances = substances or get_used_substances()
         if "point" in sourcetypes:
             create_pointsource_emis_table(substances=substances, unit=unit)
+        if "area" in sourcetypes:
+            create_areasource_emis_table(substances=substances, unit=unit)
 
     def aggregate_emissions(
         self,
@@ -204,9 +225,15 @@ def main():
             )
             sys.exit(1)
         if args.sheets == "PointSource":
-            status = editor.import_pointsources(args.filename, dry_run=args.dryrun)
+            status = editor.import_sources(
+                args.filename, dry_run=args.dryrun, type="point"
+            )
+        if args.sheets == "AreaSource":
+            status = editor.import_sources(
+                args.filename, dry_run=args.dryrun, type="area"
+            )
         else:
-            status = editor.import_pointsourceactivities(
+            status = editor.import_sourceactivities(
                 args.filename, sheet=args.sheets, dry_run=args.dryrun
             )
         log.debug("Imported data from '{args.filename}' to '{db_path}")
@@ -254,7 +281,7 @@ def main():
             sys.exit(1)
         if args.update:
             editor.update_emission_tables(sourcetypes=args.sourcetypes, unit=args.unit)
-            sys.stdout.write("Successfully updated tables")
+            sys.stdout.write("Successfully updated tables\n")
             sys.exit(0)
         if args.aggregate is not None:
             editor.aggregate_emissions(

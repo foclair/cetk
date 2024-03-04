@@ -7,7 +7,7 @@ from etk.edb.models import CodeSet, Settings, Substance
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.queries import (
     create_aggregate_emis_query,
-    create_pointsource_emis_query,
+    create_source_emis_query,
     create_used_substances_query,
 )
 
@@ -30,9 +30,10 @@ def calculate_source_emissions(
 ):
     cur = connection.cursor()
     settings = Settings.get_current()
-    if sourcetype == "point":
+    if (sourcetype == "point") or (sourcetype == "area"):
         # create point source emission view
-        sql = create_pointsource_emis_query(
+        sql = create_source_emis_query(
+            sourcetype=sourcetype,
             srid=settings.srid,
             substances=substances,
             name=name,
@@ -56,6 +57,7 @@ def aggregate_emissions(
     polygon=None,
     tags=None,
     point_ids=None,
+    area_ids=None,
     unit="ton/year",
 ):
 
@@ -68,19 +70,22 @@ def aggregate_emissions(
         polygon=polygon,
         tags=tags,
         point_ids=point_ids,
+        area_ids=area_ids,
     )
     cur = connection.cursor()
     cur.execute(sql)
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
-    try:
-        codeset = CodeSet.objects.get(slug=codeset)
-    except CodeSet.DoesNotExist:
-        raise ValueError(f"Codeset {codeset} does not exist, choose valid slug.")
+    if codeset is not None:
+        try:
+            codeset = CodeSet.objects.get(slug=codeset)
+        except CodeSet.DoesNotExist:
+            raise ValueError(f"Codeset {codeset} does not exist, choose valid slug.")
     if codeset is not None:
         # add code labels to dataframe
         df.insert(1, "activity", "")
         code_labels = dict(codeset.codes.values_list("code", "label"))
         for ind in df.index:
+            # breakpoint()
             code = df.loc[ind, "activitycode"]
             if code is not None:
                 df.loc[ind, "activity"] = code_labels[code]

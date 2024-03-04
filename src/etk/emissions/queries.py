@@ -18,7 +18,8 @@ def load_sql(filename):
     return resources.files("etk.emissions").joinpath(filename).read_text()
 
 
-def create_pointsource_emis_query(
+def create_source_emis_query(
+    sourcetype="point",  # or "area"
     srid=None,
     name=None,
     ids=None,
@@ -46,11 +47,7 @@ def create_pointsource_emis_query(
     #        ac3: iterable of activitycode instances
     """
 
-    sql = load_sql("pointsource_emissions.sql")
-    # ac_filter, ac_params = create_activitycode_where_clauses(
-    #    ac1, ac2, ac3, first_cond=False
-    # )
-    # source filters
+    sql = load_sql(sourcetype + "source_emissions.sql")
     source_filters = []
     if tags is not None:
         source_filters.append(create_tag_where_clause(tags))
@@ -59,6 +56,7 @@ def create_pointsource_emis_query(
     if name is not None:
         source_filters.append(create_name_where_clause(name))
     if polygon is not None:
+        # NB "point" here works for point and areasources
         source_filters.append(create_polygon_where_clause("point", polygon))
     if len(source_filters) > 0:
         source_filter_sql = "WHERE " + " AND ".join(source_filters)
@@ -89,12 +87,13 @@ def create_aggregate_emis_query(
     polygon=None,
     tags=None,
     point_ids=None,
+    area_ids=None,
 ):
     sql = load_sql("aggregate_emissions.sql")
     if isinstance(substances, Substance):
         substances = [substances]
 
-    sourcetypes = sourcetypes or ("point")
+    sourcetypes = sourcetypes or ("point", "area")
     if not isinstance(sourcetypes, Sequence):
         sourcetypes = [sourcetypes]
 
@@ -115,6 +114,7 @@ def create_aggregate_emis_query(
     if tags is not None:
         source_filters.append(create_tag_where_clause(tags))
     if polygon is not None:
+        # filters now both for area and point
         source_filters.append(create_polygon_where_clause("point", polygon))
 
     # point source filters
@@ -129,6 +129,18 @@ def create_aggregate_emis_query(
     else:
         point_source_filter_sql = ""
 
+    # area source filters
+    area_source_filters = list(*source_filters)
+    if area_ids is not None:
+        area_source_filters.append(create_ids_where_clause(area_ids))
+    if "area" not in sourcetypes:
+        area_source_filters.append("1=0")
+
+    if len(area_source_filters) > 0:
+        area_source_filter_sql = "WHERE " + " AND ".join(source_filters)
+    else:
+        area_source_filter_sql = ""
+
     if substances is not None:
         emis_subst_filter = " AND " + create_substance_emis_where_clause(substances)
         ef_subst_filter = " AND " + create_ef_substance_where_clause(substances)
@@ -141,6 +153,7 @@ def create_aggregate_emis_query(
         ac_column=ac_column,
         ac_groupby=ac_groupby,
         point_source_filter=point_source_filter_sql,
+        area_source_filter=area_source_filter_sql,
         emis_substance_filter=emis_subst_filter,
         ef_substance_filter=ef_subst_filter,
     )

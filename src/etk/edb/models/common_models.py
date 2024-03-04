@@ -55,16 +55,22 @@ class Settings(models.Model):
 
     def get_codeset_index(self, codeset):
         """Return index of a specific codeset."""
-        if self.codeset1 is not None:
-            if codeset == self.codeset1.slug:
-                return 1
-        elif self.codeset2 is not None:
-            if codeset == self.codeset2.slug:
-                return 2
-        elif self.codeset3 is not None:
-            if codeset == self.codeset3.slug:
-                return 3
-        elif len(CodeSet.objects.filter(slug=codeset)) > 0:
-            return CodeSet.objects.filter(slug=codeset).first().id
+        if type(codeset) == str:
+            codeset_slug = codeset
+        elif type(codeset) == CodeSet:
+            codeset_slug = codeset.slug
+        else:
+            raise ValueError(f"codeset '{codeset}' is not of valid type")
+        # if self.codeset1 is not None:
+        #     if codeset_slug == self.codeset1.slug:
+        #         return 1
+        # if self.codeset2 is not None:
+        #     if codeset_slug == self.codeset2.slug:
+        #         return 2
+        # if self.codeset3 is not None:
+        #     if codeset_slug == self.codeset3.slug:
+        #         return 3
+        if len(CodeSet.objects.filter(slug=codeset_slug)) > 0:
+            return CodeSet.objects.filter(slug=codeset_slug).first().id
         else:
             raise ValueError(f"codeset '{codeset}' not found in inventory settings")

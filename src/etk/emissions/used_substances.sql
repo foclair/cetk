@@ -3,12 +3,11 @@ with point_subst as (
 	from edb_pointsourcesubstance as psrc_emis
 	join edb_pointsource as psrc on psrc.id = psrc_emis.source_id
 ),
--- area_subst as (
--- 	select distinct asrc_emis.substance_id
--- 	from edb_areasourcesubstance as asrc_emis
--- 	join edb_areasource as asrc on asrc.id = asrc_emis.source_id
--- 	where asrc.inventory_id = %(inventory_id)s
--- ),
+area_subst as (
+	select distinct asrc_emis.substance_id
+	from edb_areasourcesubstance as asrc_emis
+	join edb_areasource as asrc on asrc.id = asrc_emis.source_id
+),
 -- grid_subst as (
 -- 	select distinct gsrc_emis.substance_id
 -- 	from edb_gridsourcesubstance as gsrc_emis
@@ -30,10 +29,10 @@ source_ef_subst as (
 			select psrc_act.activity_id
 			from edb_pointsource as psrc
 			join edb_pointsourceactivity as psrc_act on psrc.id = psrc_act.source_id
-			-- union all
-			-- select asrc_act.activity_id
-			-- from edb_areasource as asrc
-			-- join edb_areasourceactivity as asrc_act on asrc.id = asrc_act.source_id
+			union all
+			select asrc_act.activity_id
+			from edb_areasource as asrc
+			join edb_areasourceactivity as asrc_act on asrc.id = asrc_act.source_id
 			-- union all
 			-- select gsrc_act.activity_id
 			-- from edb_gridsource as gsrc
@@ -44,8 +43,8 @@ source_ef_subst as (
 select distinct slug
 from (
 	select * from point_subst
-	-- union all
-	-- select * from area_subst
+	union all
+	select * from area_subst
 	-- union all
 	-- select * from grid_subst
 	-- union all
