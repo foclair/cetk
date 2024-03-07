@@ -1,33 +1,13 @@
 """Emission database models."""
 
-import ast
 
-import numpy as np
-import pandas as pd
-
-# from django.conf import settings
 from django.contrib.gis.db import models
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
-
-# from django.db.models import Sum
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from etk.edb.const import CHAR_FIELD_LENGTH, WGS84_SRID
-
-# from etk.edb.copy import copy_model_instance
 from etk.edb.ltreefield import LtreeField
-from etk.settings import TIME_ZONE
-
-# import datetime
-
-
-# import pytz
-
-
-# TODO is a locid necessary when starting inventories from scratch, instead of importing
-# existing gadget databases?
-# locid = models.AutoField(primary_key=True, auto_created=True, editable=False)
 
 SRID = WGS84_SRID
 
@@ -172,8 +152,6 @@ class VerticalDist(BaseNamedModel):
 
     name = models.CharField(max_length=64)
     slug = models.SlugField(max_length=64, unique=True)
-    # TODO weights as ArrayField in Gadget, are all functions updated to fun on
-    # CharField instead?
     weights = models.CharField(
         max_length=CHAR_FIELD_LENGTH, default=default_vertical_dist
     )
@@ -329,77 +307,6 @@ class ActivityCode(models.Model):
     def is_leaf(self):
         """Return True if code is a leaf (i.e. has no sub-codes)."""
         return not self.get_decendents().exists()
-
-
-def default_timevar_typeday():
-    return str(24 * [7 * [100.0]])
-
-
-def default_timevar_month():
-    return str(12 * [100.0])
-
-
-def get_normalization_constant(typeday, month, timezone):
-    commonyear = pd.date_range("2018", periods=24 * 365, freq="H", tz=timezone)
-    values = typeday[commonyear.hour, commonyear.weekday] * month[commonyear.month - 1]
-    return len(values) / values.sum()
-
-
-def normalize(timevar, timezone=None):
-    """Set the normalization constants on a timevar instance."""
-    if timezone is None:
-        timezone = TIME_ZONE
-    typeday = np.array(ast.literal_eval(timevar.typeday))
-    month = np.array(ast.literal_eval(timevar.month))
-    timevar.typeday_sum = typeday.sum()
-    timevar._normalization_constant = get_normalization_constant(
-        typeday, month, timezone
-    )
-    return timevar
-
-
-class TimevarBase(models.Model):
-    name = models.CharField(max_length=CHAR_FIELD_LENGTH, unique=True)
-
-    # typeday should be a 2d-field with hours as rows and weekdays as columns
-    # ArrayField not supported in SQLite
-    typeday = models.CharField(
-        max_length=10 * len(default_timevar_typeday()),
-        default=default_timevar_typeday(),
-    )
-    # month should be a 1d field with 12 values
-    month = models.CharField(
-        max_length=10 * len(default_timevar_month()), default=default_timevar_month()
-    )
-
-    # pre-calculated normalization constants
-    typeday_sum = models.FloatField(editable=False)
-    _normalization_constant = models.FloatField(editable=False)
-
-    class Meta:
-        abstract = True
-
-    def __str__(self):
-        """Return a unicode representation of this timevariation."""
-        return self.name
-
-    @property
-    def normalization_constant(self):
-        if self._normalization_constant is None:
-            normalize(self)
-        return self._normalization_constant
-
-    def save(self, *args, **kwargs):
-        """Overloads save to ensure normalizing factors are calculated."""
-        normalize(self)
-        super(TimevarBase, self).save(*args, **kwargs)
-
-
-class Timevar(TimevarBase):
-    """A source time-variation profile."""
-
-    class Meta(TimevarBase.Meta):
-        default_related_name = "timevars"
 
 
 class SourceBase(models.Model):

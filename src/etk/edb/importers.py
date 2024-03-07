@@ -6,11 +6,14 @@ from itertools import islice
 import numpy as np
 import pandas as pd
 from django.contrib.gis.geos import GEOSGeometry, Point
+from django.core.exceptions import MultipleObjectsReturned
 from django.db import IntegrityError
 from openpyxl import load_workbook
 
+from etk.edb.cache import cache_queryset
 from etk.edb.const import SHEET_NAMES, WGS84_SRID
-from etk.edb.models.common_models import Settings
+
+# from etk.edb.models.common_models import Settings
 from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.models.source_models import (
     Activity,
@@ -25,35 +28,34 @@ from etk.edb.models.source_models import (
     PointSourceActivity,
     PointSourceSubstance,
     Substance,
-    Timevar,
     VerticalDist,
 )
+from etk.edb.models.timevar_models import Timevar
 from etk.edb.units import (
     activity_ef_unit_to_si,
     activity_rate_unit_to_si,
     emission_unit_to_si,
+    heating_demand_unit_to_si,
+    heating_ef_unit_to_si,
 )
-from etk.tools.utils import cache_queryset
 
 # column facility and name are used as index and is therefore not included here
 REQUIRED_COLUMNS_AREA = {
     "facility_id": np.str_,
-    "geometry": np.str_,
     "facility_name": np.str_,
     "source_name": np.str_,
+    "geometry": np.str_,
+    "EPSG": int,
     "timevar": np.str_,
 }
 
 REQUIRED_COLUMNS_POINT = {
     "facility_id": np.str_,
-    "lat": float,
-    "lon": float,
     "facility_name": np.str_,
     "source_name": np.str_,
+    "lat": float,
+    "lon": float,
     "timevar": np.str_,
-    # "activitycode1": np.str_,
-    # "activitycode2": np.str_,
-    # "activitycode3": np.str_,
     "chimney_height": float,
     "outer_diameter": float,
     "inner_diameter": float,
@@ -127,7 +129,7 @@ def import_sources(
     srid=None,
     type="point",
 ):
-    """Import point-sources from xlsx or csv-file.
+    """Import point- or area-sources from xlsx or csv-file.
 
     args
         filepath: path to file
@@ -136,11 +138,10 @@ def import_sources(
         encoding: encoding of file (default is utf-8)
         srid: srid of file, default is same srid as domain
     """
-    # or change to user defined SRID?
-    try:
-        project_srid = Settings.objects.get().srid
-    except Settings.DoesNotExist:
-        project_srid = WGS84_SRID
+    # user defined SRID for import or WGS84 if nothing specified
+    # as long as we do not have functions in Eclair to edit the "settings_SRID"
+    # it does not make sense to use that SRID as default for import.
+    srid = srid or WGS84_SRID
     # cache related models
     substances = cache_queryset(Substance.objects.all(), "slug")
     timevars = cache_queryset(Timevar.objects.all(), "name")
@@ -281,12 +282,12 @@ def import_sources(
                 y = float(row_dict["lat"])
             except ValueError:
                 return_message = import_error(
-                    f"Invalid coordinates on row {row_nr}", return_message, validation
+                    f"Invalid {type} coordinates on row {row_nr}",
+                    return_message,
+                    validation,
                 )
             # create geometry
-            source_data["geom"] = Point(x, y, srid=srid or project_srid).transform(
-                4326, clone=True
-            )
+            source_data["geom"] = Point(x, y, srid=srid).transform(4326, clone=True)
             # get chimney properties
             for attr, key in {
                 "chimney_height": "chimney_height",
@@ -297,7 +298,7 @@ def import_sources(
             }.items():
                 if pd.isna(row_dict[key]):
                     return_message = import_error(
-                        f"Missing value for {key} on row {row_nr}",
+                        f"Missing value in PointSource sheet for {key} on row {row_nr}",
                         return_message,
                         validation,
                     )
@@ -321,7 +322,9 @@ def import_sources(
                 # TODO add check that valid WKT polygon
             except ValueError:
                 return_message = import_error(
-                    f"Invalid geometry on row {row_nr}", return_message, validation
+                    f"Invalid polygon geometry in AreaSource sheet on row {row_nr}",
+                    return_message,
+                    validation,
                 )
             # create geometry
             EPSG = row_dict["EPSG"]
@@ -346,7 +349,7 @@ def import_sources(
                         if code is not None and code is not np.nan:
                             return_message = import_error(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
-                                + f" on row {row_nr}",
+                                + f" for {type} source on row {row_nr}",
                                 return_message,
                                 validation,
                             )
@@ -360,7 +363,7 @@ def import_sources(
                         except KeyError:
                             return_message = import_error(
                                 f"Unknown activitycode_{code_set_slug} '{code}'"
-                                + f" on row {row_nr}",
+                                + f" for {type} source on row {row_nr}",
                                 return_message,
                                 validation,
                             )
@@ -379,7 +382,7 @@ def import_sources(
                                 return_message = import_error(
                                     f"Specified activitycode {row_dict[column]} for "
                                     + f" unknown codeset {codeset_slug[index]}"
-                                    + f" on row {row_nr}",
+                                    + f" for {type} source on row {row_nr}",
                                     return_message,
                                     validation,
                                 )
@@ -400,7 +403,8 @@ def import_sources(
                 source_data["timevar"] = timevars[timevar_name]
             except KeyError:
                 return_message = import_error(
-                    f"Timevar '{timevar_name}' " f"on row {row_nr} does not exist",
+                    f"Timevar '{timevar_name}' "
+                    f"on row {row_nr} for {type} source does not exist",
                     return_message,
                     validation,
                 )
@@ -435,13 +439,14 @@ def import_sources(
                     )
                 else:
                     return_message = import_error(
-                        f"No unit specified for emissions on {row_nr}",
+                        f"No unit specified for {type} emissions on row {row_nr}",
                         return_message,
                         validation,
                     )
             except ValueError:
                 return_message = import_error(
-                    f"Invalid emission value {row_dict[subst_key]} on row {row_nr}",
+                    f"Invalid {type} emission value {row_dict[subst_key]}"
+                    + f" on row {row_nr}",
                     return_message,
                     validation,
                 )
@@ -454,7 +459,7 @@ def import_sources(
 
         if pd.isna(source_name):
             return_message = import_error(
-                f"No name specified for source on row {row_nr}",
+                f"No name specified for {type} source on row {row_nr}",
                 return_message,
                 validation,
             )
@@ -722,6 +727,7 @@ def import_eea_emfacs(filepath, encoding=None):
     extension = filepath.suffix
     if extension == ".csv":
         # read csv-file
+        print("Warning, this is not as much tested as xlsx!")
         with open(filepath, encoding=encoding or "utf-8") as csvfile:
             log.debug("reading point-sources from csv-file")
             df = pd.read_csv(
@@ -822,126 +828,109 @@ def import_eea_emfacs(filepath, encoding=None):
         eea_emfac = EEAEmissionFactor()
         for key, val in emfac_data.items():
             setattr(eea_emfac, key, val)
-        create_eea_emfac.append(eea_emfac)
+        if not pd.isnull(eea_emfac.value):
+            create_eea_emfac.append(eea_emfac)
         row_nr += 1
 
     EEAEmissionFactor.objects.bulk_create(create_eea_emfac)
     # TODO check for existing emfac and do not create twice, or only update
-    return create_eea_emfac
-
-
-def import_sourceactivities(
-    filepath,
-    encoding=None,
-    srid=None,
-    import_sheets=SHEET_NAMES,
-    return_message="",
-    validation=False,
-):
-    """Import point-sources from xlsx or csv-file.
-
-    args
-        filepath: path to file
-
-    options
-        encoding: encoding of file (default is utf-8)
-        srid: srid of file, default is same srid as domain
-    """
-    try:
-        workbook = load_workbook(filename=filepath, data_only=True)
-    except Exception as exc:
-        return_message = import_error(str(exc), return_message, validation)
-
+    # a bit challenging since database itself has duplicates.
     return_dict = {}
-    sheet_names = [sheet.title for sheet in workbook.worksheets]
-    if ("Timevar" in sheet_names) and ("Timevar" in import_sheets):
-        timevar_data = workbook["Timevar"].values
-        df_timevar = worksheet_to_dataframe(timevar_data)
-        timevar_dict = {"emission": {}}
-        # NB this only works if Excel file has exact same format
-        nr_timevars = (len(df_timevar["ID"]) + 1) // 27
-        for i in range(nr_timevars):
-            label = df_timevar["ID"][i * 27]
-            typeday = np.asarray(
-                df_timevar[
-                    [
-                        "monday",
-                        "tuesday",
-                        "wednesday",
-                        "thursday",
-                        "friday",
-                        "saturday",
-                        "sunday",
-                    ]
-                ][i * 27 : i * 27 + 24]
-            )
-            month = np.asarray(df_timevar.iloc[i * 27 + 25, 2:14])
-            typeday_str = np.array2string(typeday).replace("\n", "").replace(" ", ", ")
-            month_str = np.array2string(month).replace("\n", "").replace(" ", ", ")
-            timevar_dict["emission"].update(
-                {label: {"typeday": typeday_str, "month": month_str}}
-            )
-        tv, return_append = import_timevars(
-            timevar_dict, overwrite=True, validation=validation
-        )
-        return_message += return_append
-        return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
+    return_dict["eea_emfacs_created"] = len(create_eea_emfac)
+    return return_dict
 
-    if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
-        nr_codesets = len(CodeSet.objects.all())
-        data = workbook["CodeSet"].values
-        df_codeset = worksheet_to_dataframe(data)
-        slugs = df_codeset["slug"]
-        update_codesets = []
-        create_codesets = {}
-        for row_nr, slug in enumerate(slugs):
-            try:
-                codeset = CodeSet.objects.get(slug=slug)
-                setattr(codeset, "name", df_codeset["name"][row_nr])
-                setattr(codeset, "description", df_codeset["description"][row_nr])
-                update_codesets.append(codeset)
-            except CodeSet.DoesNotExist:
-                if nr_codesets + len(create_codesets) < 3:
-                    codeset = CodeSet(
-                        name=df_codeset["name"][row_nr],
-                        slug=slug,
-                        description=df_codeset["description"][row_nr],
-                    )
-                    if slug not in create_codesets:
-                        create_codesets[slug] = codeset
-                else:
-                    return_message = import_error(
-                        "Trying to import a new codeset, but can have maximum 3.",
-                        return_message,
-                        validation,
-                    )
 
-        CodeSet.objects.bulk_create(create_codesets.values())
-        CodeSet.objects.bulk_update(
-            update_codesets,
-            [
-                "name",
-                "description",
-            ],
+def import_timevarsheet(workbook, return_message, return_dict, validation):
+    timevar_data = workbook["Timevar"].values
+    df_timevar = worksheet_to_dataframe(timevar_data)
+    timevar_dict = {"emission": {}}
+    # NB this only works if Excel file has exact same format
+    nr_timevars = (len(df_timevar["ID"]) + 1) // 27
+    for i in range(nr_timevars):
+        label = df_timevar["ID"][i * 27]
+        typeday = np.asarray(
+            df_timevar[
+                [
+                    "monday",
+                    "tuesday",
+                    "wednesday",
+                    "thursday",
+                    "friday",
+                    "saturday",
+                    "sunday",
+                ]
+            ][i * 27 : i * 27 + 24]
         )
-        return_dict.update(
-            {
-                "codeset": {
-                    "updated": len(update_codesets),
-                    "created": len(create_codesets),
-                }
+        month = np.asarray(df_timevar.iloc[i * 27 + 25, 2:14])
+        typeday_str = np.array2string(typeday).replace("\n", "").replace(" ", ", ")
+        month_str = np.array2string(month).replace("\n", "").replace(" ", ", ")
+        timevar_dict["emission"].update(
+            {label: {"typeday": typeday_str, "month": month_str}}
+        )
+    tv, return_append = import_timevars(
+        timevar_dict, overwrite=True, validation=validation
+    )
+    return_message += return_append
+    return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
+
+
+def import_codesetsheet(workbook, return_message, return_dict, validation):
+    nr_codesets = len(CodeSet.objects.all())
+    data = workbook["CodeSet"].values
+    df_codeset = worksheet_to_dataframe(data)
+    slugs = df_codeset["slug"]
+    update_codesets = []
+    create_codesets = {}
+    for row_nr, slug in enumerate(slugs):
+        try:
+            codeset = CodeSet.objects.get(slug=slug)
+            setattr(codeset, "name", df_codeset["name"][row_nr])
+            setattr(codeset, "description", df_codeset["description"][row_nr])
+            update_codesets.append(codeset)
+        except CodeSet.DoesNotExist:
+            if nr_codesets + len(create_codesets) < 3:
+                codeset = CodeSet(
+                    name=df_codeset["name"][row_nr],
+                    slug=slug,
+                    description=df_codeset["description"][row_nr],
+                )
+                if slug not in create_codesets:
+                    create_codesets[slug] = codeset
+            else:
+                return_message = import_error(
+                    "Trying to import a new codeset, but can have maximum 3.",
+                    return_message,
+                    validation,
+                )
+
+    CodeSet.objects.bulk_create(create_codesets.values())
+    CodeSet.objects.bulk_update(
+        update_codesets,
+        [
+            "name",
+            "description",
+        ],
+    )
+    return_dict.update(
+        {
+            "codeset": {
+                "updated": len(update_codesets),
+                "created": len(create_codesets),
             }
-        )
+        }
+    )
 
-    if ("ActivityCode" in sheet_names) and ("ActivityCode" in import_sheets):
-        data = workbook["ActivityCode"].values
-        df_activitycode = worksheet_to_dataframe(data)
-        update_activitycodes = []
-        create_activitycodes = {}
-        for row_key, row in df_activitycode.iterrows():
-            row_dict = row.to_dict()
-            try:
-                codeset = CodeSet.objects.get(slug=row_dict["codeset_slug"])
+
+def import_activitycodesheet(workbook, return_message, return_dict, validation):
+    data = workbook["ActivityCode"].values
+    df_activitycode = worksheet_to_dataframe(data)
+    update_activitycodes = []
+    create_activitycodes = {}
+    for row_key, row in df_activitycode.iterrows():
+        row_dict = row.to_dict()
+        try:
+            codeset = CodeSet.objects.get(slug=row_dict["codeset_slug"])
+            if "vertical_distribution_slug" in row_dict:
                 if row_dict["vertical_distribution_slug"] is not None:
                     try:
                         vdist = VerticalDist.objects.get(
@@ -959,45 +948,81 @@ def import_sourceactivities(
                         )
                 else:
                     vdist_id = None
-                try:
-                    activitycode = ActivityCode.objects.get(
-                        code_set_id=codeset.id, code=row_dict["activitycode"]
-                    )
-                    setattr(activitycode, "label", row_dict["label"])
-                    setattr(activitycode, "vertical_dist_id", vdist_id)
-                    update_activitycodes.append(activitycode)
-                except ActivityCode.DoesNotExist:
-                    activitycode = ActivityCode(
-                        code=row_dict["activitycode"],
-                        label=row_dict["label"],
-                        code_set_id=codeset.id,
-                        vertical_dist_id=vdist_id,
-                    )
-                    create_activitycodes[row_dict["activitycode"]] = activitycode
-            except CodeSet.DoesNotExist:
-                return_message = import_error(
-                    f"Trying to import an activity code from row '{row_key}'"
-                    + f"but CodeSet '{row_dict['codeset_slug']}' is not defined.",
-                    return_message,
-                    validation,
+            else:
+                vdist_id = None
+            try:
+                activitycode = ActivityCode.objects.get(
+                    code_set_id=codeset.id, code=row_dict["activitycode"]
                 )
+                setattr(activitycode, "label", row_dict["label"])
+                setattr(activitycode, "vertical_dist_id", vdist_id)
+                update_activitycodes.append(activitycode)
+            except ActivityCode.DoesNotExist:
+                activitycode = ActivityCode(
+                    code=row_dict["activitycode"],
+                    label=row_dict["label"],
+                    code_set_id=codeset.id,
+                    vertical_dist_id=vdist_id,
+                )
+                create_activitycodes[row_dict["activitycode"]] = activitycode
+        except CodeSet.DoesNotExist:
+            return_message = import_error(
+                f"Trying to import an activity code from row '{row_key}'"
+                + f"but CodeSet '{row_dict['codeset_slug']}' is not defined.",
+                return_message,
+                validation,
+            )
 
-        ActivityCode.objects.bulk_create(create_activitycodes.values())
-        ActivityCode.objects.bulk_update(
-            update_activitycodes,
-            [
-                "label",
-                "vertical_dist_id",
-            ],
-        )
-        return_dict.update(
-            {
-                "activitycode": {
-                    "updated": len(update_activitycodes),
-                    "created": len(create_activitycodes),
-                }
+    ActivityCode.objects.bulk_create(create_activitycodes.values())
+    ActivityCode.objects.bulk_update(
+        update_activitycodes,
+        [
+            "label",
+            "vertical_dist_id",
+        ],
+    )
+    return_dict.update(
+        {
+            "activitycode": {
+                "updated": len(update_activitycodes),
+                "created": len(create_activitycodes),
             }
-        )
+        }
+    )
+
+
+def import_sourceactivities(
+    filepath,
+    encoding=None,
+    srid=None,
+    import_sheets=SHEET_NAMES,
+    return_message="",
+    validation=False,
+):
+    """Import point-sources and/or area-sources from xlsx or csv-file.
+
+    args
+        filepath: path to file
+
+    options
+        encoding: encoding of file (default is utf-8)
+        srid: srid of file, default is same srid as domain
+    """
+    try:
+        workbook = load_workbook(filename=filepath, data_only=True)
+    except Exception as exc:
+        return_message = import_error(str(exc), return_message, validation)
+
+    return_dict = {}
+    sheet_names = [sheet.title for sheet in workbook.worksheets]
+    if ("Timevar" in sheet_names) and ("Timevar" in import_sheets):
+        import_timevarsheet(workbook, return_message, return_dict, validation)
+
+    if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
+        import_codesetsheet(workbook, return_message, return_dict, validation)
+
+    if ("ActivityCode" in sheet_names) and ("ActivityCode" in import_sheets):
+        import_activitycodesheet(workbook, return_message, return_dict, validation)
 
     # Could be that activities are linked to previously imported pointsources,
     # or pointsources to be imported later, therefore not requiring PointSource-sheet.
@@ -1093,7 +1118,7 @@ def import_sourceactivities(
                     mass_unit, factor_quantity_unit = factor_unit.split("/")
                     if activity_quantity_unit != factor_quantity_unit:
                         # emission factor and activity need to have the same unit
-                        # for quantity, eg GJ, m3 pellets, number of produces bottles
+                        # for quantity, eg GJ, m3 "pellets", number of produces bottles
                         return_message = import_error(
                             "Units for emission factor and activity rate for"
                             + f" '{activity_name}'"
@@ -1172,11 +1197,13 @@ def import_sourceactivities(
         create_pointsourceactivities = []
         update_pointsourceactivities = []
         for row_key, row in df_pointsource.iterrows():
-            if "activity_name" in row:
-                if row["activity_name"] is not None:
-                    rate = row["activity_rate"]
+            # NB: does not work if column header starts with space, but same for subst:
+            activity_keys = [k for k in row.keys() if k.startswith("act:")]
+            for activity_key in activity_keys:
+                if not pd.isnull(row[activity_key]):
+                    rate = row[activity_key]
                     try:
-                        activity = activities[row["activity_name"]]
+                        activity = activities[activity_key[4:]]
                     except KeyError:
                         return_message = import_error(
                             f"unknown activity '{activity_name}'"
@@ -1188,7 +1215,7 @@ def import_sourceactivities(
                     # original unit stored in activity.unit, but
                     # pointsourceactivity.rate stored as activity / s.
                     pointsource = pointsources[
-                        str(row["facility_id"]), row["source_name"]
+                        str(row["facility_id"]), str(row["source_name"])
                     ]
                     try:
                         psa = pointsourceactivities[activity, pointsource]
@@ -1229,11 +1256,13 @@ def import_sourceactivities(
         create_areasourceactivities = []
         update_areasourceactivities = []
         for row_key, row in df_areasource.iterrows():
-            if "activity_name" in row:
-                if row["activity_name"] is not None:
-                    rate = row["activity_rate"]
+            # NB: does not work if column header starts with space, but same for subst:
+            activity_keys = [k for k in row.keys() if k.startswith("act:")]
+            for activity_key in activity_keys:
+                if not pd.isnull(row[activity_key]):
+                    rate = row[activity_key]
                     try:
-                        activity = activities[row["activity_name"]]
+                        activity = activities[activity_key[4:]]
                     except KeyError:
                         return_message = import_error(
                             f"unknown activity '{activity_name}'"
@@ -1245,7 +1274,7 @@ def import_sourceactivities(
                     # original unit stored in activity.unit, but
                     # areasourceactivity.rate stored as activity / s.
                     areasource = areasources[
-                        str(row["facility_id"]), row["source_name"]
+                        str(row["facility_id"]), str(row["source_name"])
                     ]
                     try:
                         psa = areasourceactivities[activity, areasource]
@@ -1272,6 +1301,452 @@ def import_sourceactivities(
 
     return return_dict, return_message
 
-    # TODO
-    # figure out how to handle facility, is this really useful?
-    # see also discussion about uniqueness wrt facility on mattermost.
+
+# hardcode eea tables or read from import file?
+EEA_Tables = {
+    "coal_fplace": {"table": "3-12", "NFR": "1.A.4.b.i"},
+    "coal_stove": {"table": "3-14", "NFR": "1.A.4.b.i"},
+    "coal_shb_m": {"table": "3-15", "NFR": "1.A.4.b.i"},
+    "coal_shb_a": {"table": "3-19", "NFR": "1.A.4.b.i"},
+    "coal_mb_m": {"table": "3-22", "NFR": "1.A.4.a.i"},
+    "coal_mb_a": {"table": "3-21", "NFR": "1.A.4.a.i"},
+    "oil_stove": {"table": "3-17", "NFR": "1.A.4.b.i"},
+    "oil_shb_m": {"table": "3-18", "NFR": "1.A.4.b.i"},
+    "oil_mb_m": {"table": "3-24", "NFR": "1.A.4.a.i"},
+    "oil_mb_a": {"table": "3-25", "NFR": "1.A.4.a.i"},
+    "natural_gas_stove": {"table": "3-13", "NFR": "1.A.4.b.i"},
+    "natural_gas_shb_m": {"table": "3-16", "NFR": "1.A.4.b.i"},
+    "natural_gas_mb_m": {"table": "3-26", "NFR": "1.A.4.a.i"},
+    "natural_gas_mb_a": {"table": "3-27", "NFR": "1.A.4.a.i"},
+    "wood_stove": {"table": "3-40", "NFR": "1.A.4.b.i"},
+    "wood_shb_a": {"table": "3-44", "NFR": "1.A.4.b.i"},
+    "wood_shb_m": {"table": "3-43", "NFR": "1.A.4.b.i"},
+    "wood_fplace": {"table": "3-39", "NFR": "1.A.4.b.i"},
+    "wood_mb_a": {"table": "3-45", "NFR": "1.A.4.a.i"},
+    "wood_mb_m": {"table": "3-47", "NFR": "1.A.4.a.i"},
+    "pellets_shb_a": {"table": "3-44", "NFR": "1.A.4.b.i"},
+}
+
+# lpg not specifically in eea, taken as natural_gas
+# wood residue taken as wood, but appliance distributions may vary between
+# wood & wood residue, or lpg and natural_gas.
+eea_fuels = ["coal", "oil", "natural_gas", "wood", "pellets", "lpg", "wood_residue"]
+eea_appliances = ["fplace", "stove", "shb_a", "shb_m", "mb_a", "mb_m"]
+
+# combinations of fuel and appliance not in EEA
+excluded_combinations = [
+    ("oil", "fplace"),
+    ("oil", "shb_a"),
+    ("natural_gas", "fplace"),
+    ("natural_gas", "shb_a"),
+    ("pellets", "fplace"),
+    ("pellets", "stove"),
+    ("pellets", "shb_m"),
+    ("pellets", "mb_a"),
+    ("pellets", "mb_m"),
+]
+
+
+def import_residentialheating(
+    filepath,
+    srid=None,
+    import_substances=None,
+    return_message="",
+    validation=False,
+):
+    """Import point-sources from xlsx or csv-file.
+
+    args
+        filepath: path to file
+
+    options
+        srid: srid of file, default is same srid as domain
+        substances: list of substances for which emfacs should be imported,
+                    if None, all substances for which emfacs exist in EEA are imported.
+    """
+    try:
+        workbook = load_workbook(filename=filepath, data_only=True)
+    except Exception as exc:
+        return_message = import_error(str(exc), return_message, validation)
+
+    return_dict = {}
+    sheet_names = [sheet.title for sheet in workbook.worksheets]
+
+    if "Timevar" in sheet_names:
+        import_timevarsheet(workbook, return_message, return_dict, validation)
+
+    if "CodeSet" in sheet_names:
+        import_codesetsheet(workbook, return_message, return_dict, validation)
+
+    if "ActivityCode" in sheet_names:
+        import_activitycodesheet(workbook, return_message, return_dict, validation)
+
+    if "PointSource" in sheet_names:
+        ps, return_message = import_sources(
+            filepath,
+            srid=srid,
+            return_message=return_message,
+            validation=validation,
+            type="point",
+        )
+        return_dict.update(ps)
+        data = workbook["PointSource"].values
+        df = worksheet_to_dataframe(data)
+        column_names = df.keys()
+        fuel_types_pointsources = [
+            name[7:] for name in column_names if name.startswith("energy_")
+        ]
+    else:
+        fuel_types_pointsources = []
+
+    if "AreaSource" in sheet_names:
+        ps, return_message = import_sources(
+            filepath,
+            srid=srid,
+            return_message=return_message,
+            validation=validation,
+            type="area",
+        )
+        return_dict.update(ps)
+        data = workbook["AreaSource"].values
+        df = worksheet_to_dataframe(data)
+        column_names = df.keys()
+        fuel_types_areasources = [
+            name[7:] for name in column_names if name.startswith("energy_")
+        ]
+    else:
+        fuel_types_areasources = []
+
+    # unique fuel types
+    fuel_types = set(fuel_types_pointsources + fuel_types_areasources)
+    fuel_appliance_distribution = worksheet_to_dataframe(
+        workbook["FuelApplianceDistribution"].values
+    )
+
+    ef_overwrite = worksheet_to_dataframe(workbook["EF_Overwrite"].values)
+
+    for fuel, appliance in excluded_combinations:
+        fuel_appliance_weight = fuel_appliance_distribution.loc[
+            fuel_appliance_distribution["fuel"] == fuel, appliance
+        ].values[0]
+        if isinstance(fuel_appliance_weight, (int, float)):
+            if fuel_appliance_weight > 0:
+                if not any(
+                    (ef_overwrite["fuel"] == fuel)
+                    & (ef_overwrite["appliance"] == appliance)
+                ):
+                    return_message = import_error(
+                        "There are no emfacs for the fuel+appliance combination "
+                        + fuel
+                        + "+"
+                        + appliance
+                        + " in EEA, add manually to EF_Overwrite sheet.",
+                        return_message,
+                        validation,
+                    )
+
+    # TODO what if all energy_fuel values are 0 for some column,
+    # should still require appliance weights are set? Currently doing so.
+    fuel_appliance_weights = {}
+    for fuel in fuel_types:
+        if fuel not in eea_fuels and fuel not in ef_overwrite["fuel"]:
+            return_message = import_error(
+                f"The fuel {fuel} is not in EEA Guidebook, add emission factors "
+                + "manually to EF_Overwrite sheet.",
+                return_message,
+                validation,
+            )
+        fuel_appliance_weights[fuel] = {}
+        for appliance in eea_appliances:
+            weight = fuel_appliance_distribution.loc[
+                fuel_appliance_distribution["fuel"] == fuel, appliance
+            ].values[0]
+            if isinstance(weight, (int, float)):
+                if weight > 0:
+                    fuel_appliance_weights[fuel][appliance] = weight
+        if fuel_appliance_weights[fuel] == {}:
+            return_message = import_error(
+                f"Weights for energy consumption per fuel type are missing for {fuel}. "
+                + "Fill positive numerical values in sheet FuelApplianceDistribution.",
+                return_message,
+                validation,
+            )
+        weight_sum = sum(fuel_appliance_weights[fuel].values())
+        for appliance in fuel_appliance_weights[fuel].keys():
+            fuel_appliance_weights[fuel][appliance] = (
+                fuel_appliance_weights[fuel][appliance] / weight_sum
+            )
+
+    activities = cache_queryset(
+        Activity.objects.prefetch_related("emissionfactors").all(), "name"
+    )
+    update_activities = []
+    create_activities = {}
+    drop_emfacs = []
+    for fuel in fuel_types:
+        for appliance in fuel_appliance_weights[fuel].keys():
+            activity_name = fuel + "_" + appliance  # + facility?! + NFR
+            try:
+                activity = activities[activity_name]
+                setattr(activity, "name", activity_name)
+                setattr(activity, "unit", "GJ/yr")
+                update_activities.append(activity)
+                drop_emfacs += list(activities[activity_name].emissionfactors.all())
+            except KeyError:
+                activity = Activity(name=activity_name, unit="GJ/yr")
+                if activity_name not in create_activities:
+                    create_activities[activity_name] = activity
+    Activity.objects.bulk_create(create_activities.values())
+    Activity.objects.bulk_update(
+        update_activities,
+        [
+            "name",
+            "unit",
+        ],
+    )
+    # drop existing emfacs of activities that will be updated
+    EmissionFactor.objects.filter(pk__in=[inst.id for inst in drop_emfacs]).delete()
+    return_dict.update(
+        {
+            "activity": {
+                "updated": len(update_activities),
+                "created": len(create_activities),
+            }
+        }
+    )
+
+    # TODO or do we prefer to import eea_emfacs as migration to template database?
+    if EEAEmissionFactor.objects.count() == 0:
+        return_message = import_error(
+            "First need to import emission factor table from EEA. "
+            + "Download csv at https://efdb.apps.eea.europa.eu/ ",
+            return_message,
+            validation,
+        )
+    create_emfacs = []
+    for fuel in fuel_types:
+        for appliance in fuel_appliance_weights[fuel].keys():
+            activity_name = fuel + "_" + appliance  # + facility?!
+            activity = Activity.objects.get(name=activity_name)
+            if fuel not in ["wood_residue", "lpg"]:
+                EEA_ref = EEA_Tables[activity_name]
+            elif fuel == "wood_residue":
+                EEA_ref = EEA_Tables["wood" + "_" + appliance]
+            elif fuel == "lpg":
+                EEA_ref = EEA_Tables["natural_gas" + "_" + appliance]
+            eea_emfacs = EEAEmissionFactor.objects.filter(
+                nfr_code=EEA_ref["NFR"], table="Table_" + EEA_ref["table"]
+            )
+            for eea_emfac in eea_emfacs:
+                substance = eea_emfac.substance
+                if isinstance(substance, type(None)):
+                    # skip unknown substance, substance in EEA not contained in edb.
+                    continue
+                if import_substances is not None:
+                    if substance.name not in import_substances:
+                        # only import substances in import_substances
+                        continue
+                if any(
+                    [
+                        (ef.substance == substance)
+                        and (ef.activity.name == activity_name)
+                        for ef in create_emfacs
+                    ]
+                ):
+                    # duplicates in EEA
+                    continue
+                if any(
+                    (ef_overwrite["fuel"] == fuel)
+                    & (ef_overwrite["appliance"] == appliance)
+                    & (ef_overwrite["substance"] == substance.name)
+                ):
+                    index = (
+                        (ef_overwrite["fuel"] == fuel)
+                        & (ef_overwrite["appliance"] == appliance)
+                        & (ef_overwrite["substance"] == substance.name)
+                    )
+                    if len(index) > 1:
+                        return_message = import_error(
+                            "Several emfacs are given for fuel, appliance, substance: "
+                            + f" {fuel, appliance, substance} in EF_Overwrite. "
+                            + "Emission factors should be defined uniquely. ",
+                            return_message,
+                            validation,
+                        )
+                    factor = ef_overwrite.loc[index]["emission factor"].values[0]
+                    factor_unit = ef_overwrite.loc[index]["unit"].values[0]
+                else:
+                    factor = eea_emfac.value
+                    factor_unit = eea_emfac.unit
+                    # convert emfac to kg/GJ
+                if factor_unit == "% of PM2.5":
+                    # Too complicated to look for EF_Overwrite of pm2.5, would not be
+                    # intuitive to combine EEA emfac with overwritten emfac
+                    substPM25 = Substance.objects.get(name="PM2.5")
+                    try:
+                        EF_PM25 = EEAEmissionFactor.objects.get(
+                            nfr_code=EEA_ref["NFR"],
+                            table="Table_" + EEA_ref["table"],
+                            substance=substPM25,
+                        )
+                    except MultipleObjectsReturned:
+                        # Duplicates exist in EEA database, check value
+                        EFs_PM25 = EEAEmissionFactor.objects.filter(
+                            nfr_code=EEA_ref["NFR"],
+                            table="Table_" + EEA_ref["table"],
+                            substance=substPM25,
+                        )
+                        values = [EF_PM25.value for EF_PM25 in EFs_PM25]
+                        EF_PM25 = EFs_PM25.first()
+                        if EF_PM25.value != np.mean(values):
+                            return_message = import_error(
+                                "Several emfacs given for PM2.5 in Table "
+                                + f"{EEA_ref['table']} for NFR {EEA_ref['NFR']}. "
+                                + "These emfacs should have only 1 value.",
+                                return_message,
+                                validation,
+                            )
+                    factor = EF_PM25.value * factor * 0.01
+                    factor_unit = EF_PM25.unit
+                factor = heating_ef_unit_to_si(factor, factor_unit)
+                emfac = EmissionFactor(
+                    activity=activity, substance=substance, factor=factor
+                )
+                create_emfacs.append(emfac)
+    try:
+        EmissionFactor.objects.bulk_create(create_emfacs)
+    except IntegrityError:
+        return_message = import_error(
+            "Two emission factors for same activity and substance are given.",
+            return_message,
+            validation,
+        )
+    return_dict.update(
+        {
+            "emission_factors": {
+                "updated": len(drop_emfacs),
+                "created": len(create_emfacs) - len(drop_emfacs),
+            }
+        }
+    )
+
+    if "PointSource" in sheet_names:
+        # now that activities, pointsources and emission factors are created,
+        # pointsourceactivities can be created.
+        # should not matter whether activities and emission factors were imported from
+        # same file or existed already in database.
+        pointsourceactivities = cache_queryset(
+            PointSourceActivity.objects.all(), ["activity", "source"]
+        )
+        data = workbook["PointSource"].values
+        df_pointsource = worksheet_to_dataframe(data)
+        activities = cache_queryset(Activity.objects.all(), "name")
+        pointsources = cache_sources(
+            PointSource.objects.select_related("facility")
+            .prefetch_related("substances")
+            .all()
+        )
+        create_pointsourceactivities = []
+        update_pointsourceactivities = []
+        for row_key, row in df_pointsource.iterrows():
+            pointsource = pointsources[str(row["facility_id"]), str(row["source_name"])]
+            for fuel in fuel_types_pointsources:
+                if row["energy_" + fuel] > 0:
+                    energy = row["energy_" + fuel]
+                    for appliance in fuel_appliance_weights[fuel].keys():
+                        if fuel_appliance_weights[fuel][appliance] > 0:
+                            activity_name = fuel + "_" + appliance  # + facility?!
+                            try:
+                                activity = activities[activity_name]
+                            except KeyError:
+                                return_message = import_error(
+                                    f"unknown activity '{activity_name}'"
+                                    + f" for pointsource '{row['source_name']}'",
+                                    return_message,
+                                    validation,
+                                )
+                            rate = energy * fuel_appliance_weights[fuel][appliance]
+                            rate = heating_demand_unit_to_si(rate, row["unit"])
+                            # original unit stored in activity.unit, but
+                            # pointsourceactivity.rate stored as GJ / s.
+                        try:
+                            psa = pointsourceactivities[activity, pointsource]
+                            setattr(psa, "rate", rate)
+                            update_pointsourceactivities.append(psa)
+                        except KeyError:
+                            psa = PointSourceActivity(
+                                activity=activity, source=pointsource, rate=rate
+                            )
+                            create_pointsourceactivities.append(psa)
+
+        PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
+        PointSourceActivity.objects.bulk_update(
+            update_pointsourceactivities, ["activity", "source", "rate"]
+        )
+        return_dict.update(
+            {
+                "pointsourceactivity": {
+                    "updated": len(update_pointsourceactivities),
+                    "created": len(create_pointsourceactivities),
+                }
+            }
+        )
+
+    if "AreaSource" in sheet_names:
+        areasourceactivities = cache_queryset(
+            AreaSourceActivity.objects.all(), ["activity", "source"]
+        )
+        data = workbook["AreaSource"].values
+        df_areasource = worksheet_to_dataframe(data)
+        activities = cache_queryset(Activity.objects.all(), "name")
+        areasources = cache_sources(
+            AreaSource.objects.select_related("facility")
+            .prefetch_related("substances")
+            .all()
+        )
+        create_areasourceactivities = []
+        update_areasourceactivities = []
+        for row_key, row in df_areasource.iterrows():
+            areasource = areasources[str(row["facility_id"]), str(row["source_name"])]
+            for fuel in fuel_types_areasources:
+                if row["energy_" + fuel] > 0:
+                    energy = row["energy_" + fuel]
+                    for appliance in fuel_appliance_weights[fuel].keys():
+                        if fuel_appliance_weights[fuel][appliance] > 0:
+                            activity_name = fuel + "_" + appliance  # + facility?!
+                            try:
+                                activity = activities[activity_name]
+                            except KeyError:
+                                return_message = import_error(
+                                    f"unknown activity '{activity_name}'"
+                                    + f" for areasource '{row['source_name']}'",
+                                    return_message,
+                                    validation,
+                                )
+                            rate = energy * fuel_appliance_weights[fuel][appliance]
+                            rate = heating_demand_unit_to_si(rate, row["unit"])
+                            # original unit stored in activity.unit, but
+                            # areasourceactivity.rate stored as GJ / s.
+                        try:
+                            asa = areasourceactivities[activity, areasource]
+                            setattr(asa, "rate", rate)
+                            update_areasourceactivities.append(asa)
+                        except KeyError:
+                            asa = AreaSourceActivity(
+                                activity=activity, source=areasource, rate=rate
+                            )
+                            create_areasourceactivities.append(asa)
+        AreaSourceActivity.objects.bulk_create(create_areasourceactivities)
+        AreaSourceActivity.objects.bulk_update(
+            update_areasourceactivities, ["activity", "source", "rate"]
+        )
+        return_dict.update(
+            {
+                "areasourceactivity": {
+                    "updated": len(update_areasourceactivities),
+                    "created": len(create_areasourceactivities),
+                }
+            }
+        )
+
+    return return_dict, return_message

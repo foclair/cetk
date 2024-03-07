@@ -22,6 +22,7 @@ def get_used_substances():
 def calculate_source_emissions(
     sourcetype,
     substances=None,
+    srid=None,
     name=None,
     ids=None,
     tags=None,
@@ -30,20 +31,36 @@ def calculate_source_emissions(
 ):
     cur = connection.cursor()
     settings = Settings.get_current()
+    srid = srid or settings.srid
     if (sourcetype == "point") or (sourcetype == "area"):
         # create point source emission view
         sql = create_source_emis_query(
             sourcetype=sourcetype,
-            srid=settings.srid,
+            srid=srid,
             substances=substances,
             name=name,
             ids=ids,
             tags=tags,
-            polygon=polygon,
+            # polygon=polygon, TODO ST_GeomFromEWKT is PostGIS specific!
         )
     else:
-        raise NotImplementedError("only implemented for point-sources")
+        raise NotImplementedError("only implemented for point and area-sources")
     cur.execute(sql)
+    return cur
+
+
+def calculate_source_emissions_df(
+    sourcetype,
+    substances=None,
+    name=None,
+    ids=None,
+    tags=None,
+    polygon=None,
+    unit="kg/year",
+):
+    cur = calculate_source_emissions(
+        sourcetype, substances, name, ids, tags, polygon, unit
+    )
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
     df.set_index(["source_id", "substance"], inplace=True)
     df.loc[:, "emis"] *= emis_conversion_factor_from_si(unit)

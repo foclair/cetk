@@ -14,3 +14,4 @@ from .source_models import (  # noqa
     Substance,
     VerticalDist,
 )
+from .timevar_models import Timevar  # noqa

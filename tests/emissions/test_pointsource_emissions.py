@@ -3,7 +3,7 @@ import pytest
 from django.db import connection
 
 from etk.edb import models
-from etk.emissions.calc import calculate_source_emissions
+from etk.emissions.calc import calculate_source_emissions_df
 from etk.emissions.views import (
     create_pointsource_emis_table,
     create_pointsource_emis_view,
@@ -31,5 +31,5 @@ def test_calculate_emissions(pointsources):
 
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
-    df = calculate_source_emissions("point", [NOx, SOx], unit="kg/year")
+    df = calculate_source_emissions_df("point", [NOx, SOx], unit="kg/year")
     assert df.loc[(1, "SOx"), "emis"] == pytest.approx(2001000.0)

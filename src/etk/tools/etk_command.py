@@ -1,10 +1,15 @@
 """Command line interface for managing a Clair emission inventory offline."""
 
 import argparse
+import datetime
 import logging
+import os
 import sys
+
+# import traceback
 from pathlib import Path
 
+# from django.contrib.gis.geos import Polygon
 from django.db import transaction
 
 import etk
@@ -22,9 +27,16 @@ log = logging.getLogger(__name__)
 
 settings = etk.configure()
 
-from etk.edb import importers  # noqa
-from etk.edb.const import SHEET_NAMES  # noqa
-from etk.edb.models import Substance  # noqa
+from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
+from etk.edb.exporters import export_sources  # noqa
+from etk.edb.importers import (  # noqa
+    import_eea_emfacs,
+    import_residentialheating,
+    import_sourceactivities,
+    import_sources,
+)
+from etk.edb.models import Settings, Substance  # noqa
+from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
 from etk.emissions.views import (  # noqa
     create_areasource_emis_table,
@@ -66,9 +78,7 @@ class Editor(object):
         # reverse all created/updated DataModels if doing dry run or error occurs.
         try:
             with transaction.atomic():
-                progress = importers.import_sources(
-                    filename, validation=dry_run, type="point"
-                )
+                progress = import_sources(filename, validation=dry_run, type="point")
                 if dry_run:
                     raise DryrunAbort
         except DryrunAbort:
@@ -79,9 +89,7 @@ class Editor(object):
         # reverse all created/updated DataModels if doing dry run or error occurs.
         try:
             with transaction.atomic():
-                progress = importers.import_sources(
-                    filename, validation=dry_run, type="area"
-                )
+                progress = import_sources(filename, validation=dry_run, type="area")
                 if dry_run:
                     raise DryrunAbort
         except DryrunAbort:
@@ -92,13 +100,30 @@ class Editor(object):
         # works for point and area, recognizes from tab name which one.
         try:
             with transaction.atomic():
-                progress = importers.import_sourceactivities(
+                progress = import_sourceactivities(
                     filename, import_sheets=sheet, validation=dry_run
                 )
                 if dry_run:
                     raise DryrunAbort
         except DryrunAbort:
             pass
+        return progress
+
+    def import_residentialheating(self, filename, substance=None, dry_run=False):
+        # works for point and area, recognizes from tab name which one.
+        try:
+            with transaction.atomic():
+                progress = import_residentialheating(
+                    filename, import_substances=substance, validation=dry_run
+                )
+                if dry_run:
+                    raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
+
+    def import_eea_emfacs(self, filename):
+        progress = import_eea_emfacs(filename)
         return progress
 
     def update_emission_tables(
@@ -131,8 +156,46 @@ class Editor(object):
             )
             sys.exit(1)
 
-    def export_data(self):
-        print("Not implemented")
+    def rasterize_emissions(
+        self,
+        outputpath,
+        nx,
+        ny,
+        sourcetypes=None,
+        unit=DEFAULT_EMISSION_UNIT,
+        codeset=None,
+        substances=None,
+        begin=None,
+        end=None,
+        extent=None,
+        srid=None,
+        timezone=None,
+    ):
+        # TODO souretypes and codeset not actually given as arguments to rasterizer yet!
+        substances = substances or get_used_substances()
+        timezone = timezone or datetime.timezone.utc
+        extent = extent or Settings.get_current().extent.extent
+        # Settings.extent is a Polygon, Settings.extent.extent a tuple (x1, y1, x2, y2)
+        if extent is None:
+            log.error(
+                f"could not rasterize emissions to path {outputpath}: extent not set"
+                + " for database nor rasterizer"
+            )
+        srid = srid or DEFAULT_SRID
+        try:
+            output = Output(
+                extent=extent, timezone=timezone, path=outputpath, srid=srid
+            )
+            rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
+            rasterizer.process(substances, begin=begin, end=end, unit=unit)
+        except Exception as err:
+            log.error(f"could not rasterize emissions to path {outputpath}: {str(err)}")
+            # log.error(traceback.print_exc())
+            sys.exit(1)
+
+    def export_data(self, filename):
+        export_sources(filename)
+        return True
 
 
 def main():
@@ -142,8 +205,10 @@ def main():
         usage=f"""etk <command> [<args>]
 
         Main commands are:
+        create   create an sqlite inventory
         migrate  migrate an sqlite inventory
         import   import data
+        import_eea_emfacs   import emission factors from EEA/EMEP database
         export   export data
         calc     calculate emissions
 
@@ -153,7 +218,7 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "import", "export", "calc"),
+        choices=("migrate", "create", "import", "import_eea_emfacs", "export", "calc"),
     )
     main_args = parser.parse_args(args=sys.argv[1:2])
 
@@ -201,18 +266,31 @@ def main():
     elif main_args.command == "import":
         sub_parser = argparse.ArgumentParser(
             description="Import data from an xlsx-file",
-            usage="etk import <filename> <sheet> [options]",
+            usage="etk import <filename> [options]",
         )
         sub_parser.add_argument(
             "filename", help="Path to xslx-file", type=check_and_get_path
         )
         sub_parser.add_argument(
-            "sheets", help="List of sheets to import, valid names {SHEET_NAMES}"
+            "--sheets", help=f"List of sheets to import, valid names {SHEET_NAMES}"
         )
         sub_parser.add_argument(
             "--dryrun",
             action="store_true",
             help="Do dry run to validate import file without actually importing data",
+        )
+        sub_parser.add_argument(
+            "--residential-heating",
+            action="store_true",
+            help="Import file with energy demand for residential heating",
+        )
+        sub_parser.add_argument(
+            "--substances",
+            nargs="*",
+            help="Only import residential heating emissions for these substances"
+            + " (default is all with emissions)",
+            choices=Substance.objects.values_list("slug", flat=True),
+            metavar=("NOx", "PM10"),
         )
         # pointsource_grp = sub_parser.add_argument_group(
         #     "pointsources", description="Options for pointsource import"
@@ -224,11 +302,15 @@ def main():
                 "'etk create' or 'etk migrate'\n"
             )
             sys.exit(1)
-        if args.sheets == "PointSource":
+        if args.residential_heating:
+            status = editor.import_residentialheating(
+                args.filename, substance=args.substances, dry_run=args.dryrun
+            )
+        elif args.sheets == "PointSource":
             status = editor.import_sources(
                 args.filename, dry_run=args.dryrun, type="point"
             )
-        if args.sheets == "AreaSource":
+        elif args.sheets == "AreaSource":
             status = editor.import_sources(
                 args.filename, dry_run=args.dryrun, type="area"
             )
@@ -237,9 +319,21 @@ def main():
                 args.filename, sheet=args.sheets, dry_run=args.dryrun
             )
         log.debug("Imported data from '{args.filename}' to '{db_path}")
-        sys.stdout.write(str(status))
+        sys.stdout.write(str(status) + "\n")
         sys.exit(0)
-
+    elif main_args.command == "import_eea_emfacs":
+        sub_parser = argparse.ArgumentParser(
+            description="Import EEA emission factors from an xlsx-file",
+            usage="etk import_eea_emfacs <filename> ",
+        )
+        sub_parser.add_argument(
+            "filename", help="Path to xslx-file", type=check_and_get_path
+        )
+        args = sub_parser.parse_args(sys.argv[2:])
+        status = editor.import_eea_emfacs(args.filename)
+        log.debug("Imported emfacs from '{args.filename}' to '{db_path}")
+        sys.stdout.write(str(status) + "\n")
+        sys.exit(0)
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(
             description="Calculate emissions",
@@ -273,6 +367,45 @@ def main():
         aggregate_grp.add_argument(
             "--codeset", help="Aggregate emissions by codeset", metavar="SLUG"
         )
+        calc_grp.add_argument(
+            "--rasterize", help="Rasterize emissions", metavar="OUTPUTPATH"
+        )
+        rasterize_grp = sub_parser.add_argument_group(
+            "rasterize emissions", description="Settings to rasterize emissions"
+        )
+        rasterize_grp.add_argument(
+            "--nx",
+            help="Number of cells in x-direction in output raster",
+            metavar="int",
+        )
+        rasterize_grp.add_argument(
+            "--ny",
+            help="Number of cells in y-direction in output raster",
+            metavar="int",
+        )
+        rasterize_grp.add_argument(
+            "--extent",
+            help="Extent of output raster. Settings.extent is taken otherwise",
+            metavar="x1,y1,x2,y2",
+        )
+        rasterize_grp.add_argument(
+            "--srid",
+            help="EPSG of output raster. 4-5 digits integer",
+            metavar="EPSG",
+        )
+        rasterize_grp.add_argument(
+            "--begin",
+            help="when hourly rasters are desired, specify begin date."
+            + " Time 00:00 assumed",
+            metavar="2022-01-01",
+        )
+        rasterize_grp.add_argument(
+            "--end",
+            help="when hourly rasters are desired, specify end date"
+            + " Time 00:00 assumed",
+            metavar="2023-01-01",
+        )
+        # TODO add argument begin/end for rasterize
         # TODO add argument to aggregate emissions within polygon
 
         args = sub_parser.parse_args(sys.argv[2:])
@@ -292,8 +425,63 @@ def main():
             )
             sys.stdout.write("Successfully aggregated emissions\n")
             sys.exit(0)
+        if args.rasterize is not None:
+            if args.extent is not None:
+                x1, y1, x2, y2 = map(float, args.extent.split(","))
+                # Create the extent tuple
+                args.extent = (x1, y1, x2, y2)
+            if args.begin is not None:
+                args.begin = datetime.datetime.strptime(args.begin, "%Y-%m-%d").replace(
+                    tzinfo=datetime.timezone.utc
+                )
+                if args.end is not None:
+                    args.end = datetime.datetime.strptime(args.end, "%Y-%m-%d").replace(
+                        tzinfo=datetime.timezone.utc
+                    )
+                else:
+                    sys.stderr.write(
+                        "If begin is specified," + " end has to be specified too.\n"
+                    )
+                    sys.exit(1)
+            editor.rasterize_emissions(
+                args.rasterize,
+                int(args.nx),
+                int(args.ny),
+                sourcetypes=args.sourcetypes,
+                unit=args.unit,
+                extent=args.extent,
+                srid=args.srid,
+                begin=args.begin,
+                end=args.end,
+            )  # TODO add arguments for codeset, substances, begin/end, timezone!
+            # could also add for polygon, but this filtering is not implemented yet!!
+            sys.stdout.write("Successfully rasterized emissions\n")
+            sys.exit(0)
 
     elif main_args.command == "export":
-        sub_parser = argparse.ArgumentParser(description="Export data to file\n")
+        sub_parser = argparse.ArgumentParser(
+            description="Export data to xlsx-file",
+            usage="etk export <filename> [options]",
+        )
+        sub_parser.add_argument("filename", help="Path to xslx-file")
+        if not Path(db_path).exists():
+            sys.stderr.write(
+                "Database " + db_path + " does not exist, first run "
+                "'etk create' or 'etk migrate'\n"
+            )
+            sys.exit(1)
+
         args = sub_parser.parse_args(sys.argv[2:])
-        editor.export_data(*args)
+        try:
+            # Check if the file can be created at the given path
+            os.access(args.filename, os.W_OK | os.X_OK)
+        except Exception as e:
+            sys.stderr.write(f"File {args.filename} cannot be created: \n {e} ")
+            sys.exit(1)
+        status = editor.export_data(args.filename)
+        if status:
+            sys.stdout.write(f"Exported data from {db_path} to {args.filename}.\n")
+            sys.exit(0)
+        else:
+            sys.stderr.write("Did not export data, something went wrong.")
+            sys.exit(1)

@@ -51,15 +51,55 @@ def run_aggregate_emissions(filename, db_path=None, **kwargs):
     return run("etk", "calc", db_path=db_path, *cmd_args)
 
 
+def run_rasterize_emissions(outputpath, **kwargs):
+    """rasterize emissions and store as NetCDF."""
+    cmd_args = ["--rasterize", str(outputpath)]
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        cmd_args.append(str(v))
+    return run("etk", "calc", *cmd_args)
+
+
 def run_import(filename, sheet, dry_run=False, db_path=None, **kwargs):
     """run import in a sub-process."""
-    cmd_args = [str(filename), str(sheet)]
+    cmd_args = [str(filename)]
+    cmd_args.append("--sheets")
+    cmd_args.append(str(sheet))
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
     if dry_run:
         cmd_args.append("--dryrun")
-    return run("etk", "import", db_path=db_path, *cmd_args)
+    return run("etk", "import", *cmd_args)
+
+
+def run_import_residential_heating(filename, dry_run=False, **kwargs):
+    """run import residential heating in a sub-process."""
+    cmd_args = [str(filename)]
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        if k == "substances":
+            for substance in v:
+                cmd_args.append(substance)
+        else:
+            cmd_args.append(str(v))
+    if dry_run:
+        cmd_args.append("--dryrun")
+    cmd_args.append("--residential-heating")
+    return run("etk", "import", *cmd_args)
+
+
+def run_import_eea_emfacs(filename):
+    return run("etk", "import_eea_emfacs", filename)
+
+
+def run_export(filename, db_path=None, **kwargs):
+    """run export in a sub-process, arguments to be added are unit and srid."""
+    cmd_args = [str(filename)]
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        cmd_args.append(str(v))
+    return run("etk", "export", db_path=db_path, *cmd_args)
 
 
 def create_from_template(filename):
@@ -71,29 +111,8 @@ def run(*args, db_path=None):
     env = (
         os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
     )
-    print(args)
     proc = subprocess.run(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=env
     )
     log.debug(f"command {'_'.join(args)} finished with status code {proc.returncode}")
     return proc.stdout, proc.stderr
-
-
-def cache_queryset(queryset, fields):
-    """Return dict of model instances with fields as key
-    If several fields are specified, a tuple of the fields is used as key
-    """
-
-    def fields2key(inst, fields):
-        if hasattr(fields, "__iter__") and not isinstance(fields, str):
-            return tuple([getattr(inst, field) for field in fields])
-        else:
-            return getattr(inst, fields)
-
-    return dict(((fields2key(instance, fields), instance) for instance in queryset))
-
-
-def cache_codeset(code_set):
-    if code_set is None:
-        return {}
-    return cache_queryset(code_set.codes.all(), "code")

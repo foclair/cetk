@@ -161,3 +161,7 @@ class TestImport:
         psa = import_sourceactivities(filepath)
         print(psa)
         assert AreaSourceActivity.objects.all().count()
+
+
+# TODO test_import_residentialheating
+# difficulty is that eea emission factors need to be imported first, too big file?
