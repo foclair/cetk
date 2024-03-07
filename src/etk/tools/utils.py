@@ -111,13 +111,8 @@ def run(*args, db_path=None):
     env = (
         os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
     )
-    print(args)
-    # try:
     proc = subprocess.run(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=env
     )
-    # except subprocess.CalledProcessError as e:
-    #     error = e.stderr.decode("utf-8")
-    #     log.debug(f"command {'_'.join(args)} failed with error {error}")
     log.debug(f"command {'_'.join(args)} finished with status code {proc.returncode}")
     return proc.stdout, proc.stderr
