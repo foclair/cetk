@@ -19,13 +19,8 @@ from rastafari import even_odd_polygon_fill
 from etk import __version__
 from etk.edb.cache import EmissionCache, NotInCacheError
 from etk.edb.models.common_models import Settings
-from etk.edb.models.source_models import (
-    AreaSource,
-    Parameter,
-    PointSource,
-    Timevar,
-    timevar_to_series,
-)
+from etk.edb.models.source_models import AreaSource, Parameter, PointSource
+from etk.edb.models.timevar_models import Timevar, timevar_to_series
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.calc import calculate_source_emissions
 

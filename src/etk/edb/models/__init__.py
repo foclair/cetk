@@ -12,6 +12,6 @@ from .source_models import (  # noqa
     PointSourceActivity,
     PointSourceSubstance,
     Substance,
-    Timevar,
     VerticalDist,
 )
+from .timevar_models import Timevar  # noqa

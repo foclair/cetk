@@ -15,8 +15,8 @@ from etk.edb.models.source_models import (
     PointSource,
     PointSourceSubstance,
     Substance,
-    Timevar,
 )
+from etk.edb.models.timevar_models import Timevar
 from etk.edb.units import activity_rate_unit_from_si, emis_conversion_factor_from_si
 
 
