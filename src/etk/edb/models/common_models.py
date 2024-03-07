@@ -23,7 +23,6 @@ class Settings(models.Model):
     )
     extent = models.PolygonField(_("extent"), geography=True)
 
-    # TODO dangerous, also defined in etk.settings.TIME_ZONE! Fix that only on def.
     timezone = models.CharField(_("timezone"), max_length=64)
 
     # some functionality in Gadget only works for one out of the three codesets.

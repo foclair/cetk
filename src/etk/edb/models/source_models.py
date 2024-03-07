@@ -11,7 +11,7 @@ from django.utils.translation import gettext_lazy as _
 
 from etk.edb.const import CHAR_FIELD_LENGTH, WGS84_SRID
 from etk.edb.ltreefield import LtreeField
-from etk.settings import TIME_ZONE
+from etk.edb.models.common_models import Settings
 
 SRID = WGS84_SRID
 
@@ -332,7 +332,7 @@ def timevar_to_series(time_index, *timevars, timezone=None):
     if not timevars:
         raise TypeError("at least one timevar must be given")
     if timezone is None:
-        timezone = TIME_ZONE  # TODO or Settings.timezone?!
+        timezone = Settings.get_current().timezone
     typeday = np.multiply.reduce([ast.literal_eval(t.typeday) for t in timevars])
     month = np.multiply.reduce([ast.literal_eval(t.month) for t in timevars])
     if len(timevars) > 1:
@@ -351,7 +351,7 @@ def timevar_to_series(time_index, *timevars, timezone=None):
 def timevar_normalize(timevar, timezone=None):
     """Set the normalization constants on a timevar instance."""
     if timezone is None:
-        timezone = TIME_ZONE  # or Settings.timezone?
+        timezone = Settings.get_current().timezone
     typeday = np.array(ast.literal_eval(timevar.typeday))
     month = np.array(ast.literal_eval(timevar.month))
     timevar.typeday_sum = typeday.sum()
