@@ -475,7 +475,7 @@ class Migration(migrations.Migration):
                 (
                     "month",
                     models.CharField(
-                        default=str(12 * [100.0]),
+                        default="[" + ", ".join(12 * ["100.0"]) + "]",
                         max_length=840,
                     ),
                 ),
