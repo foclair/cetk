@@ -7,5 +7,6 @@ flake8
 isort
 pre-commit
 pytest
+coverage[toml]
 pytest-cov
 pytest-django

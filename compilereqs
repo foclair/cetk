@@ -4,19 +4,12 @@ set -e
 
 CLAIR_INDEX_URL=https://gitlab.smhi.se/api/v4/projects/3495/packages/pypi/simple
 
-compile() {
-    outputfile=${1}; shift
-    echo updating "${outputfile}"
-    pip-compile --quiet --allow-unsafe --generate-hashes \
-		--extra-index-url=${CLAIR_INDEX_URL} \
-		${extra_compile_args} \
-		--output-file=${outputfile} \
-		--resolver=backtracking \
-		"${@}"
-    chmod 644 ${outputfile}
-}
-
-export CUSTOM_COMPILE_COMMAND="./compilereqs"
-extra_compile_args="${@}"
-compile requirements.txt setup.cfg --strip-extras
-compile requirements-dev.txt requirements-dev.in setup.cfg --strip-extras
+echo updating "requirements.txt"
+pip-compile --quiet --allow-unsafe --generate-hashes --strip-extras --extra-index-url=${CLAIR_INDEX_URL} \
+	setup.cfg --output-file requirements.txt
+chmod 644 requirements.txt
+echo updating "requirements-dev.txt"
+pip-compile --quiet --allow-unsafe --generate-hashes \
+	--resolver backtracking --no-strip-extras \
+	requirements-dev.in -c requirements.txt --output-file requirements-dev.txt
+chmod 644 requirements-dev.txt
