@@ -29,7 +29,11 @@ def validate_columns(
         for codeset_slug in code_sets:
             col_name = f"activitycode_{codeset_slug}"
             if col_name not in df.columns:
+<<<<<<< HEAD
                 messages.append(f"Missing column 'activitycode_{codeset_slug}'")
+=======
+                messages.append(f"Missing column for code-set '{codeset_slug}'")
+>>>>>>> b6395f1 (added support for gridsources)
     if substances is not None:
         expected_substances = {
             col[6:] for col in df.columns if col.startswith("subst:")
@@ -38,7 +42,11 @@ def validate_columns(
         if len(invalid_substances) > 0:
             messages.append(f"Invalid substances: {invalid_substances}")
     if activities is not None:
+<<<<<<< HEAD
         expected_activities = {col[4:] for col in df.columns if col.startswith("act:")}
+=======
+        expected_activities = {col[6:] for col in df.columns if col.startswith("act:")}
+>>>>>>> b6395f1 (added support for gridsources)
         invalid_activities = expected_activities.difference(activities.keys())
         if len(invalid_activities) > 0:
             messages.append(f"Invalid activities: {invalid_activities}")
@@ -138,7 +146,11 @@ def validate_raster(
     if rpath is not None:
         if not os.path.exists(rpath):
             messages.append(f"raster with path {rpath} does not exist")
+<<<<<<< HEAD
         elif rname not in raster_dict:
+=======
+        if rname not in raster_dict:
+>>>>>>> b6395f1 (added support for gridsources)
             with rio.open(rpath, "r") as dset:
                 try:
                     _ = int(dset.crs.to_authority()[1])
@@ -187,7 +199,12 @@ def validate_activity(values, row_nr, activity):
     rate = values[f"act:{activity}"]
     if rate != "sum":
         try:
+<<<<<<< HEAD
             if float(rate) < 0:
+=======
+            float(rate)
+            if rate < 0:
+>>>>>>> b6395f1 (added support for gridsources)
                 messages.append(
                     with_rownr_and_substance("activity rate < 0", row_nr, activity)
                 )

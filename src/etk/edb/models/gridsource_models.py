@@ -102,7 +102,10 @@ def get_gridsource_raster(name, clip_by=None):
 
 def write_gridsource_raster(raster, name):
     """write a rasterio taset to db in geopackage format."""
+<<<<<<< HEAD
 
+=======
+>>>>>>> b6395f1 (added support for gridsources)
     try:
         _ = int(raster.crs.to_authority()[1])
     except ValueError:

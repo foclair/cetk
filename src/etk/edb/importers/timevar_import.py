@@ -6,8 +6,12 @@ from etk.edb.models import Timevar
 from .utils import import_error, worksheet_to_dataframe
 
 
+<<<<<<< HEAD
 def import_timevarsheet(workbook, validation):
     return_message = []
+=======
+def import_timevarsheet(workbook, return_message, return_dict, validation):
+>>>>>>> b6395f1 (added support for gridsources)
     timevar_data = workbook["Timevar"].values
     df_timevar = worksheet_to_dataframe(timevar_data)
     timevar_dict = {"emission": {}}
@@ -38,8 +42,12 @@ def import_timevarsheet(workbook, validation):
         timevar_dict, overwrite=True, validation=validation
     )
     return_message += return_append
+<<<<<<< HEAD
     return_dict = {"timevar": {"updated or created": len(tv["emission"])}}
     return return_dict, return_message
+=======
+    return_dict.update({"timevar": {"updated or created": len(tv["emission"])}})
+>>>>>>> b6395f1 (added support for gridsources)
 
 
 def import_timevars(timevar_data, overwrite=False, validation=False):
@@ -49,6 +57,10 @@ def import_timevars(timevar_data, overwrite=False, validation=False):
     # is overloaded to calculate the normation constant.
     def make_timevar(data, timevarclass, subname=None, validation=False):
         retdict = {}
+<<<<<<< HEAD
+=======
+        return_message = ""
+>>>>>>> b6395f1 (added support for gridsources)
         for name, timevar_data in data.items():
             try:
                 typeday = timevar_data["typeday"]
@@ -70,6 +82,7 @@ def import_timevars(timevar_data, overwrite=False, validation=False):
                         )
                 retdict[name] = newobj
             except KeyError:
+<<<<<<< HEAD
                 return_message.append(
                     import_error(
                         f"Invalid specification of timevar {name}"
@@ -92,5 +105,26 @@ def import_timevars(timevar_data, overwrite=False, validation=False):
                     f"invalid time-variation type '{vartype}' specified",
                     validation=validation,
                 )
+=======
+                return_message = import_error(
+                    f"Invalid specification of timevar {name}"
+                    f", are 'typeday' and 'month' given?",
+                    return_message,
+                    validation,
+                )
+        return retdict, return_message
+
+    timevars = {}
+    for vartype, subdict in timevar_data.items():
+        if vartype == "emission":
+            timevars["emission"], return_message = make_timevar(
+                timevar_data[vartype], Timevar
+            )
+        else:
+            return_message = import_error(
+                f"invalid time-variation type '{vartype}' specified",
+                return_message,
+                validation,
+>>>>>>> b6395f1 (added support for gridsources)
             )
     return timevars, return_message

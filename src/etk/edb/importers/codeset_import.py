@@ -3,9 +3,13 @@ from etk.edb.models import ActivityCode, CodeSet, VerticalDist
 from .utils import import_error, worksheet_to_dataframe
 
 
+<<<<<<< HEAD
 def import_codesetsheet(workbook, validation):
     return_message = []
     return_dict = {}
+=======
+def import_codesetsheet(workbook, return_message, return_dict, validation):
+>>>>>>> b6395f1 (added support for gridsources)
     nr_codesets = len(CodeSet.objects.all())
     data = workbook["CodeSet"].values
     df_codeset = worksheet_to_dataframe(data)
@@ -28,11 +32,18 @@ def import_codesetsheet(workbook, validation):
                 if slug not in create_codesets:
                     create_codesets[slug] = codeset
             else:
+<<<<<<< HEAD
                 return_message.append(
                     import_error(
                         "Trying to import a new codeset," " but can have maximum 3.",
                         validation=validation,
                     )
+=======
+                return_message = import_error(
+                    "Trying to import a new codeset, but can have maximum 3.",
+                    return_message,
+                    validation,
+>>>>>>> b6395f1 (added support for gridsources)
                 )
 
     CodeSet.objects.bulk_create(create_codesets.values())
@@ -43,6 +54,7 @@ def import_codesetsheet(workbook, validation):
             "description",
         ],
     )
+<<<<<<< HEAD
     return_dict = {
         "codeset": {
             "updated": len(update_codesets),
@@ -54,6 +66,19 @@ def import_codesetsheet(workbook, validation):
 
 def import_activitycodesheet(workbook, validation):
     return_message = []
+=======
+    return_dict.update(
+        {
+            "codeset": {
+                "updated": len(update_codesets),
+                "created": len(create_codesets),
+            }
+        }
+    )
+
+
+def import_activitycodesheet(workbook, return_message, return_dict, validation):
+>>>>>>> b6395f1 (added support for gridsources)
     data = workbook["ActivityCode"].values
     df_activitycode = worksheet_to_dataframe(data)
     update_activitycodes = []
@@ -70,6 +95,7 @@ def import_activitycodesheet(workbook, validation):
                         )
                         vdist_id = vdist.id
                     except VerticalDist.DoesNotExist:
+<<<<<<< HEAD
                         return_message.append(
                             import_error(
                                 f"Trying to import an activity-code "
@@ -79,6 +105,15 @@ def import_activitycodesheet(workbook, validation):
                                 " is not defined.",
                                 validation=validation,
                             )
+=======
+                        return_message = import_error(
+                            f"Trying to import an activity code from row '{row_key}'"
+                            + "but Vertical Distribution "
+                            + f"'{row_dict['vertical_distribution_slug']}'"
+                            + " is not defined.",
+                            return_message,
+                            validation,
+>>>>>>> b6395f1 (added support for gridsources)
                         )
                 else:
                     vdist_id = None
@@ -100,6 +135,7 @@ def import_activitycodesheet(workbook, validation):
                 )
                 create_activitycodes[row_dict["activitycode"]] = activitycode
         except CodeSet.DoesNotExist:
+<<<<<<< HEAD
             return_message.append(
                 import_error(
                     f"Trying to import an activity code from row '{row_key}'"
@@ -107,6 +143,15 @@ def import_activitycodesheet(workbook, validation):
                     validation=validation,
                 )
             )
+=======
+            return_message = import_error(
+                f"Trying to import an activity code from row '{row_key}'"
+                + f"but CodeSet '{row_dict['codeset_slug']}' is not defined.",
+                return_message,
+                validation,
+            )
+
+>>>>>>> b6395f1 (added support for gridsources)
     ActivityCode.objects.bulk_create(create_activitycodes.values())
     ActivityCode.objects.bulk_update(
         update_activitycodes,
@@ -115,6 +160,7 @@ def import_activitycodesheet(workbook, validation):
             "vertical_dist_id",
         ],
     )
+<<<<<<< HEAD
     return_dict = {
         "activitycode": {
             "updated": len(update_activitycodes),
@@ -122,3 +168,13 @@ def import_activitycodesheet(workbook, validation):
         }
     }
     return return_dict, return_message
+=======
+    return_dict.update(
+        {
+            "activitycode": {
+                "updated": len(update_activitycodes),
+                "created": len(create_activitycodes),
+            }
+        }
+    )
+>>>>>>> b6395f1 (added support for gridsources)

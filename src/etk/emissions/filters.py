@@ -4,7 +4,11 @@ from collections.abc import Iterable
 
 from django.contrib.gis.geos import Polygon
 
+<<<<<<< HEAD
 from etk.edb.models import Settings, get_gridsource_raster, list_gridsource_rasters
+=======
+from etk.edb.models import get_gridsource_raster, list_gridsource_rasters
+>>>>>>> b6395f1 (added support for gridsources)
 
 
 def create_name_where_clause(name, sql):
@@ -28,11 +32,18 @@ def create_polygon_where_clause(polygon):
         polygon: a polygon in Polygon or EWKT-format
     """
     polygon_ewkt = polygon.ewkt if isinstance(polygon, Polygon) else polygon
+<<<<<<< HEAD
     settings = Settings.get_current()
     sql = f"""\
        ST_Intersects(
          sources.geom,
          ST_Transform(GeomFromEWKT('{polygon_ewkt}'), {settings.srid})
+=======
+    sql = f"""\
+       ST_Intersects(
+         sources.geom,
+         ST_Transform(GeomFromEWKT('{polygon_ewkt}'), 4326)
+>>>>>>> b6395f1 (added support for gridsources)
        )
     """
     return sql
@@ -183,5 +194,9 @@ def create_raster_share_in_polygon_sql(polygon):
             for name, total in rasters.items()
         )
     else:
+<<<<<<< HEAD
         sql = """SELECT "dummy" as name, 1.0 as total"""
+=======
+        sql = """SELECT dummy as name, 1.0 as total"""
+>>>>>>> b6395f1 (added support for gridsources)
     return sql

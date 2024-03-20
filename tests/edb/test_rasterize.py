@@ -455,6 +455,40 @@ class TestEmissionRasterizer:
             assert dset["emission_NOx"].shape == (3, 4, 4)
             assert np.sum(dset["emission_NOx"][0, :, :]) == pytest.approx(510.0, 1e-6)
 
+    def test_gridsource_no_timesteps(testsettings, gridsources, tmpdir):
+        NOx = Substance.objects.get(slug="NOx")
+        SOx = Substance.objects.get(slug="SOx")
+        extent = (0.0, 0.0, 1200.0, 1200.0)
+        srid = 3006
+        output = Output(
+            extent=extent, timezone=datetime.timezone.utc, path=tmpdir, srid=srid
+        )
+        rasterizer = EmissionRasterizer(output, nx=4, ny=4)
+        rasterizer.process([NOx, SOx], unit="ton/year")
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert dset["Emission of NOx"].shape == (4, 4)
+            assert np.sum(dset["Emission of NOx"]) == pytest.approx(510.0, 1e-6)
+
+    def test_gridsource(testsettings, gridsources, tmpdir):
+
+        NOx = Substance.objects.get(slug="NOx")
+        SOx = Substance.objects.get(slug="SOx")
+        extent = (0.0, 0.0, 1200.0, 1200.0)
+        srid = 3006
+        output = Output(
+            extent=extent, timezone=datetime.timezone.utc, path=tmpdir, srid=srid
+        )
+        rasterizer = EmissionRasterizer(output, nx=4, ny=4)
+        begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
+        rasterizer.process([NOx, SOx], begin, end, unit="ton/year")
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert dset["time"][0] == 368160
+            assert dset["Emission of NOx"].shape == (3, 4, 4)
+            assert np.sum(dset["Emission of NOx"][0, :, :]) == pytest.approx(
+                510.0, 1e-6
+            )
+
     # ac-filtering not implemented yet!
     # def test_point_source_filter(  # noqa: PLR0915
     #     self, testsettings, code_sets, test_timevar, tmpdir
