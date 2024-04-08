@@ -85,7 +85,6 @@ def aggregate_emissions(
 
     settings = Settings.get_current()
     codeset_index = None if codeset is None else settings.get_codeset_index(codeset)
-
     sql = create_aggregate_emis_query(
         substances=substances,
         sourcetypes=sourcetypes,
@@ -96,6 +95,7 @@ def aggregate_emissions(
         area_ids=area_ids,
     )
     cur = connection.cursor()
+    # breakpoint()
     cur.execute(sql)
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
     if codeset is not None:

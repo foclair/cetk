@@ -101,21 +101,12 @@ grid_emis as (
         (
           SELECT
             grid_source.source_id,
-<<<<<<< HEAD
             emis.substance_id as substance_id,
             emis.value as emis,
             emis.raster as raster_name
           FROM edb_gridsourcesubstance as emis
           JOIN grid_source ON grid_source.source_id=emis.source_id
           WHERE emis.value > 0
-=======
-            subst.substance_id as substance_id,
-            subst.value as emis,
-            subst.raster as raster_name
-          FROM edb_gridsourcesubstance as subst
-          JOIN grid_source ON grid_source.source_id=subst.source_id
-          WHERE subst.value > 0
->>>>>>> b6395f1 (added support for gridsources)
           {emis_substance_filter}
           UNION ALL
           SELECT
@@ -141,13 +132,8 @@ FROM
     SELECT * FROM area_emis
     UNION ALL
     SELECT * FROM point_emis
-<<<<<<< HEAD
    UNION ALL
    SELECT * FROM grid_emis
-=======
-    UNION ALL
-    SELECT * FROM grid_emis
->>>>>>> b6395f1 (added support for gridsources)
   ) as all_emis
 JOIN substances ON substance_id = substances.id
 GROUP BY {ac_groupby} substances.slug
