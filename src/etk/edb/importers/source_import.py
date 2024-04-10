@@ -1,6 +1,7 @@
 """Data importers for the edb application."""
 
 import logging
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -86,6 +87,7 @@ def import_sources(
     type="point",
 ):
     """Import point- or area-sources from xlsx or csv-file.
+    PointSource- and AreaSourceSubstances only, not Activities.
 
     args
         filepath: path to file
@@ -94,45 +96,7 @@ def import_sources(
         encoding: encoding of file (default is utf-8)
         srid: srid of file, default is same srid as domain
     """
-    # user defined SRID for import or WGS84 if nothing specified
-    # as long as we do not have functions in Eclair to edit the "settings_SRID"
-    # it does not make sense to use that SRID as default for import.
-
     return_message = []
-    srid = srid or WGS84_SRID
-    # cache related models
-    substances = cache_queryset(Substance.objects.all(), "slug")
-    timevars = cache_queryset(Timevar.objects.all(), "name")
-    facilities = cache_queryset(Facility.objects.all(), "official_id")
-
-    if type == "point":
-        sources = cache_sources(
-            PointSource.objects.select_related("facility").all()
-        )  # .prefetch_related("substances")
-    elif type == "area":
-        sources = cache_sources(
-            AreaSource.objects.select_related("facility").all()
-        )  # .prefetch_related("substances")
-    else:
-        return_message.append(
-            import_error(
-                "this sourcetype is not implemented",
-                validation=validation,
-            )
-        )
-
-    # using filter.first() here, not get() because code_set{i} does not have to exist
-    code_sets = [
-        cache_codeset(CodeSet.objects.filter(id=i).first()) for i in range(1, 4)
-    ]
-    code_set_slugs = {}
-    for i in range(1, 4):
-        try:
-            code_set_slug = CodeSet.objects.get(id=i).slug
-        except CodeSet.DoesNotExist:
-            code_set_slug = None
-        code_set_slugs[i] = code_set_slug
-
     extension = filepath.suffix
     if extension == ".csv":
         # read csv-file
@@ -191,6 +155,59 @@ def import_sources(
                 validation=validation,
             )
         )
+
+    create_or_update_sources(
+        df,
+        return_message="",
+        validation=False,
+        srid=None,
+        type="point",
+    )
+
+
+def create_or_update_sources(
+    df,
+    return_message="",
+    validation=False,
+    srid=None,
+    type="point",
+):
+    # user defined SRID for import or WGS84 if nothing specified
+    # as long as we do not have functions in Eclair to edit the "settings_SRID"
+    # it does not make sense to use that SRID as default for import.
+    srid = srid or WGS84_SRID
+    # cache related models
+    substances = cache_queryset(Substance.objects.all(), "slug")
+    timevars = cache_queryset(Timevar.objects.all(), "name")
+    facilities = cache_queryset(Facility.objects.all(), "official_id")
+
+    if type == "point":
+        sources = cache_sources(
+            PointSource.objects.select_related("facility").all()
+        )  # .prefetch_related("substances")
+    elif type == "area":
+        sources = cache_sources(
+            AreaSource.objects.select_related("facility").all()
+        )  # .prefetch_related("substances")
+    else:
+        return_message = import_error(
+            "this sourcetype is not implemented",
+            return_message,
+            validation,
+        )
+
+    # using filter.first() here, not get() because code_set{i} does not have to exist
+    code_sets = [
+        cache_codeset(CodeSet.objects.filter(id=i).first()) for i in range(1, 4)
+    ]
+    code_set_slugs = {}
+    for i in range(1, 4):
+        try:
+            code_set_slug = CodeSet.objects.get(id=i).slug
+        except CodeSet.DoesNotExist:
+            code_set_slug = None
+        code_set_slugs[i] = code_set_slug
+
     if type == "point":
         for col in REQUIRED_COLUMNS_POINT.keys():
             if col not in df.columns:
@@ -665,6 +682,7 @@ def import_sources(
                 "created": len(create_sources),
             },
         }
+    print(datetime.now().strftime("%H:%M:%S") + "finish point import")
     return return_dict, return_message
 
 
@@ -709,8 +727,10 @@ def import_sourceactivities(
     # Could be that activities are linked to previously imported pointsources,
     # or pointsources to be imported later, therefore not requiring PointSource-sheet.
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        ps, msgs = import_sources(
-            filepath,
+        data = workbook["PointSource"].values
+        df_pointsource = worksheet_to_dataframe(data)
+        ps, msgs = create_or_update_sources(
+            df_pointsource,
             srid=srid,
             validation=validation,
             type="point",
@@ -719,8 +739,10 @@ def import_sourceactivities(
         return_message += msgs
 
     if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
-        ps, msgs = import_sources(
-            filepath,
+        data = workbook["AreaSource"].values
+        df_areasource = worksheet_to_dataframe(data)
+        ps, msgs = create_or_update_sources(
+            df_areasource,
             srid=srid,
             validation=validation,
             type="area",
@@ -874,8 +896,6 @@ def import_sourceactivities(
             ["activity", "source"],
         )
         # TODO check unique activity for source
-        data = workbook["PointSource"].values
-        df_pointsource = worksheet_to_dataframe(data)
         activities = cache_queryset(Activity.objects.all(), "name")
         pointsources = cache_sources(
             PointSource.objects.select_related("facility").all()
@@ -933,9 +953,6 @@ def import_sourceactivities(
             AreaSourceActivity.objects.select_related("activity", "source").all(),
             ["activity", "source"],
         )
-        # TODO check unique activity for source
-        data = workbook["AreaSource"].values
-        df_areasource = worksheet_to_dataframe(data)
         activities = cache_queryset(Activity.objects.all(), "name")
         areasources = cache_sources(
             AreaSource.objects.select_related("facility")
@@ -963,9 +980,8 @@ def import_sourceactivities(
                     rate = activity_rate_unit_to_si(rate, activity.unit)
                     # original unit stored in activity.unit, but
                     # areasourceactivity.rate stored as activity / s.
-                    areasource = areasources[
-                        str(row["facility_id"]), str(row["source_name"])
-                    ]
+                    # facility_id and source_name set as df index
+                    areasource = areasources[str(row.name[0]), str(row.name[1])]
                     try:
                         psa = areasourceactivities[activity, areasource]
                         setattr(psa, "rate", rate)
@@ -990,4 +1006,5 @@ def import_sourceactivities(
         )
 
     workbook.close()
+    print(datetime.now().strftime("%H:%M:%S") + "finish import")
     return return_dict, return_message

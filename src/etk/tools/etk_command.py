@@ -93,6 +93,7 @@ class Editor(object):
             log.error(f"Error while migrating {db_path}: {err}")
         log.debug(f"Successfully migrated database {db_path}")
 
+<<<<<<< HEAD
     def import_workbook(self, filename, sheets=SHEET_NAMES, dry_run=False):
         return_msg = []
         db_updates = {}
@@ -163,6 +164,20 @@ class Editor(object):
         else:
             log.info(f"imported data {db_updates}")
         return db_updates, return_msg
+=======
+    def import_sourceactivities(self, filename, sheet, dry_run=False):
+        # works for point and area, recognizes from tab name which one.
+        try:
+            with transaction.atomic():
+                progress = import_sourceactivities(
+                    filename, import_sheets=sheet, validation=dry_run
+                )
+                if dry_run:
+                    raise DryrunAbort
+        except DryrunAbort:
+            pass
+        return progress
+>>>>>>> 2a25a7c (create dataframe for pointsources and areasources only once)
 
     def update_emission_tables(
         self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
@@ -336,8 +351,17 @@ def main():
                 "'etk create' or 'etk migrate'\n"
             )
             sys.exit(1)
+<<<<<<< HEAD
 
         editor.import_workbook(args.filename, sheets=args.sheets, dry_run=args.dryrun)
+=======
+        else:
+            status = editor.import_sourceactivities(
+                args.filename, sheet=args.sheets, dry_run=args.dryrun
+            )
+        log.debug("Imported data from '{args.filename}' to '{db_path}")
+        sys.stdout.write(str(status) + "\n")
+>>>>>>> 2a25a7c (create dataframe for pointsources and areasources only once)
         sys.exit(0)
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(
