@@ -476,7 +476,7 @@ def create_or_update_sources(
             facility_name = row_dict["facility_name"]
 
         try:
-            facility = facilities[official_facility_id]
+            facility = facilities[str(official_facility_id)]
             update_facilities.append(facility)
         except KeyError:
             if official_facility_id is not None:
@@ -501,7 +501,7 @@ def create_or_update_sources(
                 facility = None
 
         source_data["facility"] = facility
-        source_key = (official_facility_id, source_name)
+        source_key = (str(official_facility_id), str(source_name))
         try:
             source = sources[source_key]
             for key, val in source_data.items():
@@ -604,7 +604,6 @@ def create_or_update_sources(
                     f"Could not link pointsource {source.name} to "
                     + f"facility {source.facility.name}"
                 )
-
     if type == "point":
         PointSource.objects.bulk_create(create_sources.values())
         PointSource.objects.bulk_update(
@@ -686,6 +685,7 @@ def create_or_update_sources(
     return return_dict, return_message
 
 
+# @profile
 def import_sourceactivities(
     filepath,
     encoding=None,
