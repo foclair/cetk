@@ -32,9 +32,7 @@ from etk.edb.exporters import export_sources  # noqa
 from etk.edb.importers import (  # noqa
     import_activitycodesheet,
     import_codesetsheet,
-    import_eea_emfacs,
     import_gridsources,
-    import_residentialheating,
     import_sourceactivities,
     import_sources,
     import_timevarsheet,
@@ -239,7 +237,6 @@ def main():
         create   create an sqlite inventory
         migrate  migrate an sqlite inventory
         import   import data
-        import_eea_emfacs   import emission factors from EEA/EMEP database
         export   export data
         calc     calculate emissions
 
@@ -250,7 +247,7 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "import", "import_eea_emfacs", "export", "calc"),
+        choices=("migrate", "create", "import", "export", "calc"),
     )
     verbosity = [arg for arg in sys.argv if arg == "-v"]
     sys_args = [arg for arg in sys.argv if arg != "-v"]
@@ -341,19 +338,6 @@ def main():
             sys.exit(1)
 
         editor.import_workbook(args.filename, sheets=args.sheets, dry_run=args.dryrun)
-        sys.exit(0)
-    elif main_args.command == "import_eea_emfacs":
-        sub_parser = argparse.ArgumentParser(
-            description="Import EEA emission factors from an xlsx-file",
-            usage="etk import_eea_emfacs <filename> ",
-        )
-        sub_parser.add_argument(
-            "filename", help="Path to xslx-file", type=check_and_get_path
-        )
-        args = sub_parser.parse_args(sub_args)
-        status = editor.import_eea_emfacs(args.filename)
-        log.debug("Imported emfacs from '{args.filename}' to '{db_path}")
-        sys.stdout.write(str(status) + "\n")
         sys.exit(0)
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(

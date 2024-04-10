@@ -121,26 +121,6 @@ def run_import(filename, sheets=SHEET_NAMES, dry_run=False, db_path=None, **kwar
     return run("etk", "import", *cmd_args)
 
 
-def run_import_residential_heating(filename, dry_run=False, **kwargs):
-    """run import residential heating in a sub-process."""
-    cmd_args = [str(filename)]
-    for k, v in kwargs.items():
-        cmd_args.append(f"--{k}")
-        if k == "substances":
-            for substance in v:
-                cmd_args.append(substance)
-        else:
-            cmd_args.append(str(v))
-    if dry_run:
-        cmd_args.append("--dryrun")
-    cmd_args.append("--residential-heating")
-    return run("etk", "import", *cmd_args)
-
-
-def run_import_eea_emfacs(filename):
-    return run("etk", "import_eea_emfacs", filename)
-
-
 def run_export(filename, db_path=None, **kwargs):
     """run export in a sub-process, arguments to be added are unit and srid."""
     cmd_args = [str(filename)]

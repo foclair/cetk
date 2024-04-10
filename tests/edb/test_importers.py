@@ -2,11 +2,9 @@
 
 from importlib import resources
 
-import numpy as np
 import pytest
 
 from etk.edb.importers import (
-    import_eea_emfacs,
     import_gridsources,
     import_sourceactivities,
     import_sources,
@@ -20,7 +18,6 @@ from etk.edb.models import (
     PointSourceActivity,
     get_gridsource_raster,
 )
-from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.units import emis_conversion_factor_from_si
 
 
@@ -91,29 +88,11 @@ class TestImport:
         source1 = PointSource.objects.get(name="source1")
         assert "test_tag" not in source1.tags
 
-    def test_import_eea_emfac(self, vertical_dist):
-        # using vertical_dist just to get fixtures
-        vdist = vertical_dist  # noqa
-        filename = resources.files("edb.data") / "EMEPemissionfactors-short.xlsx"
-        sd = import_eea_emfacs(filename)
-        assert len(sd) > 0
-
     def test_import_pointsourceactivities(
         self, vertical_dist, pointsource_csv, pointsource_xlsx
     ):
         # similar to base_set in gadget
         cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1")
-        filename = resources.files("edb.data") / "EMEPemissionfactors-short.xlsx"
-
-        # example code how to use eea emfacs for codeset
-        import_eea_emfacs(filename)
-        emfacs = EEAEmissionFactor.objects.all()
-        nfr_codes = [ef.nfr_code for ef in emfacs]
-        unique_nfr_codes = set(nfr_codes)
-        sectors = [ef.sector for ef in emfacs]
-        for code in unique_nfr_codes:
-            index = np.argmax(np.asarray(nfr_codes) == code)
-            cs1.codes.create(code=code, label=sectors[index])
 
         cs1.codes.create(
             code="1.1", label="Stationary combustion", vertical_dist=vertical_dist
@@ -211,7 +190,3 @@ class TestImport:
         source1 = GridSource.objects.get(name="gridsource1")
         source2 = GridSource.objects.get(name="gridsource2")
         assert "test_tag" not in source1.tags
-
-
-# TODO test_import_residentialheating
-# difficulty is that eea emission factors need to be imported first, too big file?
