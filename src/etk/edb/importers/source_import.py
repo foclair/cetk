@@ -59,8 +59,8 @@ REQUIRED_COLUMNS_POINT = {
     "inner_diameter": float,
     "gas_speed": float,
     "gas_temperature": float,
-    "house_width": float,
-    "house_height": float,
+    # "house_width": float,
+    # "house_height": float,
 }
 
 
@@ -80,10 +80,6 @@ def cache_sources(queryset):
 
 def import_sources(
     filepath,
-<<<<<<< HEAD
-=======
-    return_message="",
->>>>>>> b6395f1 (added support for gridsources)
     validation=False,
     encoding=None,
     srid=None,
@@ -101,11 +97,8 @@ def import_sources(
     # user defined SRID for import or WGS84 if nothing specified
     # as long as we do not have functions in Eclair to edit the "settings_SRID"
     # it does not make sense to use that SRID as default for import.
-<<<<<<< HEAD
 
     return_message = []
-=======
->>>>>>> b6395f1 (added support for gridsources)
     srid = srid or WGS84_SRID
     # cache related models
     substances = cache_queryset(Substance.objects.all(), "slug")
@@ -114,35 +107,31 @@ def import_sources(
 
     if type == "point":
         sources = cache_sources(
-            PointSource.objects.select_related("facility")
-            .prefetch_related("substances")
-            .all()
-        )
+            PointSource.objects.select_related("facility").all()
+        )  # .prefetch_related("substances")
     elif type == "area":
         sources = cache_sources(
-            AreaSource.objects.select_related("facility")
-            .prefetch_related("substances")
-            .all()
-        )
+            AreaSource.objects.select_related("facility").all()
+        )  # .prefetch_related("substances")
     else:
-<<<<<<< HEAD
         return_message.append(
             import_error(
                 "this sourcetype is not implemented",
                 validation=validation,
             )
-=======
-        return_message = import_error(
-            "this sourcetype is not implemented",
-            return_message,
-            validation,
->>>>>>> b6395f1 (added support for gridsources)
         )
 
     # using filter.first() here, not get() because code_set{i} does not have to exist
     code_sets = [
         cache_codeset(CodeSet.objects.filter(id=i).first()) for i in range(1, 4)
     ]
+    code_set_slugs = {}
+    for i in range(1, 4):
+        try:
+            code_set_slug = CodeSet.objects.get(id=i).slug
+        except CodeSet.DoesNotExist:
+            code_set_slug = None
+        code_set_slugs[i] = code_set_slug
 
     extension = filepath.suffix
     if extension == ".csv":
@@ -170,7 +159,7 @@ def import_sources(
     elif extension == ".xlsx":
         # read spreadsheet
         try:
-            workbook = load_workbook(filename=filepath, data_only=True)
+            workbook = load_workbook(filename=filepath, data_only=True, read_only=True)
         except Exception as exc:
             return_message = import_error(str(exc), return_message, validation)
         worksheet = workbook.worksheets[0]
@@ -180,15 +169,9 @@ def import_sources(
                     "Multiple sheets in spreadsheet, importing sheet 'PointSource'."
                 )
                 data = workbook["PointSource"].values
-<<<<<<< HEAD
             elif type == "area":
                 log.debug(
                     "Multiple sheets in spreadsheet, importing sheet 'AreaSource'."
-=======
-            else:
-                log.debug(
-                    "Multiple sheets in spreadsheet, importing sheet 'PointSource'."
->>>>>>> b6395f1 (added support for gridsources)
                 )
                 data = workbook["AreaSource"].values
         else:
@@ -200,45 +183,29 @@ def import_sources(
             df = df.astype(dtype=REQUIRED_COLUMNS_AREA)
         # below is necessary not to create facilities with name 'None'
         df = df.replace(to_replace="None", value=None)
+        workbook.close()
     else:
-<<<<<<< HEAD
         return_message.append(
             import_error(
                 "Only xlsx and csv files are supported for import",
                 validation=validation,
             )
-=======
-        return_message = import_error(
-            "Only xlsx and csv files are supported for import",
-            return_message,
-            validation,
->>>>>>> b6395f1 (added support for gridsources)
         )
     if type == "point":
         for col in REQUIRED_COLUMNS_POINT.keys():
             if col not in df.columns:
-<<<<<<< HEAD
                 return_message.append(
                     import_error(
                         f"Missing required column '{col}'", validation=validation
                     )
-=======
-                return_message = import_error(
-                    f"Missing required column '{col}'", return_message, validation
->>>>>>> b6395f1 (added support for gridsources)
                 )
     else:
         for col in REQUIRED_COLUMNS_AREA.keys():
             if col not in df.columns:
-<<<<<<< HEAD
                 return_message.append(
                     import_error(
                         f"Missing required column '{col}'", validation=validation
                     )
-=======
-                return_message = import_error(
-                    f"Missing required column '{col}'", return_message, validation
->>>>>>> b6395f1 (added support for gridsources)
                 )
 
     # set dataframe index
@@ -247,18 +214,11 @@ def import_sources(
             ["facility_id", "source_name"], verify_integrity=True, inplace=True
         )
     except ValueError as err:
-<<<<<<< HEAD
         return_message.append(
             import_error(
                 f"Non-unique combination of facility_id and source_name: {err}",
                 validation=validation,
             )
-=======
-        return_message = import_error(
-            f"Non-unique combination of facility_id and source_name: {err}",
-            return_message,
-            validation,
->>>>>>> b6395f1 (added support for gridsources)
         )
     update_facilities = []
     create_facilities = {}
@@ -282,34 +242,20 @@ def import_sources(
             # get pointsource coordinates
             try:
                 if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
-<<<<<<< HEAD
                     return_message.append(
                         import_error(
                             f"missing coordinates for source '{row_key}'",
                             validation=validation,
                         )
-=======
-                    return_message = import_error(
-                        f"missing coordinates for source '{row_key}'",
-                        return_message,
-                        validation,
->>>>>>> b6395f1 (added support for gridsources)
                     )
                 x = float(row_dict["lon"])
                 y = float(row_dict["lat"])
             except ValueError:
-<<<<<<< HEAD
                 return_message.append(
                     import_error(
                         f"Invalid {type} coordinates on row {row_nr}",
                         validation=validation,
                     )
-=======
-                return_message = import_error(
-                    f"Invalid {type} coordinates on row {row_nr}",
-                    return_message,
-                    validation,
->>>>>>> b6395f1 (added support for gridsources)
                 )
             # create geometry
             source_data["geom"] = Point(x, y, srid=srid).transform(4326, clone=True)
@@ -322,59 +268,47 @@ def import_sources(
                 "chimney_gas_temperature": "gas_temperature",
             }.items():
                 if pd.isna(row_dict[key]):
-<<<<<<< HEAD
                     return_message.append(
                         import_error(
                             "Missing value in PointSource sheet "
                             f"for {key} on row {row_nr}",
                             validation=validation,
                         )
-=======
-                    return_message = import_error(
-                        f"Missing value in PointSource sheet for {key} on row {row_nr}",
-                        return_message,
-                        validation,
->>>>>>> b6395f1 (added support for gridsources)
                     )
                 else:
                     source_data[attr] = row_dict[key]
 
             # get downdraft parameters
-            if not pd.isnull(row_dict["house_width"]):
-                source_data["house_width"] = row_dict["house_width"]
-            if not pd.isnull(row_dict["house_height"]):
-                source_data["house_height"] = row_dict["house_height"]
+            try:
+                if not pd.isnull(row_dict["house_width"]):
+                    source_data["house_width"] = row_dict["house_width"]
+            except KeyError:
+                if row_nr == 2:
+                    log.debug("house_width is skipped from import.")
+            try:
+                if not pd.isnull(row_dict["house_height"]):
+                    source_data["house_height"] = row_dict["house_height"]
+            except KeyError:
+                if row_nr == 2:
+                    log.debug("house_heigth is skipped from import.")
+
         elif type == "area":
             try:
                 if pd.isnull(row_dict["geometry"]):
-<<<<<<< HEAD
                     return_message.append(
                         import_error(
                             f"missing area polygon for source '{row_key}'",
                             validation,
                         )
-=======
-                    return_message = import_error(
-                        f"missing area polygon for source '{row_key}'",
-                        return_message,
-                        validation,
->>>>>>> b6395f1 (added support for gridsources)
                     )
                 wkt_polygon = row_dict["geometry"]
                 # TODO add check that valid WKT polygon
             except ValueError:
-<<<<<<< HEAD
                 return_message.append(
                     import_error(
                         f"Invalid polygon geometry in AreaSource sheet on row {row_nr}",
                         validation=validation,
                     )
-=======
-                return_message = import_error(
-                    f"Invalid polygon geometry in AreaSource sheet on row {row_nr}",
-                    return_message,
-                    validation,
->>>>>>> b6395f1 (added support for gridsources)
                 )
             # create geometry
             EPSG = row_dict["EPSG"]
@@ -382,42 +316,27 @@ def import_sources(
                 EPSG = 4326
             source_data["geom"] = GEOSGeometry(f"SRID={int(EPSG)};" + wkt_polygon)
         else:
-<<<<<<< HEAD
             return_message.append(
                 import_error(
                     "this sourcetype is not implemented", validation=validation
                 )
-=======
-            return_message = import_error(
-                "this sourcetype is not implemented",
-                return_message,
-                validation,
->>>>>>> b6395f1 (added support for gridsources)
             )
 
         # get activitycodes
         for code_ind, code_set in enumerate(code_sets, 1):
             try:
-                code_set_slug = CodeSet.objects.filter(id=code_ind).first().slug
+                code_set_slug = code_set_slugs[code_ind]
                 code_attribute = f"activitycode_{code_set_slug}"
                 if code_attribute in row_dict:
                     code = row_dict[code_attribute]
                     if len(code_set) == 0:
                         if code is not None and code is not np.nan:
-<<<<<<< HEAD
                             return_message.append(
                                 import_error(
                                     f"Unknown activitycode_{code_set_slug} '{code}'"
                                     f" for {type} source on row {row_nr}",
                                     validation=validation,
                                 )
-=======
-                            return_message = import_error(
-                                f"Unknown activitycode_{code_set_slug} '{code}'"
-                                + f" for {type} source on row {row_nr}",
-                                return_message,
-                                validation,
->>>>>>> b6395f1 (added support for gridsources)
                             )
                     if not pd.isnull(code):
                         try:
@@ -427,20 +346,12 @@ def import_sources(
                             codeset_id = activity_code.code_set_id
                             source_data[f"activitycode{codeset_id}"] = activity_code
                         except KeyError:
-<<<<<<< HEAD
                             return_message.append(
                                 import_error(
                                     f"Unknown activitycode_{code_set_slug} '{code}'"
                                     f" for {type} source on row {row_nr}",
                                     validation=validation,
                                 )
-=======
-                            return_message = import_error(
-                                f"Unknown activitycode_{code_set_slug} '{code}'"
-                                + f" for {type} source on row {row_nr}",
-                                return_message,
-                                validation,
->>>>>>> b6395f1 (added support for gridsources)
                             )
             except AttributeError:
                 # no such codeset exists
@@ -454,7 +365,6 @@ def import_sources(
                             try:
                                 CodeSet.objects.get(slug=codeset_slug[index])
                             except CodeSet.DoesNotExist:
-<<<<<<< HEAD
                                 return_message.append(
                                     import_error(
                                         "Specified activitycode "
@@ -464,16 +374,6 @@ def import_sources(
                                         validation=validation,
                                     )
                                 )
-=======
-                                return_message = import_error(
-                                    f"Specified activitycode {row_dict[column]} for "
-                                    + f" unknown codeset {codeset_slug[index]}"
-                                    + f" for {type} source on row {row_nr}",
-                                    return_message,
-                                    validation,
-                                )
-
->>>>>>> b6395f1 (added support for gridsources)
                 pass
 
         # get columns with tag values for the current row
@@ -489,7 +389,6 @@ def import_sources(
             try:
                 source_data["timevar"] = timevars[timevar_name]
             except KeyError:
-<<<<<<< HEAD
                 return_message.append(
                     import_error(
                         f"Timevar '{timevar_name}' "
@@ -497,15 +396,6 @@ def import_sources(
                         validation=validation,
                     )
                 )
-=======
-                return_message = import_error(
-                    f"Timevar '{timevar_name}' "
-                    f"on row {row_nr} for {type} source does not exist",
-                    return_message,
-                    validation,
-                )
-
->>>>>>> b6395f1 (added support for gridsources)
         # get all column-names starting with "subst" whith value for the current row
         subst_keys = [
             key
@@ -535,7 +425,6 @@ def import_sources(
                         float(row_dict[subst_key]), row_dict["unit"]
                     )
                 else:
-<<<<<<< HEAD
                     return_message.append(
                         import_error(
                             f"No unit specified for {type} emissions on row {row_nr}",
@@ -552,43 +441,18 @@ def import_sources(
                 )
             except KeyError as err:
                 return_message.append(import_error(f"{err}", validation=validation))
-=======
-                    return_message = import_error(
-                        f"No unit specified for {type} emissions on row {row_nr}",
-                        return_message,
-                        validation,
-                    )
-            except ValueError:
-                return_message = import_error(
-                    f"Invalid {type} emission value {row_dict[subst_key]}"
-                    + f" on row {row_nr}",
-                    return_message,
-                    validation,
-                )
-            except KeyError as err:
-                return_message = import_error(f"{err}", return_message, validation)
->>>>>>> b6395f1 (added support for gridsources)
 
         official_facility_id, source_name = row_key
         if pd.isna(official_facility_id):
             official_facility_id = None
 
         if pd.isna(source_name):
-<<<<<<< HEAD
             return_message.append(
                 import_error(
                     f"No name specified for {type} source on row {row_nr}",
                     validation=validation,
                 )
             )
-=======
-            return_message = import_error(
-                f"No name specified for {type} source on row {row_nr}",
-                return_message,
-                validation,
-            )
-
->>>>>>> b6395f1 (added support for gridsources)
         if pd.isna(row_dict["facility_name"]):
             facility_name = None
         else:
@@ -602,7 +466,6 @@ def import_sources(
                 if official_facility_id in create_facilities:
                     facility = create_facilities[official_facility_id]
                 else:
-<<<<<<< HEAD
                     if facility_name is None:
                         return_message.append(
                             import_error(
@@ -612,8 +475,6 @@ def import_sources(
                         )
                         facility_name = "unspecified"
 
-=======
->>>>>>> b6395f1 (added support for gridsources)
                     facility = Facility(
                         name=facility_name,
                         official_id=official_facility_id,
@@ -650,18 +511,11 @@ def import_sources(
                         for emis in emissions.values()
                     ]
                 else:
-<<<<<<< HEAD
                     return_message.append(
                         import_error(
                             f"multiple rows for the same point-source '{source_name}'",
                             validation=validation,
                         )
-=======
-                    return_message = import_error(
-                        f"multiple rows for the same point-source '{source_name}'",
-                        return_message,
-                        validation,
->>>>>>> b6395f1 (added support for gridsources)
                     )
             else:
                 source = AreaSource(name=source_name, **source_data)
@@ -672,18 +526,11 @@ def import_sources(
                         for emis in emissions.values()
                     ]
                 else:
-<<<<<<< HEAD
                     return_message.append(
                         import_error(
                             f"multiple rows for the same area-source '{source_name}'",
                             validation=validation,
                         )
-=======
-                    return_message = import_error(
-                        f"multiple rows for the same area-source '{source_name}'",
-                        return_message,
-                        validation,
->>>>>>> b6395f1 (added support for gridsources)
                     )
         row_nr += 1
 
@@ -693,7 +540,6 @@ def import_sources(
         if f.name in existing_facility_names:
             duplicate_facility_names.append(f.name)
     if len(duplicate_facility_names) > 0:
-<<<<<<< HEAD
         return_message.append(
             import_error(
                 "The following facility names are already "
@@ -701,13 +547,6 @@ def import_sources(
                 f"different official_id: {duplicate_facility_names}",
                 validation=validation,
             )
-=======
-        return_message = import_error(
-            "The following facility names are already used in inventory but "
-            f"for facilities with different official_id: {duplicate_facility_names}",
-            return_message,
-            validation,
->>>>>>> b6395f1 (added support for gridsources)
         )
     duplicate_facility_names = {}
     for f in create_facilities.values():
@@ -719,30 +558,35 @@ def import_sources(
         name for name, nr in duplicate_facility_names.items() if nr > 1
     ]
     if len(duplicate_facility_names) > 0:
-<<<<<<< HEAD
         return_message.append(
             import_error(
                 "The same facility name is used on multiple rows but "
                 f"with different facility_id: {duplicate_facility_names}",
                 validation=validation,
             )
-=======
-        return_message = import_error(
-            "The same facility name is used on multiple rows but "
-            f"with different facility_id: {duplicate_facility_names}",
-            return_message,
-            validation,
->>>>>>> b6395f1 (added support for gridsources)
         )
 
     Facility.objects.bulk_create(create_facilities.values())
     Facility.objects.bulk_update(update_facilities, ["name"])
 
-    # ensure PointSource.facility_id is not None
+    facilities = cache_queryset(Facility.objects.all(), "id")
+    # ensure PointSource.facility_id is not None if facility exists.
     for source in create_sources.values():
         if source.facility is not None:
-            # changed by Eef, because IDs were None
-            source.facility_id = Facility.objects.get(official_id=source.facility).id
+            # find the facility_id corresponding to official id, or set None
+            source.facility_id = next(
+                (
+                    key
+                    for key, value in facilities.items()
+                    if str(value) == str(source.facility)
+                ),
+                None,
+            )
+            if source.facility_id is None:
+                raise ImportError(
+                    f"Could not link pointsource {source.name} to "
+                    + f"facility {source.facility.name}"
+                )
 
     if type == "point":
         PointSource.objects.bulk_create(create_sources.values())
@@ -829,10 +673,6 @@ def import_sourceactivities(
     encoding=None,
     srid=None,
     import_sheets=SHEET_NAMES,
-<<<<<<< HEAD
-=======
-    return_message="",
->>>>>>> b6395f1 (added support for gridsources)
     validation=False,
 ):
     """Import point-sources and/or area-sources from xlsx or csv-file.
@@ -844,19 +684,15 @@ def import_sourceactivities(
         encoding: encoding of file (default is utf-8)
         srid: srid of file, default is same srid as domain
     """
-<<<<<<< HEAD
     return_message = []
-=======
->>>>>>> b6395f1 (added support for gridsources)
     try:
-        workbook = load_workbook(filename=filepath, data_only=True)
+        workbook = load_workbook(filename=filepath, data_only=True, read_only=True)
     except Exception as exc:
         return_message = import_error(str(exc), return_message, validation)
 
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
     if ("Timevar" in sheet_names) and ("Timevar" in import_sheets):
-<<<<<<< HEAD
         updates, msgs = import_timevarsheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
@@ -876,28 +712,10 @@ def import_sourceactivities(
         ps, msgs = import_sources(
             filepath,
             srid=srid,
-=======
-        import_timevarsheet(workbook, return_message, return_dict, validation)
-
-    if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
-        import_codesetsheet(workbook, return_message, return_dict, validation)
-
-    if ("ActivityCode" in sheet_names) and ("ActivityCode" in import_sheets):
-        import_activitycodesheet(workbook, return_message, return_dict, validation)
-
-    # Could be that activities are linked to previously imported pointsources,
-    # or pointsources to be imported later, therefore not requiring PointSource-sheet.
-    if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        ps, return_message = import_sources(
-            filepath,
-            srid=srid,
-            return_message=return_message,
->>>>>>> b6395f1 (added support for gridsources)
             validation=validation,
             type="point",
         )
         return_dict.update(ps)
-<<<<<<< HEAD
         return_message += msgs
 
     if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
@@ -908,17 +726,6 @@ def import_sourceactivities(
             type="area",
         )
         return_message += msgs
-=======
-
-    if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
-        ps, return_message = import_sources(
-            filepath,
-            srid=srid,
-            return_message=return_message,
-            validation=validation,
-            type="area",
-        )
->>>>>>> b6395f1 (added support for gridsources)
         return_dict.update(ps)
 
     if ("Activity" in sheet_names) and ("Activity" in import_sheets):
@@ -945,18 +752,11 @@ def import_sourceactivities(
                 if activity_name not in create_activities:
                     create_activities[activity_name] = activity
                 else:
-<<<<<<< HEAD
                     return_message.append(
                         import_error(
                             f"multiple rows for the same activity '{activity_name}'",
                             validation=validation,
                         )
-=======
-                    return_message = import_error(
-                        f"multiple rows for the same activity '{activity_name}'",
-                        return_message,
-                        validation,
->>>>>>> b6395f1 (added support for gridsources)
                     )
         Activity.objects.bulk_create(create_activities.values())
         Activity.objects.bulk_update(
@@ -1002,7 +802,6 @@ def import_sourceactivities(
                     if activity_quantity_unit != factor_quantity_unit:
                         # emission factor and activity need to have the same unit
                         # for quantity, eg GJ, m3 "pellets", number of produces bottles
-<<<<<<< HEAD
                         return_message.append(
                             import_error(
                                 "Units for emission factor and activity rate for"
@@ -1010,14 +809,6 @@ def import_sourceactivities(
                                 " are inconsistent, convert units before importing.",
                                 validation=validation,
                             )
-=======
-                        return_message = import_error(
-                            "Units for emission factor and activity rate for"
-                            + f" '{activity_name}'"
-                            + " are inconsistent, convert units before importing.",
-                            return_message,
-                            validation,
->>>>>>> b6395f1 (added support for gridsources)
                         )
                     else:
                         factor = activity_ef_unit_to_si(factor, factor_unit)
@@ -1036,7 +827,6 @@ def import_sourceactivities(
                     if subst == "PM2.5":
                         substance = substances["PM25"]
                     else:
-<<<<<<< HEAD
                         return_message.append(
                             import_error(
                                 f"unknown substance '{subst}'"
@@ -1051,37 +841,16 @@ def import_sourceactivities(
                         f" for emission factor on row '{row_nr}'",
                         validation=validation,
                     )
-=======
-                        return_message = import_error(
-                            f"unknown substance '{subst}'"
-                            + f" for emission factor on row '{row_nr}'",
-                            return_message,
-                            validation,
-                        )
-            except KeyError:
-                return_message = import_error(
-                    f"unknown activity '{activity_name}'"
-                    + f" for emission factor on row '{row_nr}'",
-                    return_message,
-                    validation,
->>>>>>> b6395f1 (added support for gridsources)
                 )
 
         try:
             EmissionFactor.objects.bulk_create(create_emfacs)
         except IntegrityError:
-<<<<<<< HEAD
             return_message.append(
                 import_error(
                     "Two emission factors for same activity and substance are given.",
                     validation=validation,
                 )
-=======
-            return_message = import_error(
-                "Two emission factors for same activity and substance are given.",
-                return_message,
-                validation,
->>>>>>> b6395f1 (added support for gridsources)
             )
         EmissionFactor.objects.bulk_update(
             update_emfacs, ["activity", "substance", "factor"]
@@ -1101,16 +870,15 @@ def import_sourceactivities(
         # should not matter whether activities and emission factors were imported from
         # same file or existed already in database.
         pointsourceactivities = cache_queryset(
-            PointSourceActivity.objects.all(), ["activity", "source"]
+            PointSourceActivity.objects.select_related("activity", "source").all(),
+            ["activity", "source"],
         )
         # TODO check unique activity for source
         data = workbook["PointSource"].values
         df_pointsource = worksheet_to_dataframe(data)
         activities = cache_queryset(Activity.objects.all(), "name")
         pointsources = cache_sources(
-            PointSource.objects.select_related("facility")
-            .prefetch_related("substances")
-            .all()
+            PointSource.objects.select_related("facility").all()
         )
         create_pointsourceactivities = []
         update_pointsourceactivities = []
@@ -1123,20 +891,13 @@ def import_sourceactivities(
                     try:
                         activity = activities[activity_key[4:]]
                     except KeyError:
-<<<<<<< HEAD
+
                         return_message.append(
                             import_error(
                                 f"unknown activity '{activity_name}'"
                                 + f" for pointsource '{row['source_name']}'",
                                 validation=validation,
                             )
-=======
-                        return_message = import_error(
-                            f"unknown activity '{activity_name}'"
-                            + f" for pointsource '{row['source_name']}'",
-                            return_message,
-                            validation,
->>>>>>> b6395f1 (added support for gridsources)
                         )
                     rate = activity_rate_unit_to_si(rate, activity.unit)
                     # original unit stored in activity.unit, but
@@ -1169,7 +930,8 @@ def import_sourceactivities(
 
     if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
         areasourceactivities = cache_queryset(
-            AreaSourceActivity.objects.all(), ["activity", "source"]
+            AreaSourceActivity.objects.select_related("activity", "source").all(),
+            ["activity", "source"],
         )
         # TODO check unique activity for source
         data = workbook["AreaSource"].values
@@ -1187,24 +949,16 @@ def import_sourceactivities(
             activity_keys = [k for k in row.keys() if k.startswith("act:")]
             for activity_key in activity_keys:
                 if not pd.isnull(row[activity_key]):
-                    rate = row[activity_key]
+                    rate = float(row[activity_key])
                     try:
                         activity = activities[activity_key[4:]]
                     except KeyError:
-<<<<<<< HEAD
                         return_message.append(
                             import_error(
                                 f"unknown activity '{activity_name}'"
                                 f" for areasource '{row['source_name']}'",
                                 validation=validation,
                             )
-=======
-                        return_message = import_error(
-                            f"unknown activity '{activity_name}'"
-                            + f" for areasource '{row['source_name']}'",
-                            return_message,
-                            validation,
->>>>>>> b6395f1 (added support for gridsources)
                         )
                     rate = activity_rate_unit_to_si(rate, activity.unit)
                     # original unit stored in activity.unit, but
@@ -1234,8 +988,6 @@ def import_sourceactivities(
                 }
             }
         )
-<<<<<<< HEAD
-=======
 
->>>>>>> b6395f1 (added support for gridsources)
+    workbook.close()
     return return_dict, return_message
