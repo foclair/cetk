@@ -165,6 +165,7 @@ def import_sources(
     )
 
 
+# @profile
 def create_or_update_sources(
     df,
     return_message="",
@@ -181,20 +182,20 @@ def create_or_update_sources(
     timevars = cache_queryset(Timevar.objects.all(), "name")
     facilities = cache_queryset(Facility.objects.all(), "official_id")
 
-    if type == "point":
-        sources = cache_sources(
-            PointSource.objects.select_related("facility").all()
-        )  # .prefetch_related("substances")
-    elif type == "area":
-        sources = cache_sources(
-            AreaSource.objects.select_related("facility").all()
-        )  # .prefetch_related("substances")
-    else:
-        return_message = import_error(
-            "this sourcetype is not implemented",
-            return_message,
-            validation,
-        )
+    # if type == "point":
+    #     # sources = cache_sources(
+    #     #     PointSource.objects.select_related("facility").all()
+    #     # )  # .prefetch_related("substances")
+    # elif type == "area":
+    #     sources = cache_sources(
+    #         AreaSource.objects.select_related("facility").all()
+    #     )  # .prefetch_related("substances")
+    # else:
+    #     return_message = import_error(
+    #         "this sourcetype is not implemented",
+    #         return_message,
+    #         validation,
+    #     )
 
     # using filter.first() here, not get() because code_set{i} does not have to exist
     code_sets = [
@@ -503,7 +504,16 @@ def create_or_update_sources(
         source_data["facility"] = facility
         source_key = (str(official_facility_id), str(source_name))
         try:
-            source = sources[source_key]
+            facility_id = facilities[str(official_facility_id)].id
+            if type == "point":
+                source = PointSource.objects.get(
+                    name=str(source_name), facility_id=facility_id
+                )
+            elif type == "area":
+                source = AreaSource.objects.get(
+                    name=str(source_name), facility_id=facility_id
+                )
+            # source = sources[source_key]
             for key, val in source_data.items():
                 setattr(source, key, val)
             update_sources.append(source)
@@ -518,7 +528,7 @@ def create_or_update_sources(
                     AreaSourceSubstance(source=source, **emis)
                     for emis in emissions.values()
                 ]
-        except KeyError:
+        except (PointSource.DoesNotExist, AreaSource.DoesNotExist):  # KeyError:
             if type == "point":
                 source = PointSource(name=source_name, **source_data)
                 if source_key not in create_sources:
@@ -891,15 +901,16 @@ def import_sourceactivities(
         # pointsourceactivities can be created.
         # should not matter whether activities and emission factors were imported from
         # same file or existed already in database.
-        pointsourceactivities = cache_queryset(
-            PointSourceActivity.objects.select_related("activity", "source").all(),
-            ["activity", "source"],
-        )
+        # pointsourceactivities = cache_queryset(
+        #     PointSourceActivity.objects.select_related("activity", "source").all(),
+        #     ["activity", "source"],
+        # )
         # TODO check unique activity for source
         activities = cache_queryset(Activity.objects.all(), "name")
-        pointsources = cache_sources(
-            PointSource.objects.select_related("facility").all()
-        )
+        facilities = cache_queryset(Facility.objects.all(), "official_id")
+        # pointsources = cache_sources(
+        #     PointSource.objects.select_related("facility").all()
+        # )
         create_pointsourceactivities = []
         update_pointsourceactivities = []
         for row_key, row in df_pointsource.iterrows():
@@ -918,22 +929,26 @@ def import_sourceactivities(
                                 + f" for pointsource '{row['source_name']}'",
                                 validation=validation,
                             )
+                        rate = activity_rate_unit_to_si(rate, activity.unit)
+                        # original unit stored in activity.unit, but
+                        # pointsourceactivity.rate stored as activity / s.
+                        # row index set as ["facility_id", "source_name"]
+                        # pointsource = pointsources[str(row.name[0]), str(row.name[1])]
+                        facility_id = facilities[str(row.name[0])].id
+                        pointsource = PointSource.objects.get(
+                            name=str(row.name[1]), facility_id=facility_id
                         )
-                    rate = activity_rate_unit_to_si(rate, activity.unit)
-                    # original unit stored in activity.unit, but
-                    # pointsourceactivity.rate stored as activity / s.
-                    pointsource = pointsources[
-                        str(row["facility_id"]), str(row["source_name"])
-                    ]
-                    try:
-                        psa = pointsourceactivities[activity, pointsource]
-                        setattr(psa, "rate", rate)
-                        update_pointsourceactivities.append(psa)
-                    except KeyError:
-                        psa = PointSourceActivity(
-                            activity=activity, source=pointsource, rate=rate
-                        )
-                        create_pointsourceactivities.append(psa)
+                        try:
+                            psa = PointSourceActivity.objects.get(
+                                activity_id=activity.id, source_id=pointsource.id
+                            )
+                            setattr(psa, "rate", rate)
+                            update_pointsourceactivities.append(psa)
+                        except PointSourceActivity.DoesNotExist:
+                            psa = PointSourceActivity(
+                                activity=activity, source=pointsource, rate=rate
+                            )
+                            create_pointsourceactivities.append(psa)
 
         PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
         PointSourceActivity.objects.bulk_update(
