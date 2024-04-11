@@ -65,7 +65,6 @@ REQUIRED_COLUMNS_AREA = {
     "facility_name": np.str_,
     "source_name": np.str_,
     "geometry": np.str_,
-    "EPSG": int,
     "timevar": np.str_,
 }
 
@@ -75,14 +74,17 @@ REQUIRED_COLUMNS_POINT = {
     "source_name": np.str_,
     "lat": float,
     "lon": float,
+}
+
+OPTIONAL_COLUMNS_POINT = {
     "timevar": np.str_,
     "chimney_height": float,
     "outer_diameter": float,
     "inner_diameter": float,
     "gas_speed": float,
     "gas_temperature[K]": float,
-    # "house_width": float,
-    # "house_height": float,
+    "house_width": float,
+    "house_height": float,
 }
 
 
@@ -105,7 +107,7 @@ def import_sources(
     validation=False,
     encoding=None,
     srid=None,
-    type="point",
+    sourcetype="point",
 ):
     """Import point- or area-sources from xlsx or csv-file.
     PointSource- and AreaSourceSubstances only, not Activities.
@@ -121,7 +123,7 @@ def import_sources(
     extension = filepath.suffix
     if extension == ".csv":
         # read csv-file
-        if type == "point":
+        if sourcetype == "point":
             with open(filepath, encoding=encoding or "utf-8") as csvfile:
                 log.debug("reading point-sources from csv-file")
                 df = pd.read_csv(
@@ -149,12 +151,12 @@ def import_sources(
             return_message = import_error(str(exc), return_message, validation)
         worksheet = workbook.worksheets[0]
         if len(workbook.worksheets) > 1:
-            if type == "point":
+            if sourcetype == "point":
                 log.debug(
                     "Multiple sheets in spreadsheet, importing sheet 'PointSource'."
                 )
                 data = workbook["PointSource"].values
-            elif type == "area":
+            elif sourcetype == "area":
                 log.debug(
                     "Multiple sheets in spreadsheet, importing sheet 'AreaSource'."
                 )
@@ -162,12 +164,6 @@ def import_sources(
         else:
             data = worksheet.values
         df = worksheet_to_dataframe(data)
-        if type == "point":
-            df = df.astype(dtype=REQUIRED_COLUMNS_POINT)
-        else:
-            df = df.astype(dtype=REQUIRED_COLUMNS_AREA)
-        # below is necessary not to create facilities with name 'None'
-        df = df.replace(to_replace="None", value=None)
         workbook.close()
     else:
         return_message.append(
@@ -177,13 +173,27 @@ def import_sources(
             )
         )
 
+    df = set_datatypes(df, sourcetype)
+
     create_or_update_sources(
         df,
         return_message="",
         validation=False,
         srid=None,
-        type=type,
+        sourcetype=sourcetype,
     )
+
+
+def set_datatypes(df, sourcetype):
+    if sourcetype == "point":
+        df = df.astype(dtype=REQUIRED_COLUMNS_POINT)
+        df = df.astype(dtype=OPTIONAL_COLUMNS_POINT)
+    else:
+        df = df.astype(dtype=REQUIRED_COLUMNS_AREA)
+    # below is necessary not to create facilities with name 'None'
+    df = df.replace(to_replace="None", value=None)
+    df = df.replace(to_replace="nan", value=None)
+    return df
 
 
 # @profile
@@ -192,7 +202,7 @@ def create_or_update_sources(
     return_message="",
     validation=False,
     srid=None,
-    type="point",
+    sourcetype="point",
     cache=True,
 ):
     # user defined SRID for import or WGS84 if nothing specified
@@ -205,11 +215,11 @@ def create_or_update_sources(
     facilities = cache_queryset(Facility.objects.all(), "official_id")
 
     if cache:
-        if type == "point":
+        if sourcetype == "point":
             sources = cache_sources(
                 PointSource.objects.select_related("facility").all()
             )  # .prefetch_related("substances")
-        elif type == "area":
+        elif sourcetype == "area":
             sources = cache_sources(
                 AreaSource.objects.select_related("facility").all()
             )  # .prefetch_related("substances")
@@ -231,7 +241,7 @@ def create_or_update_sources(
             code_set_slug = None
         code_set_slugs[i] = code_set_slug
 
-    if type == "point":
+    if sourcetype == "point":
         for col in REQUIRED_COLUMNS_POINT.keys():
             if col not in df.columns:
                 return_message.append(
@@ -278,7 +288,7 @@ def create_or_update_sources(
             "activitycode3": None,
         }
 
-        if type == "point":
+        if sourcetype == "point":
             # get pointsource coordinates
             try:
                 if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
@@ -293,7 +303,7 @@ def create_or_update_sources(
             except ValueError:
                 return_message.append(
                     import_error(
-                        f"Invalid {type} coordinates on row {row_nr}",
+                        f"Invalid {sourcetype} coordinates on row {row_nr}",
                         validation=validation,
                     )
                 )
@@ -332,7 +342,7 @@ def create_or_update_sources(
                 if row_nr == 2:
                     log.debug("house_heigth is skipped from import.")
 
-        elif type == "area":
+        elif sourcetype == "area":
             try:
                 if pd.isnull(row_dict["geometry"]):
                     return_message.append(
@@ -350,11 +360,7 @@ def create_or_update_sources(
                         validation=validation,
                     )
                 )
-            # create geometry
-            EPSG = row_dict["EPSG"]
-            if pd.isnull(EPSG):
-                EPSG = 4326
-            source_data["geom"] = GEOSGeometry(f"SRID={int(EPSG)};" + wkt_polygon)
+            source_data["geom"] = GEOSGeometry(f"SRID={4326};" + wkt_polygon)
         else:
             return_message.append(
                 import_error(
@@ -374,7 +380,7 @@ def create_or_update_sources(
                             return_message.append(
                                 import_error(
                                     f"Unknown activitycode_{code_set_slug} '{code}'"
-                                    f" for {type} source on row {row_nr}",
+                                    f" for {sourcetype} source on row {row_nr}",
                                     validation=validation,
                                 )
                             )
@@ -389,7 +395,7 @@ def create_or_update_sources(
                             return_message.append(
                                 import_error(
                                     f"Unknown activitycode_{code_set_slug} '{code}'"
-                                    f" for {type} source on row {row_nr}",
+                                    f" for {sourcetype} source on row {row_nr}",
                                     validation=validation,
                                 )
                             )
@@ -410,7 +416,7 @@ def create_or_update_sources(
                                         "Specified activitycode "
                                         f"{row_dict[column]} for "
                                         f" unknown codeset {codeset_slug[index]}"
-                                        f" for {type} source on row {row_nr}",
+                                        f" for {sourcetype} source on row {row_nr}",
                                         validation=validation,
                                     )
                                 )
@@ -432,7 +438,7 @@ def create_or_update_sources(
                 return_message.append(
                     import_error(
                         f"Timevar '{timevar_name}' "
-                        f"on row {row_nr} for {type} source does not exist",
+                        f"on row {row_nr} for {sourcetype} source does not exist",
                         validation=validation,
                     )
                 )
@@ -467,14 +473,14 @@ def create_or_update_sources(
                 else:
                     return_message.append(
                         import_error(
-                            f"No unit specified for {type} emissions on row {row_nr}",
+                            f"No unit specified for {sourcetype} emissions on row {row_nr}",
                             validation=validation,
                         )
                     )
             except ValueError:
                 return_message.append(
                     import_error(
-                        f"Invalid {type} emission value {row_dict[subst_key]}"
+                        f"Invalid {sourcetype} emission value {row_dict[subst_key]}"
                         f" on row {row_nr}",
                         validation=validation,
                     )
@@ -489,7 +495,7 @@ def create_or_update_sources(
         if pd.isna(source_name):
             return_message.append(
                 import_error(
-                    f"No name specified for {type} source on row {row_nr}",
+                    f"No name specified for {sourcetype} source on row {row_nr}",
                     validation=validation,
                 )
             )
@@ -499,7 +505,7 @@ def create_or_update_sources(
             facility_name = row_dict["facility_name"]
 
         try:
-            facility = facilities[str(official_facility_id)]
+            facility = facilities[official_facility_id]
             update_facilities.append(facility)
         except KeyError:
             if official_facility_id is not None:
@@ -524,10 +530,7 @@ def create_or_update_sources(
                 facility = None
 
         source_data["facility"] = facility
-        if official_facility_id is None:
-            source_key = (official_facility_id, str(source_name))
-        else:
-            source_key = (str(official_facility_id), str(source_name))
+        source_key = (official_facility_id, source_name)
         try:
             if cache:
                 source = sources[source_key]
@@ -538,11 +541,11 @@ def create_or_update_sources(
                     # this could through a keyerror for the wrong reason,
                     # because facility is None, not because pointsource exists already
                     facility_id = facilities[str(official_facility_id)].id
-                if type == "point":
+                if sourcetype == "point":
                     source = PointSource.objects.get(
                         name=str(source_name), facility_id=facility_id
                     )
-                elif type == "area":
+                elif sourcetype == "area":
                     source = AreaSource.objects.get(
                         name=str(source_name), facility_id=facility_id
                     )
@@ -550,18 +553,18 @@ def create_or_update_sources(
                 setattr(source, key, val)
             update_sources.append(source)
             drop_substances += list(source.substances.all())
-            if type == "point":
+            if sourcetype == "point":
                 create_substances += [
                     PointSourceSubstance(source=source, **emis)
                     for emis in emissions.values()
                 ]
-            elif type == "area":
+            elif sourcetype == "area":
                 create_substances += [
                     AreaSourceSubstance(source=source, **emis)
                     for emis in emissions.values()
                 ]
         except (PointSource.DoesNotExist, AreaSource.DoesNotExist, KeyError):
-            if type == "point":
+            if sourcetype == "point":
                 source = PointSource(name=source_name, **source_data)
                 if source_key not in create_sources:
                     create_sources[source_key] = source
@@ -646,7 +649,7 @@ def create_or_update_sources(
                     f"Could not link pointsource {source.name} to "
                     + f"facility {source.facility.name}"
                 )
-    if type == "point":
+    if sourcetype == "point":
         PointSource.objects.bulk_create(create_sources.values())
         PointSource.objects.bulk_update(
             update_sources,
@@ -688,7 +691,7 @@ def create_or_update_sources(
                 "created": len(create_sources),
             },
         }
-    if type == "area":
+    if sourcetype == "area":
         AreaSource.objects.bulk_create(create_sources.values())
         AreaSource.objects.bulk_update(
             update_sources,
@@ -906,6 +909,7 @@ def import_sourceactivities(
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
         data = workbook["PointSource"].values
         df_pointsource = worksheet_to_dataframe(data)
+        df_pointsource = set_datatypes(df_pointsource, "point")
         # import pointsources and pointsourcesubstances
         caching_sources = len(df_pointsource) > PointSource.objects.count()
         ps, return_message = create_or_update_sources(
@@ -913,7 +917,7 @@ def import_sourceactivities(
             srid=srid,
             return_message=return_message,
             validation=validation,
-            type="point",
+            sourcetype="point",
             cache=caching_sources,
         )
         return_dict.update(ps)
@@ -991,12 +995,13 @@ def import_sourceactivities(
     if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
         data = workbook["AreaSource"].values
         df_areasource = worksheet_to_dataframe(data)
+        df_areasource = set_datatypes(df_areasource, "area")
         ps, return_message = create_or_update_sources(
             df_areasource,
             srid=srid,
             return_message=return_message,
             validation=validation,
-            type="area",
+            sourcetype="area",
         )
         return_dict.update(ps)
         # for now always caching areasources, change if case with many areasources
