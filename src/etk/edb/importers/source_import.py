@@ -1,6 +1,9 @@
 """Data importers for the edb application."""
 
 import logging
+
+# from etk.edb.models.common_models import Settings
+# import sys
 from datetime import datetime
 
 import numpy as np
@@ -35,7 +38,25 @@ from .codeset_import import import_activitycodesheet, import_codesetsheet
 from .timevar_import import import_timevarsheet
 from .utils import cache_codeset, import_error, worksheet_to_dataframe
 
-# from etk.edb.models.common_models import Settings
+# uncomment for automatic debugging when receiving error
+# def info(type, value, tb):
+#     # if hasattr(sys, "ps1") or not sys.stderr.isatty():
+#     #     # we are in interactive mode or we don't have a tty-like
+#     #     # device, so we call the default hook
+#     #     sys.__excepthook__(type, value, tb)
+#     # else:
+#     import pdb
+#     import traceback
+
+#     # we are NOT in interactive mode, print the exception...
+#     traceback.print_exception(type, value, tb)
+#     print
+#     # ...then start the debugger in post-mortem mode.
+#     # pdb.pm() # deprecated
+#     pdb.post_mortem(tb)  # more "modern"
+
+
+# sys.excepthook = info
 
 
 # column facility and name are used as index and is therefore not included here
@@ -161,7 +182,7 @@ def import_sources(
         return_message="",
         validation=False,
         srid=None,
-        type="point",
+        type=type,
     )
 
 
@@ -503,12 +524,20 @@ def create_or_update_sources(
                 facility = None
 
         source_data["facility"] = facility
-        source_key = (str(official_facility_id), str(source_name))
+        if official_facility_id is None:
+            source_key = (official_facility_id, str(source_name))
+        else:
+            source_key = (str(official_facility_id), str(source_name))
         try:
             if cache:
                 source = sources[source_key]
             else:
-                facility_id = facilities[str(official_facility_id)].id
+                if official_facility_id is None:
+                    facility_id = None
+                else:
+                    # this could through a keyerror for the wrong reason,
+                    # because facility is None, not because pointsource exists already
+                    facility_id = facilities[str(official_facility_id)].id
                 if type == "point":
                     source = PointSource.objects.get(
                         name=str(source_name), facility_id=facility_id
