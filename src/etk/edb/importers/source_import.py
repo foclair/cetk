@@ -770,39 +770,54 @@ def import_sourceactivities(
         return_dict.update(updates)
         return_message += msgs
 
-    if ("Activity" in sheet_names) and ("Activity" in import_sheets):
+    if ("EmissionFactor" in sheet_names) and ("EmissionFactor" in import_sheets):
         activities = cache_queryset(
             Activity.objects.prefetch_related("emissionfactors").all(), "name"
         )
-        data = workbook["Activity"].values
+        data = workbook["EmissionFactor"].values
         df_activity = worksheet_to_dataframe(data)
         activity_names = df_activity["activity_name"]
-        update_activities = []
+        update_activities = {}
         create_activities = {}
         drop_emfacs = []
         for row_nr, activity_name in enumerate(activity_names):
             try:
                 activity = activities[activity_name]
-                setattr(activity, "name", activity_name)
-                setattr(activity, "unit", df_activity["activity_unit"][row_nr])
-                update_activities.append(activity)
-                drop_emfacs += list(activities[activity_name].emissionfactors.all())
+                if activity_name not in update_activities.keys():
+                    setattr(activity, "name", activity_name)
+                    setattr(activity, "unit", df_activity["activity_unit"][row_nr])
+                    update_activities[activity_name] = activity
+                    drop_emfacs += list(activities[activity_name].emissionfactors.all())
+                else:
+                    if (
+                        df_activity["activity_unit"][row_nr]
+                        != update_activities[activity_name].unit
+                    ):
+                        return_message = import_error(
+                            f"conflicting units for activity '{activity_name}'",
+                            return_message,
+                            validation,
+                        )
             except KeyError:
-                activity = Activity(
-                    name=activity_name, unit=df_activity["activity_unit"][row_nr]
-                )
                 if activity_name not in create_activities:
+                    activity = Activity(
+                        name=activity_name, unit=df_activity["activity_unit"][row_nr]
+                    )
                     create_activities[activity_name] = activity
                 else:
-                    return_message.append(
-                        import_error(
-                            f"multiple rows for the same activity '{activity_name}'",
-                            validation=validation,
+                    if (
+                        df_activity["activity_unit"][row_nr]
+                        != create_activities[activity_name].unit
+                    ):
+                        return_message.append(
+                            import_error(
+                                f"multiple rows for the same activity '{activity_name}'",
+                                validation=validation,
+                            )
                         )
-                    )
         Activity.objects.bulk_create(create_activities.values())
         Activity.objects.bulk_update(
-            update_activities,
+            update_activities.values(),
             [
                 "name",
                 "unit",
@@ -818,8 +833,6 @@ def import_sourceactivities(
                 }
             }
         )
-
-    if ("EmissionFactor" in sheet_names) and ("EmissionFactor" in import_sheets):
         data = workbook["EmissionFactor"].values
         df_emfac = worksheet_to_dataframe(data)
         substances = cache_queryset(Substance.objects.all(), "slug")
