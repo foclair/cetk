@@ -172,6 +172,7 @@ def create_or_update_sources(
     validation=False,
     srid=None,
     type="point",
+    cache=True,
 ):
     # user defined SRID for import or WGS84 if nothing specified
     # as long as we do not have functions in Eclair to edit the "settings_SRID"
@@ -182,22 +183,22 @@ def create_or_update_sources(
     timevars = cache_queryset(Timevar.objects.all(), "name")
     facilities = cache_queryset(Facility.objects.all(), "official_id")
 
-    # if type == "point":
-    #     # sources = cache_sources(
-    #     #     PointSource.objects.select_related("facility").all()
-    #     # )  # .prefetch_related("substances")
-    # elif type == "area":
-    #     sources = cache_sources(
-    #         AreaSource.objects.select_related("facility").all()
-    #     )  # .prefetch_related("substances")
-    # else:
-    #     return_message = import_error(
-    #         "this sourcetype is not implemented",
-    #         return_message,
-    #         validation,
-    #     )
+    if cache:
+        if type == "point":
+            sources = cache_sources(
+                PointSource.objects.select_related("facility").all()
+            )  # .prefetch_related("substances")
+        elif type == "area":
+            sources = cache_sources(
+                AreaSource.objects.select_related("facility").all()
+            )  # .prefetch_related("substances")
+        else:
+            return_message = import_error(
+                "this sourcetype is not implemented",
+                return_message,
+                validation,
+            )
 
-    # using filter.first() here, not get() because code_set{i} does not have to exist
     code_sets = [
         cache_codeset(CodeSet.objects.filter(id=i).first()) for i in range(1, 4)
     ]
@@ -438,9 +439,9 @@ def create_or_update_sources(
                 )
 
             try:
-                if not pd.isnull(row_dict["unit"]):
+                if not pd.isnull(row_dict["emission_unit"]):
                     emis["value"] = emission_unit_to_si(
-                        float(row_dict[subst_key]), row_dict["unit"]
+                        float(row_dict[subst_key]), row_dict["emission_unit"]
                     )
                 else:
                     return_message.append(
@@ -504,16 +505,18 @@ def create_or_update_sources(
         source_data["facility"] = facility
         source_key = (str(official_facility_id), str(source_name))
         try:
-            facility_id = facilities[str(official_facility_id)].id
-            if type == "point":
-                source = PointSource.objects.get(
-                    name=str(source_name), facility_id=facility_id
-                )
-            elif type == "area":
-                source = AreaSource.objects.get(
-                    name=str(source_name), facility_id=facility_id
-                )
-            # source = sources[source_key]
+            if cache:
+                source = sources[source_key]
+            else:
+                facility_id = facilities[str(official_facility_id)].id
+                if type == "point":
+                    source = PointSource.objects.get(
+                        name=str(source_name), facility_id=facility_id
+                    )
+                elif type == "area":
+                    source = AreaSource.objects.get(
+                        name=str(source_name), facility_id=facility_id
+                    )
             for key, val in source_data.items():
                 setattr(source, key, val)
             update_sources.append(source)
@@ -528,7 +531,7 @@ def create_or_update_sources(
                     AreaSourceSubstance(source=source, **emis)
                     for emis in emissions.values()
                 ]
-        except (PointSource.DoesNotExist, AreaSource.DoesNotExist):  # KeyError:
+        except (PointSource.DoesNotExist, AreaSource.DoesNotExist, KeyError):
             if type == "point":
                 source = PointSource(name=source_name, **source_data)
                 if source_key not in create_sources:
@@ -734,31 +737,6 @@ def import_sourceactivities(
         updates, msgs = import_activitycodesheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
-    # Could be that activities are linked to previously imported pointsources,
-    # or pointsources to be imported later, therefore not requiring PointSource-sheet.
-    if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        data = workbook["PointSource"].values
-        df_pointsource = worksheet_to_dataframe(data)
-        ps, msgs = create_or_update_sources(
-            df_pointsource,
-            srid=srid,
-            validation=validation,
-            type="point",
-        )
-        return_dict.update(ps)
-        return_message += msgs
-
-    if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
-        data = workbook["AreaSource"].values
-        df_areasource = worksheet_to_dataframe(data)
-        ps, msgs = create_or_update_sources(
-            df_areasource,
-            srid=srid,
-            validation=validation,
-            type="area",
-        )
-        return_message += msgs
-        return_dict.update(ps)
 
     if ("Activity" in sheet_names) and ("Activity" in import_sheets):
         activities = cache_queryset(
@@ -897,20 +875,31 @@ def import_sourceactivities(
         )
 
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        # now that activities, pointsources and emission factors are created,
-        # pointsourceactivities can be created.
-        # should not matter whether activities and emission factors were imported from
-        # same file or existed already in database.
-        # pointsourceactivities = cache_queryset(
-        #     PointSourceActivity.objects.select_related("activity", "source").all(),
-        #     ["activity", "source"],
-        # )
-        # TODO check unique activity for source
+        data = workbook["PointSource"].values
+        df_pointsource = worksheet_to_dataframe(data)
+        # import pointsources and pointsourcesubstances
+        caching_sources = len(df_pointsource) > PointSource.objects.count()
+        ps, return_message = create_or_update_sources(
+            df_pointsource,
+            srid=srid,
+            return_message=return_message,
+            validation=validation,
+            type="point",
+            cache=caching_sources,
+        )
+        return_dict.update(ps)
+
+        # import pointsourceactivities
         activities = cache_queryset(Activity.objects.all(), "name")
         facilities = cache_queryset(Facility.objects.all(), "official_id")
-        # pointsources = cache_sources(
-        #     PointSource.objects.select_related("facility").all()
-        # )
+        if caching_sources:
+            pointsourceactivities = cache_queryset(
+                PointSourceActivity.objects.select_related("activity", "source").all(),
+                ["activity", "source"],
+            )
+            pointsources = cache_sources(
+                PointSource.objects.select_related("facility").all()
+            )
         create_pointsourceactivities = []
         update_pointsourceactivities = []
         for row_key, row in df_pointsource.iterrows():
@@ -932,19 +921,26 @@ def import_sourceactivities(
                         rate = activity_rate_unit_to_si(rate, activity.unit)
                         # original unit stored in activity.unit, but
                         # pointsourceactivity.rate stored as activity / s.
-                        # row index set as ["facility_id", "source_name"]
-                        # pointsource = pointsources[str(row.name[0]), str(row.name[1])]
-                        facility_id = facilities[str(row.name[0])].id
-                        pointsource = PointSource.objects.get(
-                            name=str(row.name[1]), facility_id=facility_id
-                        )
-                        try:
-                            psa = PointSourceActivity.objects.get(
-                                activity_id=activity.id, source_id=pointsource.id
+                        if caching_sources:
+                            # row index set as ["facility_id", "source_name"]
+                            pointsource = pointsources[
+                                str(row.name[0]), str(row.name[1])
+                            ]
+                        else:
+                            facility_id = facilities[str(row.name[0])].id
+                            pointsource = PointSource.objects.get(
+                                name=str(row.name[1]), facility_id=facility_id
                             )
+                        try:
+                            if caching_sources:
+                                psa = pointsourceactivities[activity, pointsource]
+                            else:
+                                psa = PointSourceActivity.objects.get(
+                                    activity_id=activity.id, source_id=pointsource.id
+                                )
                             setattr(psa, "rate", rate)
                             update_pointsourceactivities.append(psa)
-                        except PointSourceActivity.DoesNotExist:
+                        except (PointSourceActivity.DoesNotExist, KeyError):
                             psa = PointSourceActivity(
                                 activity=activity, source=pointsource, rate=rate
                             )
@@ -964,6 +960,18 @@ def import_sourceactivities(
         )
 
     if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
+        data = workbook["AreaSource"].values
+        df_areasource = worksheet_to_dataframe(data)
+        ps, return_message = create_or_update_sources(
+            df_areasource,
+            srid=srid,
+            return_message=return_message,
+            validation=validation,
+            type="area",
+        )
+        return_dict.update(ps)
+        # for now always caching areasources, change if case with many areasources
+        # becomes relevant.
         areasourceactivities = cache_queryset(
             AreaSourceActivity.objects.select_related("activity", "source").all(),
             ["activity", "source"],
