@@ -80,7 +80,7 @@ REQUIRED_COLUMNS_POINT = {
     "outer_diameter": float,
     "inner_diameter": float,
     "gas_speed": float,
-    "gas_temperature": float,
+    "gas_temperature[K]": float,
     # "house_width": float,
     # "house_height": float,
 }
@@ -305,7 +305,7 @@ def create_or_update_sources(
                 "chimney_inner_diameter": "inner_diameter",
                 "chimney_outer_diameter": "outer_diameter",
                 "chimney_gas_speed": "gas_speed",
-                "chimney_gas_temperature": "gas_temperature",
+                "chimney_gas_temperature": "gas_temperature[K]",
             }.items():
                 if pd.isna(row_dict[key]):
                     return_message.append(
