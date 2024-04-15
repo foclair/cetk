@@ -2,10 +2,6 @@
 
 import logging
 
-# from etk.edb.models.common_models import Settings
-# import sys
-from datetime import datetime
-
 import numpy as np
 import pandas as pd
 from django.contrib.gis.geos import GEOSGeometry, Point
@@ -38,6 +34,9 @@ from .codeset_import import import_activitycodesheet, import_codesetsheet
 from .timevar_import import import_timevarsheet
 from .utils import cache_codeset, import_error, worksheet_to_dataframe
 
+# from etk.edb.models.common_models import Settings
+# import sys
+# from datetime import datetime
 # uncomment for automatic debugging when receiving error
 # def info(type, value, tb):
 #     # if hasattr(sys, "ps1") or not sys.stderr.isatty():
@@ -726,7 +725,7 @@ def create_or_update_sources(
                 "created": len(create_sources),
             },
         }
-    print(datetime.now().strftime("%H:%M:%S") + "finish point import")
+    # print(datetime.now().strftime("%H:%M:%S") + "finish point import")
     return return_dict, return_message
 
 
@@ -1076,5 +1075,5 @@ def import_sourceactivities(
         )
 
     workbook.close()
-    print(datetime.now().strftime("%H:%M:%S") + "finish import")
+    # print(datetime.now().strftime("%H:%M:%S") + "finish import")
     return return_dict, return_message
