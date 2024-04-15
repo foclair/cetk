@@ -4,6 +4,7 @@ from openpyxl import Workbook
 
 from etk.edb.const import WGS84_SRID
 from etk.edb.importers.source_import import (
+    OPTIONAL_COLUMNS_POINT,
     REQUIRED_COLUMNS_AREA,
     REQUIRED_COLUMNS_POINT,
 )
@@ -27,25 +28,17 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit="ton/year"):
     # Create a new Excel workbook and remove standard first Sheet
     workbook = Workbook()
     del workbook["Sheet"]
-
+    point_columns = REQUIRED_COLUMNS_POINT | OPTIONAL_COLUMNS_POINT
     worksheet = workbook.create_sheet(title="PointSource")
     create_source_sheet(
-        worksheet, PointSource, REQUIRED_COLUMNS_POINT, PointSourceSubstance, srid, unit
+        worksheet, PointSource, point_columns, PointSourceSubstance, unit
     )
 
     worksheet = workbook.create_sheet(title="AreaSource")
     create_source_sheet(
-        worksheet, AreaSource, REQUIRED_COLUMNS_AREA, AreaSourceSubstance, srid, unit
+        worksheet, AreaSource, REQUIRED_COLUMNS_AREA, AreaSourceSubstance, unit
     )
 
-    worksheet = workbook.create_sheet(title="Activity")
-    header = ["activity_name", "activity_unit"]
-    worksheet.append(header)
-    for activity in Activity.objects.all():
-        worksheet.append([activity.name, activity.unit])
-
-    # could simplify by removing activity sheet? but good to instruct that each unique
-    # activity can only have 1 activity_unit, but several emfacs and emfac_units
     worksheet = workbook.create_sheet(title="EmissionFactor")
     header = [
         "activity_name",
@@ -157,7 +150,7 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit="ton/year"):
 
 
 def create_source_sheet(
-    worksheet, model_type, REQUIRED_COLUMNS, SourceSubstanceModel, srid, unit
+    worksheet, model_type, REQUIRED_COLUMNS, SourceSubstanceModel, unit
 ):
     emis_conversion_factor = emis_conversion_factor_from_si(unit)
     # works for pointsource and areasource
@@ -171,7 +164,7 @@ def create_source_sheet(
         set([ss.substance.slug for ss in SourceSubstanceModel.objects.all()])
     )
     substance_columns = [f"subst:{subst}" for subst in substance_slugs]
-    header = header + codeset_columns + substance_columns + ["unit"]
+    header = header + codeset_columns + substance_columns + ["emission_unit"]
     activities = Activity.objects.all()
     if len(activities) > 0:
         activity_names = [activity.name for activity in activities]
@@ -182,10 +175,6 @@ def create_source_sheet(
     worksheet.append(header)
     # Iterate through features and add data to the worksheet
     for source in model_type.objects.all():
-        # TODO would be safer to do this and header in dictionary,
-        # to make sure that order of fields is correct
-        if srid != WGS84_SRID:
-            raise ValueError("export to other srid than wgs84 not implemented yet")
         if source.timevar_id is not None:
             timevar_name = Timevar.objects.get(id=source.timevar_id).name
         else:
@@ -201,9 +190,10 @@ def create_source_sheet(
             Facility.objects.get(id=source.facility_id).name,
             source.name,
             source.geom.coords[1] if model_type == PointSource else source.geom.wkt,
-            source.geom.coords[0] if model_type == PointSource else source.geom.srid,
-            timevar_name,
         ]
+        if model_type == PointSource:
+            row_data.append(source.geom.coords[0])
+        row_data.append(timevar_name)
 
         if hasattr(source, "chimney_height"):
             row_data.extend(

@@ -470,22 +470,24 @@ def create_or_update_sources(
                         float(row_dict[subst_key]), row_dict["emission_unit"]
                     )
                 else:
-                    return_message.append(
-                        import_error(
-                            f"No unit specified for {sourcetype} emissions on row {row_nr}",
-                            validation=validation,
-                        )
+                    return_message = import_error(
+                        f"No unit specified for {sourcetype} sources on row {row_nr}",
+                        return_message,
+                        validation,
                     )
             except ValueError:
-                return_message.append(
-                    import_error(
-                        f"Invalid {sourcetype} emission value {row_dict[subst_key]}"
-                        f" on row {row_nr}",
-                        validation=validation,
-                    )
+                return_message = import_error(
+                    f"Invalid {sourcetype} emission value {row_dict[subst_key]}"
+                    + f" on row {row_nr} for {sourcetype} sources.",
+                    return_message,
+                    validation,
                 )
             except KeyError as err:
-                return_message.append(import_error(f"{err}", validation=validation))
+                return_message = import_error(
+                    f"Missing data {err} on row {row_nr} for {sourcetype} sources.",
+                    return_message,
+                    validation,
+                )
 
         official_facility_id, source_name = row_key
         if pd.isna(official_facility_id):
