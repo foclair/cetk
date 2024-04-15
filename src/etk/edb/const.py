@@ -8,7 +8,6 @@ NODATA = -9999.0
 SHEET_NAMES = [
     "CodeSet",
     "ActivityCode",
-    "Activity",
     "EmissionFactor",
     "Timevar",
     "PointSource",
