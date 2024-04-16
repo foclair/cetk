@@ -37,7 +37,7 @@ from .validation import (
     with_rownr_and_substance,
 )
 
-REQUIRED_COLUMNS = ["name", "rastername", "timevar", "path", "unit"]
+REQUIRED_COLUMNS = ["name", "rastername", "timevar", "path", "emission_unit"]
 
 
 log = logging.getLogger(__name__)
@@ -164,11 +164,7 @@ def import_gridsources(filepath, validation=False, encoding=None):
     try:
         df = read_import_file(filepath, encoding)
     except ImportError as err:
-<<<<<<< HEAD
         return {}, [f"{err}"]
-=======
-        return [f"{err}"]
->>>>>>> b6395f1 (added support for gridsources)
 
     messages = []
     messages += validate_columns(
@@ -179,41 +175,28 @@ def import_gridsources(filepath, validation=False, encoding=None):
         code_sets=code_sets,
     )
     if len(messages) > 0:
-<<<<<<< HEAD
         return {}, messages
-=======
-        return messages
->>>>>>> b6395f1 (added support for gridsources)
 
     row_nr = 2
     rasters, messages = validate_gridsources(
         df, timevars, code_sets, raster_names, datadir
     )
     if len(messages) > 0:
-<<<<<<< HEAD
         return {}, messages
 
     create_or_update_rasters(rasters, raster_names)
     nr_created_sources = 0
     nr_updated_sources = 0
-=======
-        return messages
-
-    create_or_update_rasters(rasters, raster_names)
->>>>>>> b6395f1 (added support for gridsources)
     if not validation:
         subst_cols = get_substance_emission_columns(df)
         act_cols = get_activity_rate_columns(df)
         for name, row in df.iterrows():
             row_dict = nan2None(row.to_dict())
             src, created = GridSource.objects.get_or_create(name=name)
-<<<<<<< HEAD
             if created:
                 nr_created_sources += 1
             else:
                 nr_updated_sources += 1
-=======
->>>>>>> b6395f1 (added support for gridsources)
             # set tags
             tag_keys = [key for key in row_dict.keys() if key.startswith("tag:")]
             src.tags = {
@@ -226,10 +209,7 @@ def import_gridsources(filepath, validation=False, encoding=None):
             # remove any existing emissions
             if not created:
                 src.substances.all().delete()
-<<<<<<< HEAD
                 src.activities.all().delete()
-=======
->>>>>>> b6395f1 (added support for gridsources)
 
             for col in filter(lambda x: row_dict[x] is not None, subst_cols):
                 subst = col[6:]
@@ -240,7 +220,7 @@ def import_gridsources(filepath, validation=False, encoding=None):
                 )
                 emis = {"substance": substances[subst], "raster": rname}
                 emis_value = row_dict[col]
-                unit = row_dict["unit"]
+                unit = row_dict["emission_unit"]
                 if emis_value == "sum":
                     emis["value"] = emission_unit_to_si(rasters[rname]["sum"], unit)
                 else:
@@ -255,22 +235,13 @@ def import_gridsources(filepath, validation=False, encoding=None):
                 emis = {"activity": activities[activity_name], "raster": rname}
                 rate = row_dict[col]
                 if rate == "sum":
-<<<<<<< HEAD
-=======
-                    # TODO: add columns for rate_unit and comnvert to SI
-                    # (need validation of activity rate units also)
->>>>>>> b6395f1 (added support for gridsources)
                     emis["rate"] = rasters[rname]["sum"]
                 else:
                     emis["rate"] = rate
                 src.activities.create(**emis)
 
             row_nr += 1
-<<<<<<< HEAD
     db_updates = {
         "gridsources": {"updated": nr_updated_sources, "created": nr_created_sources}
     }
     return db_updates, messages
-=======
-    return messages
->>>>>>> b6395f1 (added support for gridsources)

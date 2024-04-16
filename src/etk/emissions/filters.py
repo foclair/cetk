@@ -183,13 +183,5 @@ def create_raster_share_in_polygon_sql(polygon):
             for name, total in rasters.items()
         )
     else:
-<<<<<<< HEAD
-<<<<<<< HEAD
         sql = """SELECT "dummy" as name, 1.0 as total"""
-=======
-        sql = """SELECT dummy as name, 1.0 as total"""
->>>>>>> b6395f1 (added support for gridsources)
-=======
-        sql = """SELECT "dummy" as name, 1.0 as total"""
->>>>>>> 804d203 (bug fix sql no quotation dummy in create_raster_share_in_polygon when grid sources absent)
     return sql

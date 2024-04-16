@@ -174,7 +174,7 @@ def import_sources(
 
     df = set_datatypes(df, sourcetype)
 
-    create_or_update_sources(
+    return create_or_update_sources(
         df,
         return_message="",
         validation=False,
@@ -812,7 +812,8 @@ def import_sourceactivities(
                     ):
                         return_message.append(
                             import_error(
-                                f"multiple rows for the same activity '{activity_name}'",
+                                "multiple rows for the same activity "
+                                + str(activity_name),
                                 validation=validation,
                             )
                         )
@@ -954,16 +955,18 @@ def import_sourceactivities(
             activity_keys = [k for k in row.keys() if k.startswith("act:")]
             for activity_key in activity_keys:
                 if not pd.isnull(row[activity_key]):
-                    rate = row[activity_key]
-                    try:
-                        activity = activities[activity_key[4:]]
-                    except KeyError:
-
-                        return_message.append(
-                            import_error(
-                                f"unknown activity '{activity_name}'"
-                                + f" for pointsource '{row['source_name']}'",
-                                validation=validation,
+                    rate = float(row[activity_key])
+                    if rate > 0.0:
+                        # residential heating template has many zeroes, skip these.
+                        try:
+                            activity = activities[activity_key[4:]]
+                        except KeyError:
+                            return_message.append(
+                                import_error(
+                                    f"unknown activity '{activity_name}'"
+                                    + f" for pointsource '{row['source_name']}'",
+                                    validation=validation,
+                                )
                             )
                         rate = activity_rate_unit_to_si(rate, activity.unit)
                         # original unit stored in activity.unit, but
