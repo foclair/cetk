@@ -8,12 +8,11 @@ area_subst as (
 	from edb_areasourcesubstance as asrc_emis
 	join edb_areasource as asrc on asrc.id = asrc_emis.source_id
 ),
--- grid_subst as (
--- 	select distinct gsrc_emis.substance_id
--- 	from edb_gridsourcesubstance as gsrc_emis
--- 	join edb_gridsource as gsrc on gsrc.id = gsrc_emis.source_id
--- 	where gsrc.inventory_id = %(inventory_id)s
--- ),
+grid_subst as (
+	select distinct gsrc_emis.substance_id
+ 	from edb_gridsourcesubstance as gsrc_emis
+ 	join edb_gridsource as gsrc on gsrc.id = gsrc_emis.source_id
+),
 -- road_subst as (
 -- 	select distinct veh_ef.substance_id
 -- 	from edb_vehicleef as veh_ef
@@ -45,12 +44,12 @@ from (
 	select * from point_subst
 	union all
 	select * from area_subst
-	-- union all
-	-- select * from grid_subst
+	union all
+	select * from grid_subst
 	-- union all
 	-- select * from road_subst
-	UNION ALL
-	SELECT * FROM source_ef_subst
+	union all
+	select * from source_ef_subst
 ) as all_subst
 join substances on substance_id = substances.id
 order by slug

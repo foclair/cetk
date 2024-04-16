@@ -13,25 +13,31 @@ import numpy as np
 import pandas as pd
 import rasterio as rio
 from django.contrib.gis.geos import GEOSGeometry, Polygon
-from rastafari import even_odd_polygon_fill
+from rastafari import even_odd_polygon_fill, resample_band
 
 # TODO EmissionCache needs to be updated when road and grid sources introduced
 from etk import __version__
 from etk.edb.cache import EmissionCache, NotInCacheError
-from etk.edb.models.common_models import Settings
-from etk.edb.models.source_models import AreaSource, Parameter, PointSource
-from etk.edb.models.timevar_models import Timevar, timevar_to_series
+from etk.edb.models import (
+    AreaSource,
+    GridSource,
+    Parameter,
+    PointSource,
+    Settings,
+    Timevar,
+    get_gridsource_raster,
+    timevar_to_series,
+)
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.calc import calculate_source_emissions
 
 # short  source type identifiers for conveniency
-POINT = PointSource.sourcetype  # equal to 'point'
+POINT = PointSource.sourcetype
 AREA = AreaSource.sourcetype
+GRID = GridSource.sourcetype
 
 # supported source types
-SOURCETYPES = (POINT, AREA)
-
-# TODO update requirements; rasterio and netcdf4
+SOURCETYPES = (POINT, AREA, GRID)
 
 
 class Output:
@@ -51,13 +57,7 @@ class EmissionRasterizer:
 
     """
 
-    def __init__(
-        self,
-        output,
-        nx,
-        ny,
-        job=None,
-    ):
+    def __init__(self, output, nx, ny):
         """
         args
             output: output.path: path to store NetCDF files
@@ -213,6 +213,7 @@ class EmissionRasterizer:
         tags=None,
         point_ids=None,
         area_ids=None,
+        grid_ids=None,
         polygon=None,
         substances=None,
         ac1=None,
@@ -276,13 +277,17 @@ class EmissionRasterizer:
         for sourcetype in sourcetypes:
             self.log.debug(f"- {sourcetype}source emissions")
             if sourcetype == POINT:
-                if not PointSource.objects.exists:
+                if not PointSource.objects.exists():
                     continue
                 ids = point_ids
             elif sourcetype == AREA:
-                if not AreaSource.objects.exists:
+                if not AreaSource.objects.exists():
                     continue
                 ids = area_ids
+            elif sourcetype == GRID:
+                if not GridSource.objects.exists():
+                    continue
+                ids = grid_ids
             else:
                 raise ValueError(
                     f"Rasterize cannot handle sourcetype {sourcetype} yet."
@@ -292,14 +297,14 @@ class EmissionRasterizer:
             self.querysets[sourcetype] = calculate_source_emissions(
                 sourcetype,
                 substances=substances,
-                srid=self.output.srid,
+                srid=int(self.output.srid),
                 name=name,
                 ids=ids,
                 tags=tags,
                 polygon=polygon,
             )
 
-    def _get_weights(self):
+    def _get_weights(self, polygon=None):
         """Get cell weights for all sourcetypes."""
 
         for sourcetype in self.querysets:
@@ -307,6 +312,8 @@ class EmissionRasterizer:
                 self._get_point_weights()
             elif sourcetype == AREA:
                 self._get_area_weights()
+            elif sourcetype == GRID:
+                self._get_grid_weights(polygon=polygon)
 
     def _get_point_weights(self):
         """Get cell weights for points.
@@ -394,6 +401,86 @@ class EmissionRasterizer:
         self._cache.write_weights(AREA)
         self._cache.write_emissions(AREA)
 
+    def _get_grid_weights(self, polygon=None):
+        """Store records of grid-sources in dict with source_id as key.
+
+        returns a dict with source_id as keys and
+        (index_array, weight_array) as values.
+
+        Complete records from query
+        result are stored in a dict with source_id as key.
+        """
+        col_map = self._cache.col_maps[GRID]
+        for rec in self.querysets[GRID]:
+            source_id = rec[col_map.source_id]
+            raster_name = rec[col_map.raster]
+            # spatial distribution of a grid is unique for each raster
+            source_key = (source_id, raster_name)
+            if source_key not in self._cache.gridded_sources[GRID]:
+                raster_data, metadata = get_gridsource_raster(
+                    raster_name, clip_by=polygon
+                )
+
+                index_array, source_weights = resample_band(
+                    raster_data,
+                    metadata["extent"],
+                    metadata["nodata"],
+                    self.extent,
+                    self.nx,
+                    self.ny,
+                    metadata["srid"],
+                    self.srid,
+                    subgridcells=2,
+                )
+
+                if len(source_weights) > 0:
+                    if self.levels is not None:
+                        # add weights in vertical direction
+                        ac1 = rec[col_map.ac1]
+
+                        if ac1 is not None:
+                            # add indices and weights for vertical levels
+                            try:
+                                levels, level_weights = self.level_weights[ac1]
+                            except KeyError:
+                                # if no vertical distribution is assigned to the
+                                # activity code, all emissions are put in the
+                                # lowest layer
+                                levels = np.array([0])
+                                level_weights = np.ones(1, dtype=float)
+                            index_array = (
+                                np.tile(levels, index_array[0].size),
+                                np.repeat(index_array[0], levels.size),
+                                np.repeat(index_array[1], levels.size),
+                            )
+                            # weight each level with corresponding level-weight
+                            source_weights = source_weights.repeat(
+                                level_weights.size
+                            ) * np.tile(level_weights, source_weights.size)
+                        else:
+                            index_array = (
+                                np.zeros(index_array.size[0]),
+                                index_array[0],
+                                index_array[1],
+                            )
+                    weights = (index_array, source_weights)
+                else:
+                    weights = None
+
+                # store emission record
+                self._cache.add_rec(
+                    rec,
+                    GRID,
+                    write_weights=True,
+                    weights=weights,
+                )
+            else:
+                self._cache.add_rec(rec, GRID)
+
+        # write last cache page to disk
+        self._cache.write_weights(GRID)
+        self._cache.write_emissions(GRID)
+
     def _create_variables(  # noqa: C901, PLR0912, PLR0915
         self, substances, *, timeseries=True
     ):
@@ -409,15 +496,14 @@ class EmissionRasterizer:
 
         self.variables = {}
         for substance in substances:
-            # TODO should check if path exists before starting rasterizer?
-            result_file = os.path.join(self.output.path, substance.name + ".nc")
+            result_file = os.path.join(self.output.path, substance.slug + ".nc")
             with nc.Dataset(result_file, "w", format="NETCDF4") as dset:
                 write_general_attrs(dset)
                 grid_mapping_var = self.create_gridmapping_variable(dset, self.crs)
                 time_var, time_bounds_var = create_time_variable(dset)
                 create_xy_variables(dset, self.extent, self.crs, self.nx, self.ny)
                 subst_vars = self.variables.setdefault(substance.slug, {})
-                # create variables for storage, also without emission in extent
+                # create variables also without emission in extent
                 # if any(
                 #     self._cache.has_substance(sourcetype, substance.id)
                 #     for sourcetype in self.sourcetypes
@@ -426,24 +512,23 @@ class EmissionRasterizer:
                 chunking = self._calc_chunking(
                     chunk_cache=1e8,
                 )
-                subst_vars["field2d"] = {
-                    "emission": create_variable(
-                        dset,
-                        grid_mapping_var,
-                        name=f"Emission of {substance.name}",
-                        unit=self.unit,
-                        instance=self.instance,
-                        cell_methods=cell_methods,
-                        parameter=param.name,
-                        time=time,
-                        chunksizes=chunking,
-                    )
-                }
+                var_name = param.slug
+                create_variable(
+                    dset,
+                    grid_mapping_var,
+                    name=var_name,
+                    unit=self.unit,
+                    instance=self.instance,
+                    cell_methods=cell_methods,
+                    parameter=param.name,
+                    time=time,
+                    chunksizes=chunking,
+                )
+                subst_vars["field2d"] = {"emission": var_name}
         ncreated = 0
         for subst_vars in self.variables.values():
             for sourcetype_vars in subst_vars.values():
                 ncreated += len(sourcetype_vars)
-        # return True if any variables are created
         return ncreated > 0
 
     def process(  # noqa: PLR0915
@@ -496,14 +581,14 @@ class EmissionRasterizer:
 
         self.instance = instance
         self.aggregation = aggregation
+        self.levels = None
         if polygon is None:
             # output extent
             x1, y1, x2, y2 = self.extent
             polygon = Polygon(
                 ((x1, y1), (x2, y1), (x2, y2), (x1, y2), (x1, y1)),
-                srid=self.output.srid,
+                srid=int(self.output.srid),
             )
-
         self.unit = unit or "kg/s"
         self.unit_conversion_factor = emis_conversion_factor_from_si(self.unit)
 
@@ -531,6 +616,13 @@ class EmissionRasterizer:
             ac3=ac3,
             cur=cur,
         )
+        try:
+            Path(self.output.path).mkdir(exist_ok=True)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                "parent directory of rasterized output does not exist "
+                f"({str(self.output.path)})"
+            )
 
         with EmissionCache(self.querysets) as cache:
             self._cache = cache
@@ -538,7 +630,7 @@ class EmissionRasterizer:
             self.log.debug("processing static data")
             # calculate raster cell weights for sources in querysets
             # and store in a dict
-            self._get_weights()
+            self._get_weights(polygon=polygon)
 
             self.timezone = self.output.timezone
 
@@ -570,7 +662,7 @@ class EmissionRasterizer:
 
             if self.unit_conversion_factor != 1.0:
                 chunk *= self.unit_conversion_factor
-            result_file = os.path.join(self.output.path, substance.name + ".nc")
+            result_file = os.path.join(self.output.path, substance.slug + ".nc")
             with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
                 self.set_data(dset, substance, chunk)
 
@@ -634,18 +726,9 @@ class EmissionRasterizer:
 
     def set_data(self, dset, substance, data, timestamps=None):  # noqa: C901, PLR0912
         """Add chunk of data to variable."""
-        # dset.variables.keys()
-        try:
-            var = dset["Emission of " + substance.name]
-        except Exception:
-            # variable not created yet
-            self.log.error(
-                f"this should not happen, did not create variable {substance.name}"
-            )
-            exit()
-            # TODO fix this, seems to be related to a substance existing as pointsource
-            # but not areasource and viceversa?
-            # are point and areasources even properly added?
+
+        var = dset[f"emission_{substance.slug}"]
+
         if timestamps is None:
             # map_oriented, np.flipud flips 2d data along second dimension
             var[:, :] = np.flipud(data)
@@ -749,9 +832,20 @@ class EmissionRasterizer:
 
                     # NOTE: time-series emissions will not be possible to include
                     # without specifying a time-interval.
-
-                    # get cell indices and weights for source
-                    index_array, source_weights = weights[source_id]
+                    if sourcetype != GRID:
+                        # get cell indices and weights for source
+                        index_array, source_weights = weights[source_id]
+                    else:
+                        # get cell indices and weights for grid source raster
+                        raster_name = rec[col_map.raster]
+                        # get cell indices and weights for source
+                        try:
+                            index_array, source_weights = weights[
+                                (source_id, raster_name)
+                            ]
+                        except KeyError:
+                            # grid has no emissions within modelling area
+                            continue
 
                     # add emissions to chunk at each index
                     chunk[index_array] += emis * source_weights
@@ -838,9 +932,18 @@ class EmissionRasterizer:
                     # calculate emission timeseries scaled by timevar
                     emis_ts = timevar_scalings.to_numpy() * emis
 
-                    # get cell indices and weights for source
-                    index_array, source_weights = weights[source_id]
-
+                    if sourcetype != GRID:
+                        # get cell indices and weights for source
+                        index_array, source_weights = weights[source_id]
+                    else:
+                        raster_name = rec[col_map.raster]
+                        try:
+                            index_array, source_weights = weights[
+                                (source_id, raster_name)
+                            ]
+                        except KeyError:
+                            # grid has no emissions within modelling area
+                            continue
                     # add time dimension to index array
                     try:
                         ncells = index_array[0].size

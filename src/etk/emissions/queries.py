@@ -9,6 +9,7 @@ from etk.emissions.filters import (
     create_ids_where_clause,
     create_name_where_clause,
     create_polygon_where_clause,
+    create_raster_share_in_polygon_sql,
     create_substance_emis_where_clause,
     create_tag_where_clause,
 )
@@ -19,7 +20,7 @@ def load_sql(filename):
 
 
 def create_source_emis_query(
-    sourcetype="point",  # or "area"
+    sourcetype="point",
     srid=None,
     name=None,
     ids=None,
@@ -47,7 +48,7 @@ def create_source_emis_query(
     #        ac3: iterable of activitycode instances
     """
 
-    sql = load_sql(sourcetype + "source_emissions.sql")
+    sql = load_sql(f"{sourcetype}source_emissions.sql")
     source_filters = []
     if tags is not None:
         source_filters.append(create_tag_where_clause(tags))
@@ -55,9 +56,8 @@ def create_source_emis_query(
         source_filters.append(create_ids_where_clause(ids))
     if name is not None:
         source_filters.append(create_name_where_clause(name))
-    if polygon is not None:
-        # NB "point" here works for point and areasources
-        source_filters.append(create_polygon_where_clause("point", polygon))
+    if polygon is not None and sourcetype != "grid":
+        source_filters.append(create_polygon_where_clause(polygon))
     if len(source_filters) > 0:
         source_filter_sql = "WHERE " + " AND ".join(source_filters)
     else:
@@ -88,12 +88,14 @@ def create_aggregate_emis_query(
     tags=None,
     point_ids=None,
     area_ids=None,
+    grid_ids=None,
+    raster_share_in_polygon=None,
 ):
     sql = load_sql("aggregate_emissions.sql")
     if isinstance(substances, Substance):
         substances = [substances]
 
-    sourcetypes = sourcetypes or ("point", "area")
+    sourcetypes = sourcetypes or ("point", "area", "grid")
     if not isinstance(sourcetypes, Sequence):
         sourcetypes = [sourcetypes]
 
@@ -113,31 +115,32 @@ def create_aggregate_emis_query(
     source_filters = []
     if tags is not None:
         source_filters.append(create_tag_where_clause(tags))
-    if polygon is not None:
-        # filters now both for area and point
-        source_filters.append(create_polygon_where_clause("point", polygon))
 
     # point source filters
     point_source_filters = list(*source_filters)
+    if polygon is not None:
+        point_source_filters.append(create_polygon_where_clause(polygon))
     if point_ids is not None:
         point_source_filters.append(create_ids_where_clause(point_ids))
     if "point" not in sourcetypes:
         point_source_filters.append("1=0")
 
     if len(point_source_filters) > 0:
-        point_source_filter_sql = "WHERE " + " AND ".join(source_filters)
+        point_source_filter_sql = "WHERE " + " AND ".join(point_source_filters)
     else:
         point_source_filter_sql = ""
 
     # area source filters
     area_source_filters = list(*source_filters)
+    if polygon is not None:
+        area_source_filters.append(create_polygon_where_clause(polygon))
     if area_ids is not None:
         area_source_filters.append(create_ids_where_clause(area_ids))
     if "area" not in sourcetypes:
         area_source_filters.append("1=0")
 
     if len(area_source_filters) > 0:
-        area_source_filter_sql = "WHERE " + " AND ".join(source_filters)
+        area_source_filter_sql = "WHERE " + " AND ".join(area_source_filters)
     else:
         area_source_filter_sql = ""
 
@@ -148,14 +151,30 @@ def create_aggregate_emis_query(
         emis_subst_filter = ""
         ef_subst_filter = ""
 
+    # grid source filters
+    grid_source_filters = list(*source_filters)
+
+    if grid_ids is not None:
+        grid_source_filters.append(create_ids_where_clause(grid_ids))
+    if "grid" not in sourcetypes:
+        grid_source_filters.append("1=0")
+    if len(grid_source_filters) > 0:
+        grid_source_filter_sql = "WHERE " + " AND ".join(grid_source_filters)
+    else:
+        grid_source_filter_sql = ""
+
+    raster_share_sql = create_raster_share_in_polygon_sql(polygon)
+
     sql = sql.format(
         srid=settings.srid,
         ac_column=ac_column,
         ac_groupby=ac_groupby,
         point_source_filter=point_source_filter_sql,
         area_source_filter=area_source_filter_sql,
+        grid_source_filter=grid_source_filter_sql,
         emis_substance_filter=emis_subst_filter,
         ef_substance_filter=ef_subst_filter,
+        raster_share_sql=raster_share_sql,
     )
     return sql
 

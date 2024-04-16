@@ -32,19 +32,15 @@ def calculate_source_emissions(
     cur = connection.cursor()
     settings = Settings.get_current()
     srid = srid or settings.srid
-    if (sourcetype == "point") or (sourcetype == "area"):
-        # create point source emission view
-        sql = create_source_emis_query(
-            sourcetype=sourcetype,
-            srid=srid,
-            substances=substances,
-            name=name,
-            ids=ids,
-            tags=tags,
-            # polygon=polygon, TODO ST_GeomFromEWKT is PostGIS specific!
-        )
-    else:
-        raise NotImplementedError("only implemented for point and area-sources")
+    sql = create_source_emis_query(
+        sourcetype=sourcetype,
+        srid=srid,
+        substances=substances,
+        name=name,
+        ids=ids,
+        tags=tags,
+        polygon=polygon,
+    )
     cur.execute(sql)
     return cur
 
@@ -59,10 +55,19 @@ def calculate_source_emissions_df(
     unit="kg/year",
 ):
     cur = calculate_source_emissions(
-        sourcetype, substances, name, ids, tags, polygon, unit
+        sourcetype=sourcetype,
+        substances=substances,
+        name=name,
+        ids=ids,
+        tags=tags,
+        polygon=polygon,
+        unit=unit,
     )
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
-    df.set_index(["source_id", "substance"], inplace=True)
+    if sourcetype == "grid":
+        df.set_index(["source_id", "substance", "raster"], inplace=True)
+    else:
+        df.set_index(["source_id", "substance"], inplace=True)
     df.loc[:, "emis"] *= emis_conversion_factor_from_si(unit)
     return df
 
@@ -102,7 +107,6 @@ def aggregate_emissions(
         df.insert(1, "activity", "")
         code_labels = dict(codeset.codes.values_list("code", "label"))
         for ind in df.index:
-            # breakpoint()
             code = df.loc[ind, "activitycode"]
             if code is not None:
                 df.loc[ind, "activity"] = code_labels[code]

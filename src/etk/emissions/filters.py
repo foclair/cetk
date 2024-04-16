@@ -4,6 +4,8 @@ from collections.abc import Iterable
 
 from django.contrib.gis.geos import Polygon
 
+from etk.edb.models import Settings, get_gridsource_raster, list_gridsource_rasters
+
 
 def create_name_where_clause(name, sql):
     """create SQL to filter sources by source name"""
@@ -19,32 +21,20 @@ def create_ids_where_clause(ids):
     return f"sources.id IN ({source_ids})"
 
 
-def create_polygon_where_clause(sourcetype, polygon):
+def create_polygon_where_clause(polygon):
     """create SQL to filter sources by polygon
     args:
         sourcetype: "grid", "point" or "area"
         polygon: a polygon in Polygon or EWKT-format
     """
-    if isinstance(polygon, str):
-        polygon_ewkt = polygon
-    elif isinstance(polygon, Polygon):
-        polygon_ewkt = polygon.ewkt
-    if sourcetype == "grid":
-        # intersection of geom with polygon
-        # translate polygon to same srid as grid-source
-        sql = f"""\
-        ST_Intersects(
-          ST_SetSRID(raster.geom, raster.srid),
-          ST_Transform(ST_GeomFromEWKT({polygon_ewkt}), raster.srid)
-        )
-        """
-    else:
-        sql = f"""\
-        ST_Intersects(
-          sources.geom,
-          ST_Transform(ST_GeomFromEWKT({polygon_ewkt}), 4326)
-        )
-        """
+    polygon_ewkt = polygon.ewkt if isinstance(polygon, Polygon) else polygon
+    settings = Settings.get_current()
+    sql = f"""\
+       ST_Intersects(
+         sources.geom,
+         ST_Transform(GeomFromEWKT('{polygon_ewkt}'), {settings.srid})
+       )
+    """
     return sql
 
 
@@ -176,3 +166,22 @@ def create_substance_emis_where_clause(substances):
         else ",".join([str(s.id) for s in substances])
     )
     return f"emis.substance_id IN ({substance_ids})"
+
+
+def create_raster_share_in_polygon_sql(polygon):
+    """create inline sql table for fractions of rasters inside polygon."""
+    rasters = {}
+    for raster_name in list_gridsource_rasters():
+        if polygon is not None:
+            raster_data, metadata = get_gridsource_raster(raster_name, clip_by=polygon)
+            rasters[raster_name] = raster_data.sum()
+        else:
+            rasters[raster_name] = 1.0
+    if len(rasters) > 0:
+        sql = "\nUNION ALL\n".join(
+            f"SELECT '{name}' as name, {total} as total"
+            for name, total in rasters.items()
+        )
+    else:
+        sql = """SELECT "dummy" as name, 1.0 as total"""
+    return sql

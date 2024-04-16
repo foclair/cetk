@@ -9,12 +9,6 @@ point_source as (
     LEFT JOIN edb_activitycode as ac3 ON ac3.id = sources.activitycode3_id
     {point_source_filter}
 ),
-ef_subst as (
-  SELECT * FROM edb_emissionfactor as ef
-  JOIN edb_activity ON edb_activity.id=ef.activity_id
-  WHERE ef.factor > 0
-    {ef_substance_filter}
-),
 area_source as (
     SELECT sources.id as source_id, timevar_id,
       ST_Transform(geom, {srid}) as geom,
@@ -24,6 +18,21 @@ area_source as (
     LEFT JOIN edb_activitycode as ac2 ON ac2.id = sources.activitycode2_id
     LEFT JOIN edb_activitycode as ac3 ON ac3.id = sources.activitycode3_id
     {area_source_filter}
+),
+grid_source as (
+    SELECT sources.id as source_id, timevar_id,
+      ac1.code as ac1, ac2.code as ac2, ac3.code as ac3
+    FROM edb_gridsource as sources
+    LEFT JOIN edb_activitycode as ac1 ON ac1.id = sources.activitycode1_id
+    LEFT JOIN edb_activitycode as ac2 ON ac2.id = sources.activitycode2_id
+    LEFT JOIN edb_activitycode as ac3 ON ac3.id = sources.activitycode3_id
+    {grid_source_filter}
+),
+ef_subst as (
+  SELECT * FROM edb_emissionfactor as ef
+  JOIN edb_activity ON edb_activity.id=ef.activity_id
+  WHERE ef.factor > 0
+    {ef_substance_filter}
 ),
 point_emis as (
   SELECT aggr_emis.substance_id, ac1, ac2, ac3, aggr_emis.emis
@@ -82,6 +91,40 @@ area_emis as (
       GROUP BY substance_id, source_id
     ) aggr_emis
   JOIN point_source ON aggr_emis.source_id = point_source.source_id
+),
+grid_emis as (
+  SELECT aggr_emis.substance_id, ac1, ac2, ac3, aggr_emis.emis
+  FROM
+    (
+      SELECT substance_id, source_id, raster_name, sum(emis * raster.total) as emis
+      FROM
+        (
+          SELECT
+            grid_source.source_id,
+            emis.substance_id as substance_id,
+            emis.value as emis,
+            emis.raster as raster_name
+          FROM edb_gridsourcesubstance as emis
+          JOIN grid_source ON grid_source.source_id=emis.source_id
+          WHERE emis.value > 0
+          {emis_substance_filter}
+          UNION ALL
+          SELECT
+            grid_source.source_id,
+            ef_subst.substance_id as substance_id,
+            emis.rate * ef_subst.factor as emis,
+            emis.raster as raster_name
+          FROM edb_gridsourceactivity as emis
+          JOIN grid_source ON emis.source_id=grid_source.source_id
+          JOIN ef_subst ON emis.activity_id=ef_subst.activity_id
+          WHERE emis.rate > 0
+        ) all_emis
+      JOIN (
+         {raster_share_sql}
+      ) as raster ON all_emis.raster_name = raster.name
+      GROUP BY substance_id, source_id, raster_name
+    ) aggr_emis
+  JOIN grid_source ON aggr_emis.source_id = grid_source.source_id
 )
 SELECT {ac_column} substances.slug as substance, sum(emis) as emission
 FROM
@@ -89,6 +132,8 @@ FROM
     SELECT * FROM area_emis
     UNION ALL
     SELECT * FROM point_emis
+   UNION ALL
+   SELECT * FROM grid_emis
   ) as all_emis
 JOIN substances ON substance_id = substances.id
 GROUP BY {ac_groupby} substances.slug

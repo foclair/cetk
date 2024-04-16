@@ -11,7 +11,6 @@ from etk.emissions.views import (
 
 
 def test_create_view(pointsources):
-
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
     create_pointsource_emis_view([NOx, SOx], unit="kg/year")
@@ -28,7 +27,6 @@ def test_create_table(pointsources):
 
 
 def test_calculate_emissions(pointsources):
-
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
     df = calculate_source_emissions_df("point", [NOx, SOx], unit="kg/year")

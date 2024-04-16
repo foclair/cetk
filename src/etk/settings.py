@@ -20,14 +20,15 @@ DATABASE_DIR = os.path.join(
     os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "eclair"
 )
 os.makedirs(DATABASE_DIR, exist_ok=True)
+
 # get database path from environment variable
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.spatialite",
         "NAME": os.environ.get(
-            "ETK_DATABASE_PATH", os.path.join(DATABASE_DIR, "eclair.sqlite")
+            "ETK_DATABASE_PATH", os.path.join(DATABASE_DIR, "eclair.gpkg")
         ),
-        "TEST": {"TEMPLATE": "eclair.sqlite"},
+        "TEST": {"NAME": os.path.join(DATABASE_DIR, "test.eclair.gpkg")},
     }
 }
 

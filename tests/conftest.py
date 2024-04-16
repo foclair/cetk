@@ -10,16 +10,19 @@ if sys.argv[0] != "pytest" and "--help" not in sys.argv:
     from etk.edb import models
 
 # from django.contrib.auth import get_user_model
+import rasterio as rio
+
 # from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.geos import Point, Polygon
 
 from etk.edb.const import WGS84_SRID
-from etk.edb.models.source_models import Substance
+from etk.edb.models import Substance, write_gridsource_raster
 from etk.edb.units import (
     activity_ef_unit_to_si,
     activity_rate_unit_to_si,
     emission_unit_to_si,
 )
+from etk.utils import GTiffProfile
 
 EXTENT = GEOSGeometry(
     "POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06, 10.95 69.06, 10.95 55.33))",
@@ -28,7 +31,7 @@ EXTENT = GEOSGeometry(
 
 
 @pytest.fixture
-def testsettings(db, code_sets):
+def testsettings(code_sets):
     settings = models.Settings.get_current()
     codeset1, codeset2 = code_sets
     settings.srid = 3006
@@ -42,21 +45,21 @@ def testsettings(db, code_sets):
 
 @pytest.fixture()
 def activities(db):
-    subst1 = models.Substance.objects.get(slug="NOx")
-    subst2 = models.Substance.objects.get(slug="SOx")
+    NOx = models.Substance.objects.get(slug="NOx")
+    SOx = models.Substance.objects.get(slug="SOx")
     act1 = models.Activity.objects.create(name="activity1", unit="m3")
     act1.emissionfactors.create(
-        substance=subst1, factor=activity_ef_unit_to_si(10.0, "kg/m3")
+        substance=NOx, factor=activity_ef_unit_to_si(10.0, "kg/m3")
     )
     act1.emissionfactors.create(
-        substance=subst2, factor=activity_ef_unit_to_si(1.0, "kg/m3")
+        substance=SOx, factor=activity_ef_unit_to_si(1.0, "kg/m3")
     )
     act2 = models.Activity.objects.create(name="activity2", unit="ton")
     act2.emissionfactors.create(
-        substance=subst1, factor=activity_ef_unit_to_si(10.0, "g/ton")
+        substance=NOx, factor=activity_ef_unit_to_si(10.0, "g/ton")
     )
     act2.emissionfactors.create(
-        substance=subst2, factor=activity_ef_unit_to_si(1.0, "g/ton")
+        substance=SOx, factor=activity_ef_unit_to_si(1.0, "g/ton")
     )
     return (act1, act2)
 
@@ -346,7 +349,7 @@ def pointsources(activities, code_sets, testsettings):
         activitycode2=ac2["A"],
     )
     # some substance emissions with varying attributes
-    src1.substances.create(substance=NOx, value=1000)
+    src1.substances.create(substance=NOx, value=emission_unit_to_si(1000, "ton/year"))
     src1.substances.create(substance=SOx, value=emission_unit_to_si(2000, "ton/year"))
     src2.substances.create(substance=SOx, value=emission_unit_to_si(1000, "ton/year"))
     src3.substances.create(substance=SOx, value=emission_unit_to_si(1000, "ton/year"))
@@ -441,38 +444,55 @@ def areasources(activities, code_sets):
     return (src1, src2, src3, src4, src5, src6, src7, src8)
 
 
-# @pytest.fixture()
-# def gridsources(inventories, activities):
-#     NOx = Substance.objects.get(slug="NOx")
-#     SOx = Substance.objects.get(slug="SOx")
+@pytest.fixture()
+def gridsource_raster(tmpdir, db):
+    nrows = 2
+    ncols = 2
+    x1, y1, x2, y2 = (0, 0, 1000, 1000)
+    name = "raster1"
+    data = np.array([[0.1, 0.2], [0.3, 0.4]], dtype=np.float32)
 
-#     inv1, inv2, inv3, inv4 = inventories[:4]
-#     ac1 = dict([(ac.code, ac) for ac in inv1.base_set.code_set1.codes.all()])
-#     # scale is cellsize (should be negative in y direction as in GDAL
-#     # standard) origin is upper left corner
-#     gdal_raster = GDALRaster(
-#         {
-#             "srid": DUMMY_SRID,
-#             "width": 2,
-#             "height": 2,
-#             "datatype": 6,
-#             "scale": (100, -100),
-#             "origin": (0, 1000),
-#             "bands": [{"data": [0.1, 0.2, 0.3, 0.4]}],
-#         }
-#     )
-#     raster = models.GridSourceRaster.objects.create(
-#         name="test raster1", inventory=inv1, srid=3006, geom=gdal_raster
-#     )
+    transform = rio.transform.from_bounds(x1, y1, x2, y2, width=ncols, height=nrows)
+    rasterfile = str(tmpdir / "gridsource_raster.tiff")
+    with rio.open(
+        rasterfile,
+        "w",
+        **GTiffProfile(),
+        width=ncols,
+        height=nrows,
+        transform=transform,
+        crs=3006
+    ) as dset:
+        dset.write(data, 1)
+    with rio.open(rasterfile, "r") as raster:
+        write_gridsource_raster(raster, name)
+    return name
 
-#     src1 = models.GridSource.objects.create(
-#         name="gridsource1",
-#         inventory=inv1,
-#         tags={"tag1": "A", "tag2": "B"},
-#         activitycode1=ac1["3"],
-#     )
-#     src1.substances.create(substance=NOx, value=5.0, raster=raster)
-#     src1.substances.create(substance=SOx, value=3.0, raster=raster)
-#     src1.activities.create(activity=activities[0], rate=10, raster=raster)
 
-#     return [src1]
+@pytest.fixture()
+def gridsources(activities, code_sets, gridsource_raster):
+    NOx = Substance.objects.get(slug="NOx")
+    SOx = Substance.objects.get(slug="SOx")
+    code_set1, code_set2 = code_sets
+    ac1 = dict([(ac.code, ac) for ac in code_set1.codes.all()])
+    src1 = models.GridSource.objects.create(
+        name="gridsource1",
+        tags={"tag1": "A", "tag2": "B"},
+        activitycode1=ac1["3"],
+    )
+    src1.substances.create(
+        substance=NOx,
+        value=emission_unit_to_si(500.0, "ton/year"),
+        raster=gridsource_raster,
+    )
+    src1.substances.create(
+        substance=SOx,
+        value=emission_unit_to_si(300.0, "ton/year"),
+        raster=gridsource_raster,
+    )
+    src1.activities.create(
+        activity=activities[0],
+        rate=activity_rate_unit_to_si(1000, "m3/year"),
+        raster=gridsource_raster,
+    )
+    return [src1]
