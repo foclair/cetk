@@ -3,8 +3,11 @@ import ast
 from openpyxl import Workbook
 
 from etk.edb.const import WGS84_SRID
-from etk.edb.importers import REQUIRED_COLUMNS_AREA, REQUIRED_COLUMNS_POINT
-from etk.edb.models.source_models import (
+from etk.edb.importers.source_import import (
+    REQUIRED_COLUMNS_AREA,
+    REQUIRED_COLUMNS_POINT,
+)
+from etk.edb.models import (
     Activity,
     ActivityCode,
     AreaSource,

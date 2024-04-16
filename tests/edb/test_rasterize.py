@@ -8,7 +8,7 @@ import pytest
 from django.contrib.gis.geos import Point, Polygon
 
 from etk.edb.const import WGS84_SRID
-from etk.edb.models.source_models import AreaSource, PointSource, Substance
+from etk.edb.models import AreaSource, PointSource, Substance
 from etk.edb.rasterize import EmissionRasterizer, Output
 from etk.edb.units import emission_unit_to_si
 
@@ -115,9 +115,9 @@ class TestEmissionRasterizer:
 
         with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
             assert dset["time"][0] == 368160
-            assert dset["Emission of NOx"].shape == (3, 4, 4)
-            assert np.sum(dset["Emission of NOx"]) == pytest.approx(0, 1e-6)
-            assert dset["Emission of NOx"][0, 0, 0] == pytest.approx(0, 1e-6)
+            assert dset["emission_NOx"].shape == (3, 4, 4)
+            assert np.sum(dset["emission_NOx"]) == pytest.approx(0, 1e-6)
+            assert dset["emission_NOx"][0, 0, 0] == pytest.approx(0, 1e-6)
 
     def test_empty_raster_point_outside_avg(  # noqa: PLR0915
         self, testsettings, code_sets, tmpdir
@@ -149,9 +149,9 @@ class TestEmissionRasterizer:
         rasterizer.process([subst1], unit="ton/year")
 
         with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
-            assert dset["Emission of NOx"].shape == (4, 4)
-            assert np.sum(dset["Emission of NOx"]) == pytest.approx(0, 1e-6)
-            assert dset["Emission of NOx"][0, 0] == pytest.approx(0, 1e-6)
+            assert dset["emission_NOx"].shape == (4, 4)
+            assert np.sum(dset["emission_NOx"]) == pytest.approx(0, 1e-6)
+            assert dset["emission_NOx"][0, 0] == pytest.approx(0, 1e-6)
 
     def test_area_source(self, testsettings, test_timevar, tmpdir):
         daytime_timevar = test_timevar
@@ -191,8 +191,8 @@ class TestEmissionRasterizer:
 
         with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
             assert dset["time"][0] == 368160
-            assert dset["Emission of NOx"].shape == (3, 4, 4)
-            assert np.sum(dset["Emission of NOx"][0, :, :]) == pytest.approx(
+            assert dset["emission_NOx"].shape == (3, 4, 4)
+            assert np.sum(dset["emission_NOx"][0, :, :]) == pytest.approx(
                 31.6880878, 1e-6
             )
 
@@ -234,8 +234,8 @@ class TestEmissionRasterizer:
 
         with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
             assert dset["time"][0] == 368160
-            assert dset["Emission of NOx"].shape == (3, 4, 4)
-            assert np.sum(dset["Emission of NOx"][0, :, :]) == pytest.approx(0, 1e-6)
+            assert dset["emission_NOx"].shape == (3, 4, 4)
+            assert np.sum(dset["emission_NOx"][0, :, :]) == pytest.approx(0, 1e-6)
 
     def test_area_and_point_source(self, testsettings, code_sets, test_timevar, tmpdir):
         # test where each substance has both area and pointsource
@@ -306,8 +306,8 @@ class TestEmissionRasterizer:
 
         with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
             assert dset["time"][0] == 368160
-            assert dset["Emission of NOx"].shape == (3, 4, 4)
-            assert np.sum(dset["Emission of NOx"][0, :, :]) == pytest.approx(2000, 1e-6)
+            assert dset["emission_NOx"].shape == (3, 4, 4)
+            assert np.sum(dset["emission_NOx"][0, :, :]) == pytest.approx(2000, 1e-6)
 
     def test_area_or_point_source(self, testsettings, code_sets, test_timevar, tmpdir):
         # test where each substance has either point or areasource
@@ -357,17 +357,15 @@ class TestEmissionRasterizer:
         rasterizer.process([subst1, subst2], begin, end, unit="ton/year")
         with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
             assert dset["time"][0] == 368160
-            assert dset["Emission of NOx"].shape == (13, 4, 4)
-            assert np.sum(dset["Emission of NOx"]) == pytest.approx(13000, 1e-6)
-            assert dset["Emission of NOx"][0, 0, 0] == pytest.approx(1000, 1e-6)
+            assert dset["emission_NOx"].shape == (13, 4, 4)
+            assert np.sum(dset["emission_NOx"]) == pytest.approx(13000, 1e-6)
+            assert dset["emission_NOx"][0, 0, 0] == pytest.approx(1000, 1e-6)
         with nc.Dataset(tmpdir + "/SOx.nc", "r", format="NETCDF4") as dset:
             assert dset["time"][0] == 368160
-            assert dset["Emission of SOx"].shape == (13, 4, 4)
-            assert np.sum(dset["Emission of SOx"][0, :, :]) == pytest.approx(0, 1e-6)
+            assert dset["emission_SOx"].shape == (13, 4, 4)
+            assert np.sum(dset["emission_SOx"][0, :, :]) == pytest.approx(0, 1e-6)
             # normalize to 2000 with 16 / 24 nonzero hours
-            assert np.sum(dset["Emission of SOx"][12, :, :]) == pytest.approx(
-                3000, 1e-6
-            )
+            assert np.sum(dset["emission_SOx"][12, :, :]) == pytest.approx(3000, 1e-6)
 
     def test_point_source_no_timesteps(  # noqa: PLR0915
         self, testsettings, code_sets, test_timevar, tmpdir
@@ -421,9 +419,41 @@ class TestEmissionRasterizer:
         rasterizer.process([subst1, subst2], unit="ton/year")
 
         with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
-            assert dset["Emission of NOx"].shape == (4, 4)
-            assert np.sum(dset["Emission of NOx"]) == pytest.approx(1000, 1e-6)
-            assert dset["Emission of NOx"][0, 0] == pytest.approx(1000, 1e-6)
+            assert dset["emission_NOx"].shape == (4, 4)
+            assert np.sum(dset["emission_NOx"]) == pytest.approx(1000, 1e-6)
+            assert dset["emission_NOx"][0, 0] == pytest.approx(1000, 1e-6)
+
+    def test_gridsource_no_timesteps(testsettings, gridsources, tmpdir):
+        NOx = Substance.objects.get(slug="NOx")
+        SOx = Substance.objects.get(slug="SOx")
+        extent = (0.0, 0.0, 1200.0, 1200.0)
+        srid = 3006
+        output = Output(
+            extent=extent, timezone=datetime.timezone.utc, path=tmpdir, srid=srid
+        )
+        rasterizer = EmissionRasterizer(output, nx=4, ny=4)
+        rasterizer.process([NOx, SOx], unit="ton/year")
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert dset["emission_NOx"].shape == (4, 4)
+            assert np.sum(dset["emission_NOx"]) == pytest.approx(510.0, 1e-6)
+
+    def test_gridsource(testsettings, gridsources, tmpdir):
+
+        NOx = Substance.objects.get(slug="NOx")
+        SOx = Substance.objects.get(slug="SOx")
+        extent = (0.0, 0.0, 1200.0, 1200.0)
+        srid = 3006
+        output = Output(
+            extent=extent, timezone=datetime.timezone.utc, path=tmpdir, srid=srid
+        )
+        rasterizer = EmissionRasterizer(output, nx=4, ny=4)
+        begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
+        rasterizer.process([NOx, SOx], begin, end, unit="ton/year")
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert dset["time"][0] == 368160
+            assert dset["emission_NOx"].shape == (3, 4, 4)
+            assert np.sum(dset["emission_NOx"][0, :, :]) == pytest.approx(510.0, 1e-6)
 
     # ac-filtering not implemented yet!
     # def test_point_source_filter(  # noqa: PLR0915

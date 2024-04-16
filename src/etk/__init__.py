@@ -23,7 +23,7 @@ def configure():
         config_home = os.path.join(
             os.environ.get("XDG_CONFIG_HOME", default_config_home), "eclair"
         )
-        default_db = os.path.abspath(os.path.join(config_home, "eclair.sqlite"))
+        default_db = os.path.abspath(os.path.join(config_home, "eclair.gpkg"))
         db_path = os.environ.get("ETK_DATABASE_PATH", default_db)
         settings.configure(
             **DEFAULT_SETTINGS,
@@ -31,7 +31,7 @@ def configure():
                 "default": {
                     "ENGINE": "django.contrib.gis.db.backends.spatialite",
                     "NAME": db_path,
-                    "TEST": {"TEMPLATE": "default.sqlite"},
+                    "TEST": {"NAME": os.path.join(config_home, "test.eclair.gpkg")},
                 },
             }
         )

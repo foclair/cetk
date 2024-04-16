@@ -64,16 +64,13 @@ class EmissionCache:
         self._rasterized_sources = set()
 
         # nr of emission records not yet written to disk
-        self._recs_in_memory = {"point": 0, "area": 0}
+        self._recs_in_memory = {"point": 0, "area": 0, "grid": 0}
 
         # map feature id to index in narc variable
         self.feature_ids = {"road": {}, "point": {}}
 
         # keep track of all sources that have already been gridded
-        self.gridded_sources = {
-            "point": set(),
-            "area": set(),
-        }
+        self.gridded_sources = {"point": set(), "area": set(), "grid": set()}
 
         # create mapping between column name and index using a named tuple
         self.col_maps = {}
@@ -166,8 +163,8 @@ class EmissionCache:
         if sourcetype != "grid":
             source_key = source_id
         else:
-            raster_id = rec[col_map.raster_id]
-            source_key = (source_id, raster_id)
+            raster = rec[col_map.raster]
+            source_key = (source_id, raster)
 
         if weights is not None and source_key not in self.gridded_sources[sourcetype]:
             self._weights.setdefault(sourcetype, {})[source_key] = weights

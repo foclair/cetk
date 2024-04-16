@@ -31,3 +31,7 @@ profile = "black"
 addopts = "--reuse-db"
 pythonpath = "tests"
 DJANGO_SETTINGS_MODULE = "etk.settings"
+filterwarnings = [
+    "error",
+    "ignore::RuntimeWarning",
+]

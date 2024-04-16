@@ -5,19 +5,22 @@ from importlib import resources
 import numpy as np
 import pytest
 
-from etk.edb.importers import (  # , import_timevars
+from etk.edb.importers import (
     import_eea_emfacs,
+    import_gridsources,
     import_sourceactivities,
     import_sources,
 )
-from etk.edb.models.eea_emfacs import EEAEmissionFactor
-from etk.edb.models.source_models import (
+from etk.edb.models import (
     AreaSource,
     AreaSourceActivity,
     CodeSet,
+    GridSource,
     PointSource,
     PointSourceActivity,
+    get_gridsource_raster,
 )
+from etk.edb.models.eea_emfacs import EEAEmissionFactor
 from etk.edb.units import emis_conversion_factor_from_si
 
 
@@ -34,6 +37,11 @@ def pointsource_xlsx(tmpdir, settings):
 @pytest.fixture
 def areasource_xlsx(tmpdir, settings):
     return resources.files("edb.data") / "areasources.xlsx"
+
+
+@pytest.fixture
+def gridsource_xlsx(tmpdir, settings):
+    return resources.files("edb.data") / "gridsources.xlsx"
 
 
 class TestImport:
@@ -121,12 +129,10 @@ class TestImport:
         # create pointsources
         filepath = resources.files("edb.data") / "pointsourceactivities.xlsx"
         # test if create pointsourceactivities works
-        psa = import_sourceactivities(filepath)
-        print(psa)
+        import_sourceactivities(filepath)
         assert PointSourceActivity.objects.all().count()
         # test if update also works
-        psa = import_sourceactivities(filepath)
-        print(psa)
+        import_sourceactivities(filepath)
         assert PointSourceActivity.objects.all().count()
 
     def test_import_areasources(self, vertical_dist, areasource_xlsx):
@@ -153,14 +159,58 @@ class TestImport:
         # create pointsources
         filepath = resources.files("edb.data") / "areasourceactivities.xlsx"
         # test if create pointsourceactivities works
-        psa = import_sourceactivities(filepath)
-        print(psa)
-
+        import_sourceactivities(filepath)
         assert AreaSourceActivity.objects.all().count()
         # test if update also works
-        psa = import_sourceactivities(filepath)
-        print(psa)
+        import_sourceactivities(filepath)
         assert AreaSourceActivity.objects.all().count()
+
+    @pytest.mark.django_db(transaction=False)
+    def test_import_gridsources(
+        self, transactional_db, gridsource_xlsx, activities, code_sets
+    ):
+        filepath = resources.files("edb.data") / "gridsources.xlsx"
+        updates, messages = import_gridsources(filepath)
+        assert (
+            len(messages) == 0
+        ), f"errors importing gridsources: {', '.join(messages)}"
+        source1 = GridSource.objects.get(name="gridsource1")
+        source2 = GridSource.objects.get(name="gridsource2")
+        assert source1.name == "gridsource1"
+        assert source1.tags["tag1"] == "tag1_value"
+        assert source1.timevar is None
+        assert source1.substances.all().count() == 1
+        source1_pm25 = source1.substances.get(substance__slug="PM25")
+        emis_value = source1_pm25.value * emis_conversion_factor_from_si("ton/year")
+        assert emis_value == pytest.approx(5378.204285, 1e-4)
+        data, metadata = get_gridsource_raster(source1_pm25.raster)
+        assert data.sum() == 1.0
+
+        assert source2.substances.all().count() == 2
+        source2_pm25 = source2.substances.get(substance__slug="PM25")
+        source2_nox = source2.substances.get(substance__slug="NOx")
+        data, metadata = get_gridsource_raster(source2_pm25.raster)
+        assert data.sum() == 1.0
+        data, metadata = get_gridsource_raster(source2_nox.raster)
+        assert data.sum() == 1.0
+
+        emis_value2_pm25 = source2_pm25.value * emis_conversion_factor_from_si(
+            "ton/year"
+        )
+        emis_value2_nox = source2_nox.value * emis_conversion_factor_from_si("ton/year")
+        assert emis_value2_pm25 == pytest.approx(10.0, 1e-4)
+        assert emis_value2_nox == pytest.approx(20.0, 1e-4)
+
+        # modify a source
+        source1.tags["test_tag"] = "test"
+        source1.save()
+
+        # re-import gridsources from file
+        # and check that existing source is updated
+        import_gridsources(filepath)
+        source1 = GridSource.objects.get(name="gridsource1")
+        source2 = GridSource.objects.get(name="gridsource2")
+        assert "test_tag" not in source1.tags
 
 
 # TODO test_import_residentialheating
