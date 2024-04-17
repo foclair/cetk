@@ -44,6 +44,7 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
         "timevar": {"updated or created": 2},
         "facility": {"updated": 0, "created": 4},
         "pointsource": {"updated": 0, "created": 4},
+        "pointsourceactivity": {"created": 3, "updated": 0},
     }
     assert eval(match.group(1)) == expected_dict
 
