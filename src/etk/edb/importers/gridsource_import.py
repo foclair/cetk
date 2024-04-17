@@ -175,12 +175,14 @@ def import_gridsources(filepath, validation=False, encoding=None):
         code_sets=code_sets,
     )
     if len(messages) > 0:
+        messages += "Could not validate gridsources, due to error in columns."
         return {}, messages
 
     row_nr = 2
-    rasters, messages = validate_gridsources(
+    rasters, messages_sources = validate_gridsources(
         df, timevars, code_sets, raster_names, datadir
     )
+    messages += messages_sources
     if len(messages) > 0:
         return {}, messages
 

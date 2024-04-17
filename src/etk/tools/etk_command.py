@@ -160,6 +160,7 @@ class Editor(object):
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename, validation=True)
             if len(msgs) != 0:
+                return_msg += msgs
                 log.error(
                     f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}"
                 )

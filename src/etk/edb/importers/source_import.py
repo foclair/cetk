@@ -147,7 +147,7 @@ def import_sources(
         try:
             workbook = load_workbook(filename=filepath, data_only=True, read_only=True)
         except Exception as exc:
-            return_message = import_error(str(exc), return_message, validation)
+            return_message.append(import_error(str(exc), validation))
         worksheet = workbook.worksheets[0]
         if len(workbook.worksheets) > 1:
             if sourcetype == "point":
@@ -204,6 +204,7 @@ def create_or_update_sources(
     sourcetype="point",
     cache=True,
 ):
+    return_message = []
     # user defined SRID for import or WGS84 if nothing specified
     # as long as we do not have functions in Eclair to edit the "settings_SRID"
     # it does not make sense to use that SRID as default for import.
@@ -223,10 +224,11 @@ def create_or_update_sources(
                 AreaSource.objects.select_related("facility").all()
             )  # .prefetch_related("substances")
         else:
-            return_message = import_error(
-                "this sourcetype is not implemented",
-                return_message,
-                validation,
+            return_message.append(
+                import_error(
+                    "this sourcetype is not implemented",
+                    validation=validation,
+                )
             )
 
     code_sets = [
@@ -347,7 +349,7 @@ def create_or_update_sources(
                     return_message.append(
                         import_error(
                             f"missing area polygon for source '{row_key}'",
-                            validation,
+                            validation=validation,
                         )
                     )
                 wkt_polygon = row_dict["geometry"]
@@ -460,8 +462,8 @@ def create_or_update_sources(
             try:
                 emis["substance"] = substances[subst]
             except KeyError:
-                return_message = import_error(
-                    f"Undefined substance {subst}", return_message, validation
+                return_message.append(
+                    import_error(f"Undefined substance {subst}", validation)
                 )
 
             try:
@@ -470,23 +472,27 @@ def create_or_update_sources(
                         float(row_dict[subst_key]), row_dict["emission_unit"]
                     )
                 else:
-                    return_message = import_error(
-                        f"No unit specified for {sourcetype} sources on row {row_nr}",
-                        return_message,
-                        validation,
+                    return_message.append(
+                        import_error(
+                            f"No unit specified for {sourcetype} sources"
+                            + f" on row {row_nr}",
+                            validation=validation,
+                        )
                     )
             except ValueError:
-                return_message = import_error(
-                    f"Invalid {sourcetype} emission value {row_dict[subst_key]}"
-                    + f" on row {row_nr} for {sourcetype} sources.",
-                    return_message,
-                    validation,
+                return_message.append(
+                    import_error(
+                        f"Invalid {sourcetype} emission value {row_dict[subst_key]}"
+                        + f" on row {row_nr} for {sourcetype} sources.",
+                        validation=validation,
+                    )
                 )
             except KeyError as err:
-                return_message = import_error(
-                    f"Missing data {err} on row {row_nr} for {sourcetype} sources.",
-                    return_message,
-                    validation,
+                return_message.append(
+                    import_error(
+                        f"Missing data {err} on row {row_nr} for {sourcetype} sources.",
+                        validation=validation,
+                    )
                 )
 
         official_facility_id, source_name = row_key
@@ -752,7 +758,7 @@ def import_sourceactivities(
     try:
         workbook = load_workbook(filename=filepath, data_only=True, read_only=True)
     except Exception as exc:
-        return_message = import_error(str(exc), return_message, validation)
+        return_message.append(import_error(str(exc), validation))
 
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
@@ -794,10 +800,11 @@ def import_sourceactivities(
                         df_activity["activity_unit"][row_nr]
                         != update_activities[activity_name].unit
                     ):
-                        return_message = import_error(
-                            f"conflicting units for activity '{activity_name}'",
-                            return_message,
-                            validation,
+                        return_message.append(
+                            import_error(
+                                f"conflicting units for activity '{activity_name}'",
+                                validation=validation,
+                            )
                         )
             except KeyError:
                 if activity_name not in create_activities:
