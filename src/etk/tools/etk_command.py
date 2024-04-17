@@ -167,7 +167,6 @@ class Editor(object):
         codeset=None,
         substances=None,
     ):
-        print(f"substances: {substances}")
         df = aggregate_emissions(
             sourcetypes=sourcetypes, unit=unit, codeset=codeset, substances=substances
         )

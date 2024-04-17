@@ -995,9 +995,13 @@ def import_sourceactivities(
                             # in create_or_update_source
                             pointsource = pointsources[facility_id, str(row.name[1])]
                         else:
-                            facility_id = facilities[facility_id].id
+                            facility = (
+                                facilities[facility_id]
+                                if facility_id is not None
+                                else None
+                            )
                             pointsource = PointSource.objects.get(
-                                name=str(row.name[1]), facility_id=facility_id
+                                name=str(row.name[1]), facility=facility
                             )
                         try:
                             if caching_sources:
@@ -1026,7 +1030,6 @@ def import_sourceactivities(
                 }
             }
         )
-
     if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
         data = workbook["AreaSource"].values
         df_areasource = worksheet_to_dataframe(data)

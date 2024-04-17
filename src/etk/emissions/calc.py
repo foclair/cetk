@@ -95,7 +95,6 @@ def aggregate_emissions(
         area_ids=area_ids,
     )
     cur = connection.cursor()
-    # breakpoint()
     cur.execute(sql)
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
     if codeset is not None:
