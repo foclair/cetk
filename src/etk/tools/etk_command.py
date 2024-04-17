@@ -113,11 +113,11 @@ class Editor(object):
                         import_sheets=import_sheets,
                         validation=dry_run,
                     )
-                db_updates.update(updates)
-                if len(msgs) != 0:
-                    return_msg += msgs
-                    if not dry_run:
-                        raise ImportError(return_msg)
+                    db_updates.update(updates)
+                    if len(msgs) != 0:
+                        return_msg += msgs
+                        if not dry_run:
+                            raise ImportError(return_msg)
                 if dry_run:
                     raise DryrunAbort
             # grid sources imported outside atomic transaction
