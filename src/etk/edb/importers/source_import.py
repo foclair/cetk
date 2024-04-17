@@ -186,7 +186,12 @@ def import_sources(
 def set_datatypes(df, sourcetype):
     if sourcetype == "point":
         df = df.astype(dtype=REQUIRED_COLUMNS_POINT)
-        df = df.astype(dtype=OPTIONAL_COLUMNS_POINT)
+        optional_columns = {
+            k: OPTIONAL_COLUMNS_POINT[k]
+            for k in OPTIONAL_COLUMNS_POINT
+            if k in df.columns
+        }
+        df = df.astype(dtype=optional_columns)
     else:
         df = df.astype(dtype=REQUIRED_COLUMNS_AREA)
     # below is necessary not to create facilities with name 'None'
