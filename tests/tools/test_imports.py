@@ -15,6 +15,10 @@ def pointsourceactivities_xlsx():
     return resources.files("edb.data") / "pointsourceactivities.xlsx"
 
 
+def validation_xlsx():
+    return resources.files("tools.data") / "validation.xlsx"
+
+
 @pytest.fixture
 def tmp_db(tmpdir):
     db_path = tmpdir / "test.sqlite"
@@ -22,13 +26,13 @@ def tmp_db(tmpdir):
     return db_path
 
 
-def test_import_pointsources(tmp_db, pointsourceactivities_xlsx):
+def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx):
     run_migrate(db_path=tmp_db)
 
     # Regular expression pattern to extract the dictionary part
     pattern = r"imported data (.+)\\n"
 
-    stdout = run_import(pointsourceactivities_xlsx, db_path=tmp_db)
+    (stderr, stdout) = run_import(pointsourceactivities_xlsx, db_path=tmp_db)
     # Find the dictionary part using regular expression
     match = re.search(pattern, str(stdout[1]))
     expected_dict = {
@@ -42,5 +46,6 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx):
     }
     assert eval(match.group(1)) == expected_dict
 
-    stdout = run_import(pointsourceactivities_xlsx, db_path=tmp_db, dry_run=True)
+    (stderr, stdout) = run_import(validation_xlsx, db_path=tmp_db, dry_run=True)
+    assert "Successful dry-run" in str(stdout)
     assert "Successful dry-run" in str(stdout)
