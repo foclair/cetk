@@ -106,48 +106,21 @@ class Editor(object):
             with transaction.atomic():
                 for sheet in import_sheets:
                     if sheet not in workbook.sheetnames:
-                        log.error(f"Workbook has not sheet named {sheet}")
-                        sys.exit(1)
-                    log.info(f"importing sheet '{sheet}'")
-
-                    if sheet == "CodeSet":
-                        updates, msgs = import_codesetsheet(
-                            workbook, validation=dry_run
-                        )
-                    elif sheet == "ActivityCode":
-                        updates, msgs = import_activitycodesheet(
-                            workbook, validation=dry_run
-                        )
-                    elif sheet == "EmissionFactor":
-                        updates, msgs = import_sourceactivities(
-                            filename,
-                            import_sheets=("EmissionFactor"),
-                            validation=dry_run,
-                        )
-                    elif sheet == "Timevar":
-                        updates, msgs = import_timevarsheet(
-                            workbook, validation=dry_run
-                        )
-                    # TODO this is unneccessary to do this way,
-                    # the workbook is now read may times
-                    # will give efficiency problems with large files.
-                    # should use import_sourceactivities instead!
-                    elif sheet == "PointSource":
-                        updates, msgs = import_sources(
-                            filename, validation=dry_run, sourcetype="point"
-                        )
-                    elif sheet == "AreaSource":
-                        updates, msgs = import_sources(
-                            filename, validation=dry_run, sourcetype="area"
-                        )
-                    db_updates.update(updates)
-                    if len(msgs) != 0:
-                        return_msg += msgs
-                        if not dry_run:
-                            raise ImportError(return_msg)
+                        log.info(f"Workbook has no sheet named {sheet}, skipped import")
+                if any(name != "GridSource" for name in import_sheets):
+                    updates, msgs = import_sourceactivities(
+                        filename,
+                        import_sheets=import_sheets,
+                        validation=dry_run,
+                    )
+                db_updates.update(updates)
+                if len(msgs) != 0:
+                    return_msg += msgs
+                    if not dry_run:
+                        raise ImportError(return_msg)
                 if dry_run:
                     raise DryrunAbort
-            # gris-sources imported outside atomic transaction
+            # grid sources imported outside atomic transaction
             # to avoid errors when writing rasters using rasterio
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename, validation=dry_run)
@@ -156,7 +129,7 @@ class Editor(object):
                     return_msg += msgs
                     raise ImportError(return_msg)
         except DryrunAbort:
-            # grid sources imported for real (dry-run no)
+            # validate grid sources
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename, validation=True)
             if len(msgs) != 0:

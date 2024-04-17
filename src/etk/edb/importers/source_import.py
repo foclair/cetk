@@ -292,7 +292,7 @@ def create_or_update_sources(
         if sourcetype == "point":
             # get pointsource coordinates
             try:
-                if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
+                if pd.isna(row_dict["lat"]) or pd.isna(row_dict["lon"]):
                     return_message.append(
                         import_error(
                             f"missing coordinates for source '{row_key}'",
@@ -331,13 +331,13 @@ def create_or_update_sources(
 
             # get downdraft parameters
             try:
-                if not pd.isnull(row_dict["house_width"]):
+                if not pd.isna(row_dict["house_width"]):
                     source_data["house_width"] = row_dict["house_width"]
             except KeyError:
                 if row_nr == 2:
                     log.debug("house_width is skipped from import.")
             try:
-                if not pd.isnull(row_dict["house_height"]):
+                if not pd.isna(row_dict["house_height"]):
                     source_data["house_height"] = row_dict["house_height"]
             except KeyError:
                 if row_nr == 2:
@@ -345,7 +345,7 @@ def create_or_update_sources(
 
         elif sourcetype == "area":
             try:
-                if pd.isnull(row_dict["geometry"]):
+                if pd.isna(row_dict["geometry"]):
                     return_message.append(
                         import_error(
                             f"missing area polygon for source '{row_key}'",
@@ -385,7 +385,7 @@ def create_or_update_sources(
                                     validation=validation,
                                 )
                             )
-                    if not pd.isnull(code):
+                    if not pd.isna(code):
                         try:
                             # note this can be problematic with codes 01 etc as SNAP
                             # TODO activitycodes should be string directly on import!
@@ -408,7 +408,7 @@ def create_or_update_sources(
                         column.split("_", 1)[-1] for column in activitycode_columns
                     ]
                     for index, column in enumerate(activitycode_columns):
-                        if not pd.isnull(row_dict[column]):
+                        if not pd.isna(row_dict[column]):
                             try:
                                 CodeSet.objects.get(slug=codeset_slug[index])
                             except CodeSet.DoesNotExist:
@@ -467,7 +467,7 @@ def create_or_update_sources(
                 )
 
             try:
-                if not pd.isnull(row_dict["emission_unit"]):
+                if not pd.isna(row_dict["emission_unit"]):
                     emis["value"] = emission_unit_to_si(
                         float(row_dict[subst_key]), row_dict["emission_unit"]
                     )
@@ -745,14 +745,17 @@ def import_sourceactivities(
     import_sheets=SHEET_NAMES,
     validation=False,
 ):
-    """Import point-sources and/or area-sources from xlsx or csv-file.
+    """Import sheets Timevar, Codeset, ActivityCode, EmissionFactor,
+    PointSource and AreaSource from xlsx. If GridSource in import_sheets,
+    it will be ignored.
 
     args
         filepath: path to file
 
     options
         encoding: encoding of file (default is utf-8)
-        srid: srid of file, default is same srid as domain
+        srid: srid of file, default is wgs84
+        import_sheets: sheets to be imported, default is all.
     """
     return_message = []
     try:
@@ -961,7 +964,7 @@ def import_sourceactivities(
             # NB: does not work if column header starts with space, but same for subst:
             activity_keys = [k for k in row.keys() if k.startswith("act:")]
             for activity_key in activity_keys:
-                if not pd.isnull(row[activity_key]):
+                if not pd.isna(row[activity_key]):
                     rate = float(row[activity_key])
                     if rate > 0.0:
                         # residential heating template has many zeroes, skip these.
@@ -978,13 +981,16 @@ def import_sourceactivities(
                         rate = activity_rate_unit_to_si(rate, activity.unit)
                         # original unit stored in activity.unit, but
                         # pointsourceactivity.rate stored as activity / s.
+                        if pd.isna(row.name[0]):
+                            facility_id = None
+                        else:
+                            facility_id = str(row.name[0])
                         if caching_sources:
                             # row index set as ["facility_id", "source_name"]
-                            pointsource = pointsources[
-                                str(row.name[0]), str(row.name[1])
-                            ]
+                            # in create_or_update_source
+                            pointsource = pointsources[facility_id, str(row.name[1])]
                         else:
-                            facility_id = facilities[str(row.name[0])].id
+                            facility_id = facilities[facility_id].id
                             pointsource = PointSource.objects.get(
                                 name=str(row.name[1]), facility_id=facility_id
                             )
@@ -1046,7 +1052,7 @@ def import_sourceactivities(
             # NB: does not work if column header starts with space, but same for subst:
             activity_keys = [k for k in row.keys() if k.startswith("act:")]
             for activity_key in activity_keys:
-                if not pd.isnull(row[activity_key]):
+                if not pd.isna(row[activity_key]):
                     rate = float(row[activity_key])
                     try:
                         activity = activities[activity_key[4:]]
@@ -1062,7 +1068,11 @@ def import_sourceactivities(
                     # original unit stored in activity.unit, but
                     # areasourceactivity.rate stored as activity / s.
                     # facility_id and source_name set as df index
-                    areasource = areasources[str(row.name[0]), str(row.name[1])]
+                    if pd.isna(row.name[0]):
+                        facility_id = None
+                    else:
+                        facility_id = str(row.name[0])
+                    areasource = areasources[facility_id, str(row.name[1])]
                     try:
                         psa = areasourceactivities[activity, areasource]
                         setattr(psa, "rate", rate)
