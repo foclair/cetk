@@ -29,8 +29,8 @@ def test_aggregate(inventory, tmpdir):
     assert np.all(df.columns.levels[0] == ["emission"])
     assert np.all(df.columns.levels[1] == ["NOx", "PM25"])
     assert df.index.names == ["activitycode", "activity"]
-    assert df.loc["A", ("emission", "NOx")].item() == 1.0
-    assert pd.isna(df.loc["B", ("emission", "PM25")].item())
+    assert df.loc["A", ("emission", "NOx")].item() == 2.018
+    assert df.loc["B", ("emission", "PM25")].item() == 1.0
 
     result2_csv = tmpdir / "table2.csv"
     try:
@@ -40,7 +40,7 @@ def test_aggregate(inventory, tmpdir):
         assert False, "error running aggregation"
     df = pd.read_csv(result2_csv, index_col=0, header=[0, 1], delimiter=";")
     assert np.all(df.columns.levels[0] == ["emission"])
-    assert np.all(df.columns.levels[1] == ["NOx", "PM10", "PM25", "SOx"])
+    assert np.all(df.columns.levels[1] == ["CO", "NMVOC", "NOx", "PM10", "PM25", "SOx"])
     assert df.index.names == ["activity"]
     assert df.loc["total", ("emission", "NOx")].item() == approx(2.840229e9)
     assert df.loc["total", ("emission", "PM25")].item() == approx(1.583291e9)
