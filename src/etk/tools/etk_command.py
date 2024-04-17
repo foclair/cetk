@@ -143,7 +143,10 @@ class Editor(object):
         except ImportError:
             log.error(f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}")
         else:
-            log.info(f"imported data {db_updates}")
+            log.info(
+                datetime.datetime.now().strftime("%H:%M:%S")
+                + f" imported data {db_updates}"
+            )
         return db_updates, return_msg
 
     def update_emission_tables(
