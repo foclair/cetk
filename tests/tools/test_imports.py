@@ -15,6 +15,7 @@ def pointsourceactivities_xlsx():
     return resources.files("edb.data") / "pointsourceactivities.xlsx"
 
 
+@pytest.fixture
 def validation_xlsx():
     return resources.files("tools.data") / "validation.xlsx"
 
@@ -34,7 +35,7 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
 
     (stderr, stdout) = run_import(pointsourceactivities_xlsx, db_path=tmp_db)
     # Find the dictionary part using regular expression
-    match = re.search(pattern, str(stdout[1]))
+    match = re.search(pattern, str(stdout))
     expected_dict = {
         "codeset": {"updated": 0, "created": 2},
         "activitycode": {"updated": 0, "created": 3},
@@ -46,6 +47,11 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
     }
     assert eval(match.group(1)) == expected_dict
 
+    # from etk.tools.utils import CalledProcessError
+    # try:
     (stderr, stdout) = run_import(validation_xlsx, db_path=tmp_db, dry_run=True)
-    assert "Successful dry-run" in str(stdout)
-    assert "Successful dry-run" in str(stdout)
+    # except CalledProcessError as e:
+    #    error = e.stderr.decode("utf-8")
+    #    print(error)
+    assert "ERROR" in str(stdout)
+    assert "Finished dry-run" in str(stdout)

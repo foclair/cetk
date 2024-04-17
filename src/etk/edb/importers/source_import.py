@@ -177,7 +177,7 @@ def import_sources(
     return create_or_update_sources(
         df,
         return_message="",
-        validation=False,
+        validation=validation,
         srid=None,
         sourcetype=sourcetype,
     )

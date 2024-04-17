@@ -143,7 +143,8 @@ class Editor(object):
                     db_updates.update(updates)
                     if len(msgs) != 0:
                         return_msg += msgs
-                        raise ImportError(return_msg)
+                        if not dry_run:
+                            raise ImportError(return_msg)
                 if dry_run:
                     raise DryrunAbort
             # gris-sources imported outside atomic transaction
@@ -159,9 +160,12 @@ class Editor(object):
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename, validation=True)
             if len(msgs) != 0:
-                log.error(f"Errors during import:{os.linesep}{os.linesep.join(msgs)}")
+                log.error(
+                    f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}"
+                )
+                log.info("Finished dry-run")
             else:
-                log.info("Successful dry-run")
+                log.info("Successful dry-run, no errors, the file is ready to import.")
         except ImportError:
             log.error(f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}")
         else:
