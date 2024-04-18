@@ -80,7 +80,8 @@ def run_rasterize_emissions(
     """rasterize emissions and store as NetCDF."""
     cmd_args = ["--rasterize", str(outputpath), "--cellsize", str(cellsize)]
     if extent is not None:
-        cmd_args += ["--extent", " ".join(map(str, extent))]
+        cmd_args += ["--extent"]
+        cmd_args += [f"{x}" for x in extent]
     if srid is not None:
         cmd_args += ["--srid", str(srid)]
     if begin is not None and end is not None:
