@@ -132,14 +132,18 @@ class Editor(object):
             # validate grid sources
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename, validation=True)
-            if len(msgs) != 0:
                 return_msg += msgs
+            if len(return_msg) != 0:
                 log.error(
                     f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}"
                 )
                 log.info("Finished dry-run")
             else:
                 log.info("Successful dry-run, no errors, the file is ready to import.")
+                log.info(
+                    datetime.datetime.now().strftime("%H:%M:%S")
+                    + f" data to be imported {db_updates}"
+                )
         except ImportError:
             log.error(f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}")
         else:
