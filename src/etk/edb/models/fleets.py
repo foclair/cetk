@@ -8,21 +8,6 @@ from django.db.models import Q
 from etk.edb.const import CHAR_FIELD_LENGTH
 
 from .road_models import Vehicle, VehicleFuel, VehicleFuelComb
-from .timevar_models import TimevarBase
-
-
-class FlowTimevar(TimevarBase):
-    """A road time-variation profile."""
-
-    class Meta(TimevarBase.Meta):
-        default_related_name = "flow_timevars"
-
-
-class ColdstartTimevar(TimevarBase):
-    """A vehicle cold start time-variation profile."""
-
-    class Meta(TimevarBase.Meta):
-        default_related_name = "coldstart_timevars"
 
 
 class FleetManager(models.Manager):
@@ -44,7 +29,7 @@ class FleetManager(models.Manager):
                     if (m["vehicle"], fu["fuel"]) not in validcombinations:
                         raise ValueError(
                             f"{m['vehicle']}/{fu['fuel']} is not a valid vehicle/fuel"
-                            f"combination"
+                            + " combination"
                         )
 
         fleets = [

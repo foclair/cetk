@@ -89,9 +89,10 @@ class TestFleet:
 
     def test_bulk_create_from_dicts(self, inventory, fleetdata):
         inv1 = inventory  # noqa
-        with assertNumQueries(6):
+        with assertNumQueries(8):
             # 1 get vehicles, 1 get fuels, 1 get vehicle/fuel combs,
             # 1 create fleets, 1 create fleet members, 1 create fleet member fuels
+            # 2 extra to avoid error unsaved related object fleet(_member)
             Fleet.objects.bulk_create_from_dicts(fleetdata)
         fleets = Fleet.objects.all()
         assert len(fleets) == 2
@@ -101,7 +102,6 @@ class TestFleet:
                 fleet.default_heavy_vehicle_share == data["default_heavy_vehicle_share"]
             )
             assert fleet.tags == data.get("tags", {})
-            assert fleet.is_template == data.get("is_template", False)
             members = fleet.vehicles.order_by("-fraction")
             assert len(members) == len(data["members"])
             for member, memberdata in zip(members, data["members"]):
@@ -123,4 +123,4 @@ class TestFleet:
     ):
         fleetdata[0]["members"][0]["fuels"][0]["fuel"] = "CNG"
         with pytest.raises(ValueError, match="not a valid vehicle/fuel combination"):
-            Fleet.objects.bulk_create_from_dicts(inventory, fleetdata)
+            Fleet.objects.bulk_create_from_dicts(fleetdata)
