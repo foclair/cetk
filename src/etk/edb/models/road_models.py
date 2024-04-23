@@ -12,9 +12,9 @@ from django.utils.translation import gettext_lazy as _
 
 from etk.edb.const import CHAR_FIELD_LENGTH, CODE_FIELD_LENGTH, WGS84_SRID
 
-from .common_models import Settings
+from .common_models import Settings, Substance
 from .fleets import FlowTimevar
-from .source_models import SourceBase, Substance
+from .source_models import SourceBase
 
 # FlowTimeVar in fleets.py, import from there?
 

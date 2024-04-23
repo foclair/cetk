@@ -5,7 +5,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("edb", "0003_model_updates"),
+        ("edb", "0004_traffic_models"),
     ]
 
     operations = [

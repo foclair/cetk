@@ -57,6 +57,7 @@ class FleetManager(models.Manager):
             for f in data
         ]
         self.model.objects.bulk_create(fleets)
+        fleets = self.model.objects.all()
 
         membermodel = self.model._meta.get_field("vehicles").related_model
         members = [
@@ -72,6 +73,7 @@ class FleetManager(models.Manager):
             for m in f["members"]
         ]
         membermodel.objects.bulk_create(members)
+        members = membermodel.objects.all()
 
         memberfuelmodel = membermodel._meta.get_field("fuels").related_model
         memberfuels = [
