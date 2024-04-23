@@ -1,11 +1,5 @@
 from .common_models import Parameter, Settings, Substance  # noqa
-from .fleets import (  # noqa: F401
-    ColdstartTimevar,
-    Fleet,
-    FleetMember,
-    FleetMemberFuel,
-    FlowTimevar,
-)
+from .fleets import Fleet, FleetMember, FleetMemberFuel  # noqa: F401
 from .gridsource_models import (  # noqa
     GridSource,
     GridSourceActivity,
@@ -46,4 +40,9 @@ from .source_models import (  # noqa
     PointSourceSubstance,
     VerticalDist,
 )
-from .timevar_models import Timevar, timevar_to_series  # noqa
+from .timevar_models import (  # noqa
+    ColdstartTimevar,
+    FlowTimevar,
+    Timevar,
+    timevar_to_series,
+)
