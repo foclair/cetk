@@ -16,8 +16,6 @@ grid_subst as (
 -- road_subst as (
 -- 	select distinct veh_ef.substance_id
 -- 	from edb_vehicleef as veh_ef
--- 	join edb_roadefset as roadefset on veh_ef.ef_set_id = roadefset.id
--- 	where roadefset.id = %(road_ef_set_id)s
 -- ),
 source_ef_subst as (
 	select distinct ef.substance_id

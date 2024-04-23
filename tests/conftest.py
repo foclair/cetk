@@ -106,6 +106,28 @@ def code_sets(vertical_dist):
     return (cs1, cs2)
 
 
+@pytest.fixture()
+def test_flowtimevar(db):
+    # array representing daytime activity
+    daytime_profile = np.ones((24, 7)) * 100
+    daytime_profile[:7, :] = 0
+    daytime_profile[23:, :] = 0
+    test_flowtimevar = models.FlowTimevar.objects.create(
+        name="daytime", typeday=str(daytime_profile.tolist())
+    )
+    return test_flowtimevar
+
+
+@pytest.fixture()
+def test_coldstarttimevar(db):
+    # array representing constant timevar
+    daytime_profile = np.ones((24, 7)) * 100
+    test_timevar = models.ColdstartTimevar.objects.create(
+        name="daytime", typeday=str(daytime_profile.tolist())
+    )
+    return test_timevar
+
+
 # @pytest.fixture()
 # def vehicle_fuels(db):
 #     petrol = VehicleFuel.objects.create(name="petrol")
