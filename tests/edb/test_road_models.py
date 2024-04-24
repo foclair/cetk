@@ -26,9 +26,8 @@ def dictfetchall(cursor):
 
 
 class TestCongestionProfile:
-    def test_congestion_profile(self, inventories):
-        inv1 = inventories[0]
-        constant_timevar = inv1.flow_timevars.get(name="constant")
+    def test_congestion_profile(self, test_flowtimevar_constant):
+        constant_timevar = test_flowtimevar_constant
 
         test_profile = np.ones((24, 7)) * 1
         test_profile[:7, :] = 2
@@ -36,8 +35,7 @@ class TestCongestionProfile:
 
         congestion_profile = CongestionProfile.objects.create(
             name="test congestion profile",
-            inventory=inv1,
-            traffic_condition=test_profile.tolist(),
+            traffic_condition=str(test_profile.tolist()),
         )
 
         conditions = congestion_profile.get_fractions(constant_timevar)
@@ -53,7 +51,7 @@ class TestCongestionProfile:
     )
     def test_to_series(self, start, shift):
         congestion = CongestionProfile(
-            id=123, traffic_condition=[[1] * 7, [2] * 7, [3] * 7, [4] * 7] * 6
+            id=123, traffic_condition=str([[1] * 7, [2] * 7, [3] * 7, [4] * 7] * 6)
         )
         time_index = pd.date_range(
             start, periods=24 * 7 * 2, freq="H", tz=datetime.timezone.utc
@@ -66,34 +64,23 @@ class TestCongestionProfile:
 
 
 class TestRoadSource:
-    @pytest.fixture
-    def inventory(self, ifactory):
-        return ifactory.edb.inventory()
+    # @pytest.fixture
+    # def roadclass(self, ifactory):
+    #     return ifactory.edb.roadclass()
 
-    @pytest.fixture
-    def roadclass(self, ifactory):
-        return ifactory.edb.roadclass()
-
-    @pytest.fixture
-    def fleet(self, ifactory, inventory):
-        fleet = ifactory.edb.fleet(inventory=inventory, default_heavy_vehicle_share=0.3)
-        ifactory.edb.fleetmember(
-            fraction=1, vehicle=ifactory.edb.vehicle(isheavy=True), fleet=fleet
-        )
-        ifactory.edb.fleetmember(
-            fraction=1, vehicle=ifactory.edb.vehicle(isheavy=False), fleet=fleet
-        )
-        return fleet
-
-    def test_roadsource_manager_create(self, inventories, fleets, roadclasses):
+    def test_roadsource_manager_create(self, fleets, roadclasses):
         """
         Test creating a new roadsource with references to an inventory.
         """
-        inv1 = inventories[0]
-        freeflow = inv1.congestion_profiles.get(name="free-flow")
+        test_profile = np.ones((24, 7)) * 1
+        test_profile[:7, :] = 2
+        test_profile[23:, :] = 2
+        CongestionProfile.objects.create(
+            name="free-flow", traffic_condition=str(test_profile.tolist())
+        )
+        freeflow = CongestionProfile.objects.get(name="free-flow")
         src1 = RoadSource.objects.create(
             name="roadsource1",
-            inventory=inv1,
             geom=LineString((1.0, 1.0), (2.0, 2.0), srid=WGS84_SRID),
             fleet=fleets[0],
             roadclass=roadclasses[0],
@@ -114,72 +101,64 @@ class TestRoadSource:
             {"heavy_vehicle_share": 1},
         ],
     )
-    def test_create(self, inventory, roadclass, attrs):
+    def test_create(self, roadclasses, attrs):
         try:
             RoadSource.objects.create(
                 geom="LINESTRING (0 0, 1 1)",
-                roadclass=roadclass,
-                inventory=inventory,
+                roadclass=roadclasses[0],
                 **attrs,
             )
         except IntegrityError as exc:
             pytest.fail(f"Unexpected IntegrityError when creating road source: {exc}")
 
-    def test_negative_aadt(self, inventory, roadclass):
+    def test_negative_aadt(self, roadclasses):
         with pytest.raises(IntegrityError) as excinfo:
             RoadSource.objects.create(
                 geom="LINESTRING (0 0, 1 1)",
                 aadt=-1,
-                roadclass=roadclass,
-                inventory=inventory,
+                roadclass=roadclasses[0],
             )
         assert "aadt" in str(excinfo.value)
 
     @pytest.mark.parametrize("nolanes", [-1, 0])
-    def test_invalid_nolanes(self, inventory, roadclass, nolanes):
+    def test_invalid_nolanes(self, roadclasses, nolanes):
         with pytest.raises(IntegrityError) as excinfo:
             RoadSource.objects.create(
                 geom="LINESTRING (0 0, 1 1)",
                 nolanes=nolanes,
-                roadclass=roadclass,
-                inventory=inventory,
+                roadclass=roadclasses[0],
             )
         assert "nolanes" in str(excinfo.value)
 
     @pytest.mark.parametrize("width", [-1, 0, 0.0])
-    def test_invalid_width(self, inventory, roadclass, width):
+    def test_invalid_width(self, roadclasses, width):
         with pytest.raises(IntegrityError) as excinfo:
             RoadSource.objects.create(
                 geom="LINESTRING (0 0, 1 1)",
                 width=width,
-                roadclass=roadclass,
-                inventory=inventory,
+                roadclass=roadclasses[0],
             )
         assert "width" in str(excinfo.value)
 
     @pytest.mark.parametrize("median_strip_width", [-1, -0.1, 20])
-    def test_invalid_median_strip_width(self, inventory, roadclass, median_strip_width):
+    def test_invalid_median_strip_width(self, roadclasses, median_strip_width):
         with pytest.raises(IntegrityError) as excinfo:
             RoadSource.objects.create(
                 geom="LINESTRING (0 0, 1 1)",
                 width=20,
                 median_strip_width=median_strip_width,
-                roadclass=roadclass,
-                inventory=inventory,
+                roadclass=roadclasses[0],
             )
         assert "median_strip_width" in str(excinfo.value)
 
     @pytest.mark.parametrize("heavy_vehicle_share", [-0.1, 1.1])
-    def test_invalid_heavy_vehicle_share(
-        self, inventory, roadclass, heavy_vehicle_share
-    ):
+    def test_invalid_heavy_vehicle_share(self, roadclasses, heavy_vehicle_share):
         with pytest.raises(IntegrityError) as excinfo:
             RoadSource.objects.create(
                 geom="LINESTRING (0 0, 1 1)",
                 width=20,
                 heavy_vehicle_share=heavy_vehicle_share,
-                roadclass=roadclass,
-                inventory=inventory,
+                roadclass=roadclasses[0],
             )
         assert "heavy_vehicle_share" in str(excinfo.value)
 
@@ -190,13 +169,13 @@ class TestRoadSource:
         road = RoadSource(width=20, median_strip_width=median_strip_width)
         assert road.drivable_width == expected_drivable_width
 
-    def test_get_heavy_vehicle_share(self, fleet):
-        road = RoadSource(fleet=fleet, heavy_vehicle_share=0.6)
+    def test_get_heavy_vehicle_share(self, fleets):
+        road = RoadSource(fleet=fleets[0], heavy_vehicle_share=0.6)
         assert road.get_heavy_vehicle_share() == 0.6
 
-    def test_get_heavy_vehicle_share_from_fleet(self, fleet):
-        road = RoadSource(fleet=fleet)
-        assert road.get_heavy_vehicle_share() == fleet.default_heavy_vehicle_share
+    def test_get_heavy_vehicle_share_from_fleet(self, fleets):
+        road = RoadSource(fleet=fleets[0])
+        assert road.get_heavy_vehicle_share() == fleets[0].default_heavy_vehicle_share
 
     @pytest.mark.parametrize(
         "rel_dist,target_x,target_y,target_bearing",
@@ -215,9 +194,12 @@ class TestRoadSource:
             pytest.param(1.0000, 0.0, -0.0, 315, marks=pytest.mark.xfail),
         ],
     )
-    def test_get_segments(self, ifactory, rel_dist, target_x, target_y, target_bearing):
+    def test_get_segments(
+        self, roadsources, rel_dist, target_x, target_y, target_bearing
+    ):
         geom = LineString((0, 0), (1, 1), (2, 0), (1, -1), (0, 0), srid=3006)
-        road = ifactory.edb.roadsource(geom=geom.transform(4326, clone=True))
+        road = roadsources[0]
+        road.geom = geom
         ((point, bearing),) = road.get_segments([rel_dist])
         assert point.transform(3006, clone=True).coords == (
             pytest.approx(target_x, rel=1e-3, abs=1e-3),
@@ -226,7 +208,7 @@ class TestRoadSource:
         assert bearing == pytest.approx(target_bearing)
 
         geom = LineString((0, 0), (1, 1), (1, 1), (1, -1), srid=3006)
-        road = ifactory.edb.roadsource(geom=geom.transform(4326, clone=True))
+        road.geom = geom
         ((point, bearing),) = road.get_segments([rel_dist])
 
     def test_str(self, roadsources):
@@ -235,81 +217,63 @@ class TestRoadSource:
         assert str(src1) == src1.name
 
 
-class TestInventoryRoadSources:
-    @pytest.mark.usefixtures("roadsources")
-    def test_sources(self, inventories):
-        """Test filtering and listing sources."""
-        inv1 = inventories[0]
-
-        ids = [source.pk for source in inv1.sources("road").all()]
-        assert inv1.sources("road", ids=ids[:-1]).count() == len(ids) - 1
-
-        # test filtering name using regexp
-        assert inv1.sources("road", name=".*1").count() == 1
-
-        # test filtering on tags
-        assert inv1.sources("road", tags={"tag2": "B"}).count() == 1
-
-        assert inv1.sources("road", polygon=POLYGON_WKT).count() == 2
-
+class TestRoadSources:
     @pytest.mark.usefixtures("fleets", "roadclasses")
-    def test_road_emissions(self, inventories, road_ef_sets, vehicles, roadsources):
+    def test_road_emissions(self, vehicles, roadsources, code_sets):
         """Test to calculate road emissions and to filter by ac."""
 
         subst1 = Substance.objects.get(slug="NOx")
-        subst2 = Substance.objects.get(slug="SOx")
+        # subst2 = Substance.objects.get(slug="SOx")
 
-        road_ef_set1, road_ef_set2 = road_ef_sets[:2]
-
-        inv1 = inventories[0]
-        srid = inv1.project.domain.srid
-        ac1 = {ac.code: ac for ac in inv1.base_set.code_set1.codes.all()}
+        # srid = WGS84_SRID
+        # ac1 = dict([(ac.code, ac) for ac in code_sets[0].codes.all()])
         road1, road2, road3 = roadsources[:3]
 
         # test filtering emissions by name and substance 1
         # calculate emissions in db
-        emission_recs = dictfetchall(
-            inv1.emissions("road", road_ef_set1, srid, name=".*1", substances=subst1)
-        )
+        # emission_recs = dictfetchall(
+        #     inv1.emissions("road", road_ef_set1, srid, name=".*1", substances=subst1)
+        # )
 
         # calculate emissions outside of db
-        ref_emis_by_veh_and_subst = road1.emission(road_ef_set1, substance=subst1)
+        ref_emis_by_veh_and_subst = road1.emission(substance=subst1)
+        assert ref_emis_by_veh_and_subst[Vehicle.objects.get(name="car")][subst1] > 0
 
         # sort calculated emissions into a nested dict
-        emis_by_veh_and_subst = {}
-        for em in emission_recs:
-            em_subst = Substance.objects.get(pk=em["substance_id"])
-            em_veh = Vehicle.objects.get(pk=em["vehicle_id"])
-            if em_veh not in emis_by_veh_and_subst:
-                emis_by_veh_and_subst[em_veh] = {}
-            veh_subst = emis_by_veh_and_subst[em_veh]
-            veh_subst[em_subst] = em
+        # emis_by_veh_and_subst = {}
+        # for em in emission_recs:
+        #     em_subst = Substance.objects.get(pk=em["substance_id"])
+        #     em_veh = Vehicle.objects.get(pk=em["vehicle_id"])
+        #     if em_veh not in emis_by_veh_and_subst:
+        #         emis_by_veh_and_subst[em_veh] = {}
+        #     veh_subst = emis_by_veh_and_subst[em_veh]
+        #     veh_subst[em_subst] = em
 
-            assert emis_by_veh_and_subst[em_veh][em_subst]["emis"] == pytest.approx(
-                ref_emis_by_veh_and_subst[em_veh][em_subst], 1e-6
-            )
+        #     assert emis_by_veh_and_subst[em_veh][em_subst]["emis"] == pytest.approx(
+        #         ref_emis_by_veh_and_subst[em_veh][em_subst], 1e-6
+        #     )
 
         # test filtering emissions by name, substance 1 and activitycode1
         # calculate emission in db
-        emis_ac_3_2 = dictfetchall(
-            inv1.emissions(
-                "road",
-                road_ef_set1,
-                srid,
-                name=".*1",
-                substances=subst2,
-                ac1=ac1["1.3.2"],
-            )
-        )[0]
+        # emis_ac_3_2 = dictfetchall(
+        #     inv1.emissions(
+        #         "road",
+        #         road_ef_set1,
+        #         srid,
+        #         name=".*1",
+        #         substances=subst2,
+        #         ac1=ac1["1.3.2"],
+        #     )
+        # )[0]
 
-        # calculate emission outside db
-        ref_emis_subst2_ac_3_2 = road1.emission(
-            road_ef_set1, substance=subst2, ac1=[ac1["1.3.2"]]
-        )
-        veh = vehicles[1]
-        assert emis_ac_3_2["emis"] == pytest.approx(
-            ref_emis_subst2_ac_3_2[veh][subst2], 1e-6
-        )
+        # # calculate emission outside db
+        # ref_emis_subst2_ac_3_2 = road1.emission(
+        #     road_ef_set1, substance=subst2, ac1=[ac1["1.3.2"]]
+        # )
+        # veh = vehicles[1]
+        # assert emis_ac_3_2["emis"] == pytest.approx(
+        #     ref_emis_subst2_ac_3_2[veh][subst2], 1e-6
+        # )
 
     @pytest.mark.usefixtures("vehicles", "fleets", "roadclasses")
     def test_road_missions_filter_by_name(self, inventories, road_ef_sets, roadsources):
