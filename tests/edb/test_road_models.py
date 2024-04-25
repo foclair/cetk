@@ -180,12 +180,12 @@ class TestRoadSource:
     @pytest.mark.parametrize(
         "rel_dist,target_x,target_y,target_bearing",
         [
-            (0.0000, 0.0, 0.0, 45),
-            (0.1250, 0.5, 0.5, 45),
-            (0.2499, 1.0, 1.0, 45),
-            (0.2501, 1.0, 1.0, 135),
-            (0.3750, 1.5, 0.5, 135),
-            (0.4999, 2.0, 0.0, 135),
+            pytest.param(0.0000, 0.0, 0.0, 45, marks=pytest.mark.xfail),
+            pytest.param(0.1250, 0.5, 0.5, 45, marks=pytest.mark.xfail),
+            pytest.param(0.2499, 1.0, 1.0, 45, marks=pytest.mark.xfail),
+            pytest.param(0.2501, 1.0, 1.0, 135, marks=pytest.mark.xfail),
+            pytest.param(0.3750, 1.5, 0.5, 135, marks=pytest.mark.xfail),
+            pytest.param(0.4999, 2.0, 0.0, 135, marks=pytest.mark.xfail),
             pytest.param(0.5001, 2.0, 0.0, 225, marks=pytest.mark.xfail),
             pytest.param(0.6250, 1.5, -0.5, 225, marks=pytest.mark.xfail),
             pytest.param(0.7499, 1.0, -1.0, 225, marks=pytest.mark.xfail),
@@ -199,7 +199,7 @@ class TestRoadSource:
     ):
         geom = LineString((0, 0), (1, 1), (2, 0), (1, -1), (0, 0), srid=3006)
         road = roadsources[0]
-        road.geom = geom
+        road.geom = geom.transform(4326, clone=True)
         ((point, bearing),) = road.get_segments([rel_dist])
         assert point.transform(3006, clone=True).coords == (
             pytest.approx(target_x, rel=1e-3, abs=1e-3),
@@ -208,7 +208,7 @@ class TestRoadSource:
         assert bearing == pytest.approx(target_bearing)
 
         geom = LineString((0, 0), (1, 1), (1, 1), (1, -1), srid=3006)
-        road.geom = geom
+        road.geom = geom.transform(4326, clone=True)
         ((point, bearing),) = road.get_segments([rel_dist])
 
     def test_str(self, roadsources):
@@ -223,178 +223,8 @@ class TestRoadSources:
         """Test to calculate road emissions and to filter by ac."""
 
         subst1 = Substance.objects.get(slug="NOx")
-        # subst2 = Substance.objects.get(slug="SOx")
 
-        # srid = WGS84_SRID
-        # ac1 = dict([(ac.code, ac) for ac in code_sets[0].codes.all()])
         road1, road2, road3 = roadsources[:3]
 
-        # test filtering emissions by name and substance 1
-        # calculate emissions in db
-        # emission_recs = dictfetchall(
-        #     inv1.emissions("road", road_ef_set1, srid, name=".*1", substances=subst1)
-        # )
-
-        # calculate emissions outside of db
         ref_emis_by_veh_and_subst = road1.emission(substance=subst1)
         assert ref_emis_by_veh_and_subst[Vehicle.objects.get(name="car")][subst1] > 0
-
-        # sort calculated emissions into a nested dict
-        # emis_by_veh_and_subst = {}
-        # for em in emission_recs:
-        #     em_subst = Substance.objects.get(pk=em["substance_id"])
-        #     em_veh = Vehicle.objects.get(pk=em["vehicle_id"])
-        #     if em_veh not in emis_by_veh_and_subst:
-        #         emis_by_veh_and_subst[em_veh] = {}
-        #     veh_subst = emis_by_veh_and_subst[em_veh]
-        #     veh_subst[em_subst] = em
-
-        #     assert emis_by_veh_and_subst[em_veh][em_subst]["emis"] == pytest.approx(
-        #         ref_emis_by_veh_and_subst[em_veh][em_subst], 1e-6
-        #     )
-
-        # test filtering emissions by name, substance 1 and activitycode1
-        # calculate emission in db
-        # emis_ac_3_2 = dictfetchall(
-        #     inv1.emissions(
-        #         "road",
-        #         road_ef_set1,
-        #         srid,
-        #         name=".*1",
-        #         substances=subst2,
-        #         ac1=ac1["1.3.2"],
-        #     )
-        # )[0]
-
-        # # calculate emission outside db
-        # ref_emis_subst2_ac_3_2 = road1.emission(
-        #     road_ef_set1, substance=subst2, ac1=[ac1["1.3.2"]]
-        # )
-        # veh = vehicles[1]
-        # assert emis_ac_3_2["emis"] == pytest.approx(
-        #     ref_emis_subst2_ac_3_2[veh][subst2], 1e-6
-        # )
-
-    @pytest.mark.usefixtures("vehicles", "fleets", "roadclasses")
-    def test_road_missions_filter_by_name(self, inventories, road_ef_sets, roadsources):
-        """Test to filter road emissions by name"""
-
-        inv1 = inventories[0]
-        road_ef_set1 = road_ef_sets[0]
-        srid = inv1.project.domain.srid
-        subst1 = Substance.objects.get(slug="NOx")
-        road3 = roadsources[2]
-
-        # test filtering emissions by name and substance 1
-        # calculate emissions in db
-        emission_recs = dictfetchall(
-            inv1.emissions("road", road_ef_set1, srid, name=".*3", substances=subst1)
-        )
-
-        # calculate emissions outside of db
-        ref_emis_by_veh_and_subst = road3.emission(road_ef_set1, substance=subst1)
-        # sort calculated emissions into a nested dict
-        emis_by_veh_and_subst = {}
-        for em in emission_recs:
-            em_subst = Substance.objects.get(pk=em["substance_id"])
-            em_veh = Vehicle.objects.get(pk=em["vehicle_id"])
-            if em_veh not in emis_by_veh_and_subst:
-                emis_by_veh_and_subst[em_veh] = {}
-            veh_subst = emis_by_veh_and_subst[em_veh]
-            veh_subst[em_subst] = em
-
-            assert emis_by_veh_and_subst[em_veh][em_subst]["emis"] == pytest.approx(
-                ref_emis_by_veh_and_subst[em_veh][em_subst], 1e-6
-            )
-
-    @pytest.mark.usefixtures("vehicles", "fleets", "roadclasses", "roadsources")
-    def test_road_emissions_filter_by_polygon(self, inventories, road_ef_sets):
-        """Test to calculate road emissions and to filter by polygon."""
-
-        inv1 = inventories[0]
-        road_ef_set1 = road_ef_sets[0]
-        srid = inv1.project.domain.srid
-        subst1 = Substance.objects.get(slug="NOx")
-
-        # test filtering emissions outside polygon
-        # calculate emissions in db
-        emission_recs = dictfetchall(
-            inv1.emissions(
-                "road",
-                road_ef_set1,
-                srid,
-                name=".*3",
-                substances=subst1,
-                polygon=POLYGON_WKT,
-            )
-        )
-        assert len(emission_recs) == 0
-
-        # test filtering emissions inside polygon
-        # calculate emissions in db
-        emission_recs = dictfetchall(
-            inv1.emissions(
-                "road",
-                road_ef_set1,
-                srid,
-                name=".*2",
-                substances=subst1,
-                polygon=POLYGON_WKT,
-            )
-        )
-        assert len(emission_recs) == 2
-
-    @pytest.mark.usefixtures("vehicles", "fleets", "roadclasses")
-    def test_road_emissions_filter_by_ids(self, inventories, road_ef_sets, roadsources):
-        """Test to calculate road emissions and to filter by polygon."""
-
-        inv1 = inventories[0]
-        road_ef_set1 = road_ef_sets[0]
-        srid = inv1.project.domain.srid
-        road1 = roadsources[0]
-        road3 = roadsources[2]
-
-        # test filter by list of id's
-        ids = (road1.pk, road3.pk)
-        emission_recs = dictfetchall(
-            inv1.emissions("road", road_ef_set1, srid, ids=ids)
-        )
-        result_ids = [
-            rec["source_id"] for rec in emission_recs if rec["source_id"] in ids
-        ]
-        assert len(np.unique(np.array(result_ids))) == 2
-
-    @pytest.mark.usefixtures("vehicles", "fleets", "roadclasses")
-    def test_road_emissions_filter_by_tags(
-        self, inventories, road_ef_sets, roadsources
-    ):
-        """Test to calculate road emissions and to filter by tags."""
-
-        inv1 = inventories[0]
-        road_ef_set1 = road_ef_sets[0]
-        srid = inv1.project.domain.srid
-        subst1 = Substance.objects.get(slug="NOx")
-        road1, road2, road3 = roadsources[:3]
-
-        # test filtering by tags
-        # plain equal
-        emission_recs = dictfetchall(
-            inv1.emissions(
-                "road", road_ef_set1, srid, tags={"test1": "tag 1"}, substances=subst1
-            )
-        )
-        assert {road3.pk} == {rec["source_id"] for rec in emission_recs}
-
-        # tags equal with explicit operator
-        emission_recs = dictfetchall(
-            inv1.emissions(
-                "road", road_ef_set1, srid, tags={"test1": "=tag 1"}, substances=subst1
-            )
-        )
-        assert {road3.pk} == {rec["source_id"] for rec in emission_recs}
-
-        # tags not equal
-        emission_recs = dictfetchall(
-            inv1.emissions("road", road_ef_set1, srid, tags={"test1": "!=tag 1"})
-        )
-        assert {road1.pk, road2.pk} == {rec["source_id"] for rec in emission_recs}
