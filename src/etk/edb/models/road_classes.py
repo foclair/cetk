@@ -138,7 +138,8 @@ class RoadClassManager(models.Manager.from_queryset(RoadClassQuerySet)):
             self.model(traffic_situation=traffic_situations[ts_id]) for ts_id in ts_ids
         ]
         self.bulk_create(road_classes)
-
+        ids = set([ts.id for ts in traffic_situations.values()])
+        road_classes = self.model.objects.filter(traffic_situation_id__in=ids)
         if create_values:
             attributes = RoadAttribute.objects.all()
             value_model = self.get_value_model()
@@ -155,8 +156,9 @@ class RoadClassManager(models.Manager.from_queryset(RoadClassQuerySet)):
             value_model.objects.bulk_create(
                 [v for values in valid_values.values() for v in values.values()]
             )
-        else:
-            valid_values = get_valid_road_attribute_values()
+        # need to define valid values even if create_values,
+        # otherwise unsaved related object 'roadattributevalue'
+        valid_values = get_valid_road_attribute_values()
 
         through_model = self.model.attribute_values.through
         try:
