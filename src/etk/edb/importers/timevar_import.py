@@ -1,7 +1,7 @@
 import numpy as np
 from django.db import IntegrityError
 
-from etk.edb.models import Timevar
+from etk.edb.models import ColdstartTimevar, FlowTimevar, Timevar
 
 from .utils import import_error, worksheet_to_dataframe
 
@@ -85,6 +85,14 @@ def import_timevars(timevar_data, overwrite=False, validation=False):
         if vartype == "emission":
             timevars.setdefault("emission", {}).update(
                 make_timevar(timevar_data[vartype], Timevar)
+            )
+        elif vartype == "flow":
+            timevars.setdefault("flow", {}).update(
+                make_timevar(timevar_data[vartype], FlowTimevar)
+            )
+        elif vartype == "coldstart":
+            timevars.setdefault("coldstart", {}).update(
+                make_timevar(timevar_data[vartype], ColdstartTimevar)
             )
         else:
             return_message.append(
