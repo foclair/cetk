@@ -14,6 +14,7 @@ from .road_classes import (  # noqa: F401
     RoadAttribute,
     RoadAttributeValue,
     RoadClass,
+    get_valid_road_attribute_values,
 )
 from .road_models import (  # noqa: F401
     VELOCITY_CHOICES,

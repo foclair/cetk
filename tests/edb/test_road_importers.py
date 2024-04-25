@@ -93,3 +93,61 @@ def test_import_vehicles(code_sets, get_data_file):
 
     assert lorry_diesel.activitycode1.code == "1.3.2"
     assert lorry_diesel.activitycode2.code == "A"
+
+
+def test_import_roadclasses(code_sets, get_data_file):
+    """test importing roadclasses."""
+    assert RoadClass.objects.all().count() == 0
+    code_set1, code_set2 = code_sets[:2]
+
+    vehiclefile = get_data_file("vehicles.csv")
+    vehiclesettings = get_yaml_data("vehicles.yaml")
+    import_vehicles(vehiclefile, vehiclesettings, 2019, unit="kg/m", encoding="utf-8")
+
+    roadclassfile = get_data_file("roadclasses.csv")
+    roadclass_settings = get_yaml_data("roadclasses.yaml")
+    import_roadclasses(roadclassfile, roadclass_settings, encoding="utf-8")
+
+    assert RoadClass.objects.all().count() == 2
+    # set more asserts now that roadclasstree removed
+    # assert rc_tree["attribute"] == "roadtype"
+    # assert "motorway" in rc_tree["values"]
+    # assert rc_tree["values"]["motorway"]["attribute"] == "speed"
+    # assert "90" in rc_tree["values"]["motorway"]["values"]
+    # assert "primary road" in rc_tree["values"]
+    # assert rc_tree["values"]["primary road"]["attribute"] == "speed"
+    # assert "70" in rc_tree["values"]["primary road"]["values"]
+
+    # test overwrite
+    import_roadclasses(
+        roadclassfile,
+        roadclass_settings,
+        encoding="utf-8",
+        overwrite=True,
+    )
+    assert RoadClass.objects.all().count() == 2
+
+
+def test_import_roadclasses_1attr(db, get_data_file):
+    vehiclefile = get_data_file("vehicles.csv")
+    vehiclesettings = get_yaml_data("vehicles.yaml")
+    import_vehicles(vehiclefile, vehiclesettings, 2019, unit="kg/m", encoding="utf-8")
+
+    roadclassfile = get_data_file("roadclasses_1attr.csv")
+    roadclass_settings = get_yaml_data("roadclasses_1attr.yaml")
+    import_roadclasses(roadclassfile, roadclass_settings, encoding="utf-8")
+
+    assert RoadClass.objects.all().count() == 2
+    # set more asserts now that rctree removed
+    # assert rc_tree["attribute"] == "roadtype"
+    # assert "motorway" in rc_tree["values"]
+    # assert "primary road" in rc_tree["values"]
+
+    # test overwrite
+    import_roadclasses(
+        roadclassfile,
+        roadclass_settings,
+        encoding="utf-8",
+        overwrite=True,
+    )
+    assert RoadClass.objects.all().count() == 2

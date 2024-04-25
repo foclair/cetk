@@ -22,9 +22,11 @@ from etk.edb.models import (  # noqa
     CodeSet,
     ColdstartTimevar,
     CongestionProfile,
+    Fleet,
     FleetMemberFuel,
     FlowTimevar,
     PrefetchRoadClassAttributes,
+    RoadAttribute,
     RoadClass,
     RoadSource,
     Substance,
@@ -34,6 +36,7 @@ from etk.edb.models import (  # noqa
     VehicleEF,
     VehicleFuel,
     VehicleFuelComb,
+    get_valid_road_attribute_values,
 )
 from etk.edb.units import emission_unit_to_si, vehicle_ef_unit_to_si  # noqa
 from etk.utils import inbatch
@@ -480,7 +483,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
 
 
 def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
-    base_set, roadclass_file, config, *, overwrite=False, **kwargs
+    roadclass_file, config, *, overwrite=False, **kwargs
 ):
     """import roadclasses (traffic-situations must already exist in database)."""
 
@@ -502,7 +505,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             raise ImportError("keyword 'values' not found for in config")
 
         try:
-            attr, _ = base_set.road_attributes.get_or_create(
+            attr, _ = RoadAttribute.objects.get_or_create(
                 name=attr_dict_tmp["name"], slug=attr_dict_tmp["slug"], order=ind
             )
         except IntegrityError as err:
@@ -513,7 +516,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
         defined_attributes[attr] = {"attribute": attr}
         for val in values:
             defined_attributes[attr][val], _ = attr.values.get_or_create(value=val)
-    valid_attributes = base_set.get_valid_road_attribute_values()
+    valid_attributes = get_valid_road_attribute_values()
     for attr, values in valid_attributes.items():
         if attr not in defined_attributes:
             if overwrite:
@@ -532,13 +535,11 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                     )
 
     # cache all existing traffic situations and road-classes
-    traffic_situations = {ts.ts_id: ts for ts in base_set.traffic_situations.all()}
+    traffic_situations = {ts.ts_id: ts for ts in TrafficSituation.objects.all()}
 
     existing_roadclasses = {
         tuple(rc.attributes.values()): rc.id
-        for rc in RoadClass.objects.prefetch_related(
-            PrefetchRoadClassAttributes()
-        ).filter(traffic_situation__base_set=base_set)
+        for rc in RoadClass.objects.prefetch_related(PrefetchRoadClassAttributes())
     }
 
     log.info("reading roadclass table")
@@ -597,11 +598,11 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                     rc.save()
                     rc.attribute_values.set(attribute_values)
                 else:
-                    raise ImportError(
-                        f"roadclass '{rc}' already exist in base-set '{base_set.name}'"
-                    )
+                    raise ImportError(f"roadclass '{rc}' already exists.")
         if len(roadclasses_to_create) > 0:
             RoadClass.objects.bulk_create(map(itemgetter(0), roadclasses_to_create))
+            for rctuple in roadclasses_to_create:
+                rctuple[0].save()
             through_model = RoadClass.attribute_values.through
             values = [
                 through_model(roadclass=rc, roadattributevalue=v)
@@ -611,7 +612,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             through_model.objects.bulk_create(values)
 
 
-def import_congestion_profiles(inventory, profile_data, *, overwrite=False):
+def import_congestion_profiles(profile_data, *, overwrite=False):
     """import congestion profiles."""
 
     # Profile instances must not be created by bulk_create as the save function
@@ -624,20 +625,17 @@ def import_congestion_profiles(inventory, profile_data, *, overwrite=False):
                 if overwrite:
                     newobj = CongestionProfile.objects.update_or_create(
                         name=name,
-                        inventory=inventory,
                         defaults={"traffic_condition": traffic_condition},
                     )
                 else:
                     try:
                         newobj = CongestionProfile.objects.create(
                             name=name,
-                            inventory=inventory,
                             traffic_condition=traffic_condition,
                         )
                     except IntegrityError:
                         raise IntegrityError(
-                            f"Congestion-profile {name} "
-                            f"already exist in inventory {inventory.name}"
+                            f"Congestion-profile {name} " f"already exist in inventory "
                         )
                 retdict[name] = newobj
             except KeyError:
@@ -652,11 +650,10 @@ def import_congestion_profiles(inventory, profile_data, *, overwrite=False):
     return profiles
 
 
-def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
+def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
     """import fleets
 
     args
-        inventory: an inventory instance
         data: a dict with fleets
 
     optional
@@ -664,15 +661,11 @@ def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, 
 
     """
 
-    existing_fuels = {
-        fuel.name: fuel for fuel in inventory.base_set.vehicle_fuels.all()
-    }
-    existing_vehicles = {
-        vehicle.name: vehicle for vehicle in inventory.base_set.vehicles.all()
-    }
-    existing_flow_timevars = {tvar.name: tvar for tvar in inventory.flow_timevars.all()}
+    existing_fuels = {fuel.name: fuel for fuel in VehicleFuel.objects.all()}
+    existing_vehicles = {vehicle.name: vehicle for vehicle in Vehicle.objects.all()}
+    existing_flow_timevars = {tvar.name: tvar for tvar in FlowTimevar.objects.all()}
     existing_coldstart_timevars = {
-        tvar.name: tvar for tvar in inventory.coldstart_timevars.all()
+        tvar.name: tvar for tvar in ColdstartTimevar.objects.all()
     }
 
     fleets = {}
@@ -687,7 +680,7 @@ def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, 
                 f"no 'default_heavy_vehicle_share' specified for fleet '{name}'"
             )
         if overwrite:
-            fleets[name], _ = inventory.fleets.update_or_create(
+            fleets[name], _ = Fleet.objects.update_or_create(
                 name=name,
                 defaults={
                     "is_template": is_template,
@@ -696,7 +689,7 @@ def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, 
             )
         else:
             try:
-                fleets[name] = inventory.fleets.create(
+                fleets[name] = Fleet.objects.create(
                     name=name,
                     is_template=is_template,
                     default_heavy_vehicle_share=default_heavy_vehicle_share,
@@ -704,8 +697,7 @@ def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, 
             except IntegrityError:
                 raise ImportError(
                     f"either duplicate specification in file or "
-                    f"fleet '{name}' already "
-                    f"exist in inventory '{inventory.name}'"
+                    f"fleet '{name}' already exist in inventory"
                 )
 
         members = OrderedDict()
@@ -731,7 +723,7 @@ def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, 
                     raise ImportError(
                         f"timevar '{timevar_name}' specified for vehicle "
                         f"'{vehicle_name}' in fleet '{name}' does not "
-                        f"exist in inventory '{inventory.name}'"
+                        f"exist in inventory"
                     )
             else:
                 member_data["timevar"] = None
@@ -745,8 +737,7 @@ def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, 
                     raise ImportError(
                         f"coldstart timevar '{coldstart_timevar_name}' specified for "
                         f"vehicle '{vehicle_name}' "
-                        f"in fleet '{name}' does not exist in "
-                        f"inventory '{inventory.name}'"
+                        f"in fleet '{name}' does not exist in inventory"
                     )
             else:
                 member_data["coldstart_timevar"] = None
@@ -768,9 +759,8 @@ def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, 
                         )
                     except IntegrityError:
                         raise ImportError(
-                            f"Either duplicate specification of fleet member in"
-                            "config-file, or fleet-member already exist in "
-                            f"inventory '{inventory.name}'"
+                            "Either duplicate specification of fleet member in"
+                            "config-file, or fleet-member already exist in inventory"
                         )
             except (KeyError, TypeError):
                 raise ImportError(
@@ -800,39 +790,32 @@ def import_fleets(inventory, data, *, overwrite=False):  # noqa: C901, PLR0912, 
                 raise ImportError(
                     f"sum of fuel fractions does not sum up to 1.0 (sum={fuel_sum}) "
                     f"for '{vehicle_name}s' of fleet '{name}' in inventory "
-                    f"'{inventory.name}'"
                 )
             FleetMemberFuel.objects.bulk_create(member_fuels)
         if heavy_member_sum > 0 and abs(heavy_member_sum - 1.0) >= 0.005:
             raise ImportError(
                 f"sum of heavy fleet members does not sum up to 1.0 "
                 f"(sum={heavy_member_sum}) "
-                f"for fleet '{name}' in inventory '{inventory.name}'"
+                f"for fleet '{name}' in inventory "
             )
         if light_member_sum > 0 and abs(light_member_sum - 1.0) >= 0.005:
             raise ImportError(
                 f"sum of light fleet members does not sum up to 1.0 "
                 f"(sum={light_member_sum}) "
-                f"for fleet '{name}' in inventory '{inventory.name}'"
+                f"for fleet '{name}' in inventory "
             )
     return len(fleets)
 
 
 def import_roads(  # noqa: C901, PLR0912, PLR0915
-    inventory,
     roadfile,
     config,
-    roadefset=None,
     exclude=None,
     only=None,
     chunksize=1000,
     progress_callback=None,
 ):
     """Import a road network."""
-
-    base_set = inventory.base_set
-    if roadefset is not None:
-        assert roadefset.base_set == base_set
 
     datasource = DataSource(roadfile)
 
@@ -851,10 +834,10 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
 
     if "fleet" in config:
         # prefetch fleets and store in dict for quick lookups
-        fleets = {fleet.name: fleet for fleet in inventory.fleets.all()}
+        fleets = {fleet.name: fleet for fleet in Fleet.objects.all()}
     else:
         fleet_name = defaults.get("fleet", "default")
-        default_fleet, created = inventory.fleets.get_or_create(
+        default_fleet, created = Fleet.objects.get_or_create(
             name=fleet_name, defaults={"default_heavy_vehicle_share": 0.05}
         )
         if created:
@@ -868,9 +851,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
             )
 
     # prefetch congestion profiles and store in dict for quick lookups
-    congestion_profiles = {
-        prof.name: prof for prof in inventory.congestion_profiles.all()
-    }
+    congestion_profiles = {prof.name: prof for prof in CongestionProfile.objects.all()}
     default_congestion_profile_name = defaults.get("congestion_profile")
     default_congestion_profile = None
     if config.get("congestion_profile") is None:
@@ -896,32 +877,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                     f"'{default_congestion_profile_name}' does not exist"
                 )
 
-    # prefetch wear profiles and store in dict for quick lookups
-    wear_profiles = {prof.name: prof for prof in inventory.wear_profiles.all()}
-    default_wear_profile_name = defaults.get("wear_profile")
-    default_wear_profile = None
-    if config.get("wear_profile") is None:
-        if default_wear_profile_name is None:
-            log.warning(
-                "no field for 'wear_profile' specified in road import config file"
-                "and no default specified, no wear profiles will be assigned to "
-                "imported roads"
-            )
-        else:
-            log.warning(
-                "no field specified  for 'wear_profile' in road import config"
-                f", default wear-profile '{default_wear_profile_name}' "
-                "will be used for all imported roads"
-            )
-            try:
-                default_wear_profile = wear_profiles[default_wear_profile_name]
-            except KeyError:
-                raise ImportError(
-                    "default wear-profile "
-                    f"'{default_wear_profile_name}' does not exist"
-                )
-
-    valid_values = base_set.get_valid_road_attribute_values()
+    valid_values = get_valid_road_attribute_values()
     # get valid roadclass attributes
     if "roadclass" in defaults:
         default_roadclass_attributes = {}
@@ -948,9 +904,9 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
 
     roadclasses = {
         generate_key(rc.attributes, valid_values): rc
-        for rc in RoadClass.objects.prefetch_related(PrefetchRoadClassAttributes())
-        .filter(traffic_situation__base_set=base_set)
-        .all()
+        for rc in RoadClass.objects.prefetch_related(
+            PrefetchRoadClassAttributes()
+        ).all()
     }
     if "roadclass" in config:
         # get attribute mappings for roadclass attributes
@@ -971,8 +927,8 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
         # if no mappings are specified for roadclass attributes,
         # a default roadclass and traffic situation will be created
 
-        default_ts, created = base_set.traffic_situations.get_or_create(ts_id="default")
-        if created and roadefset is not None:
+        default_ts, created = TrafficSituation.objects.get_or_create(ts_id="default")
+        if created:
             log.warning(
                 "a 'default' traffic situation is created fo the default roadclass"
             )
@@ -1042,7 +998,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                 f"using default value {road_data['width']}m",
             )
 
-        road = RoadSource(inventory=inventory, **road_data)
+        road = RoadSource(**road_data)
 
         if "roadclass" in config:
             try:
@@ -1063,8 +1019,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
             except KeyError:
                 handle_msg(
                     messages,
-                    f"no roadclass with attribute values {rc_key} in inventory "
-                    f"'{inventory.name}'",
+                    f"no roadclass with attribute values {rc_key} in inventory ",
                     fail_early=True,
                 )
                 raise ValidationError(msg)
@@ -1088,8 +1043,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
             elif name not in congestion_profiles:
                 handle_msg(
                     messages,
-                    f"no congestion profile with name '{name}' in inventory "
-                    f"'{inventory.name}'",
+                    f"no congestion profile with name '{name}' in inventory ",
                     fail_early=True,
                 )
                 raise ValidationError(msg)
@@ -1097,33 +1051,6 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                 road.congestion_profile = congestion_profiles[name]
         else:
             road.congestion_profile = default_congestion_profile
-
-        if "wear_profile" in config:
-            try:
-                field_name = config["wear_profile"]
-                name = feature.get(field_name) if field_name is not None else None
-            except ValueError:
-                raise ImportError(
-                    f"No field named '{field_name}' found in input file '{roadfile}'"
-                )
-            except KeyError:
-                raise ImportError(
-                    f"No field named '{field_name}' found in input file '{roadfile}'"
-                )
-            if name is None:
-                road.wear_profile = default_wear_profile
-            elif name not in wear_profiles:
-                handle_msg(
-                    messages,
-                    f"no wear profile with name '{name}' in inventory "
-                    f"'{inventory.name}'",
-                    fail_early=True,
-                )
-                raise ValidationError(msg)
-            else:
-                road.wear_profile = wear_profiles[name]
-        else:
-            road.wear_profile = default_wear_profile
 
         if "fleet" in config:
             try:
@@ -1137,7 +1064,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
             if name is None or name not in fleets:
                 handle_msg(
                     messages,
-                    f"no fleet with name '{name}' in inventory '{inventory.name}'",
+                    f"no fleet with name '{name}' in inventory ",
                     fail_early=True,
                 )
                 raise ValidationError(msg)
