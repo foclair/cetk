@@ -863,8 +863,9 @@ def import_sourceactivities(
             for activity_key in activity_keys:
                 if not pd.isnull(row[activity_key]):
                     rate = row[activity_key]
+                    activity_name = activity_key[4:]
                     try:
-                        activity = activities[activity_key[4:]]
+                        activity = activities[activity_name]
                     except KeyError:
                         return_message.append(
                             import_error(
