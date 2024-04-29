@@ -97,18 +97,17 @@ def test_import_vehicles(code_sets, get_data_file):
 
 def test_import_roadclasses(code_sets, get_data_file):
     """test importing roadclasses."""
-    assert RoadClass.objects.all().count() == 0
+    assert RoadClass.objects.count() == 0
     code_set1, code_set2 = code_sets[:2]
-
+    assert RoadClass.objects.count() == 0
     vehiclefile = get_data_file("vehicles.csv")
     vehiclesettings = get_yaml_data("vehicles.yaml")
     import_vehicles(vehiclefile, vehiclesettings, 2019, unit="kg/m", encoding="utf-8")
-
+    assert RoadClass.objects.count() == 0
     roadclassfile = get_data_file("roadclasses.csv")
     roadclass_settings = get_yaml_data("roadclasses.yaml")
     import_roadclasses(roadclassfile, roadclass_settings, encoding="utf-8")
-
-    assert RoadClass.objects.all().count() == 2
+    assert RoadClass.objects.count() == 2
     # set more asserts now that roadclasstree removed
     # assert rc_tree["attribute"] == "roadtype"
     # assert "motorway" in rc_tree["values"]

@@ -600,15 +600,23 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                 else:
                     raise ImportError(f"roadclass '{rc}' already exists.")
         if len(roadclasses_to_create) > 0:
+            # count=0
             RoadClass.objects.bulk_create(map(itemgetter(0), roadclasses_to_create))
-            for rctuple in roadclasses_to_create:
-                rctuple[0].save()
+            # count =2
+            # for rctuple in roadclasses_to_create:
+            #    rctuple[0].save()
+            # count=4, so something goes wrong here!
+            # need to do assignment of roadclass in another way to make sure no problem
+            # unsaved related bojects
             through_model = RoadClass.attribute_values.through
+            # need to somehow redefine roadclasses_to_create without creating new ones
+            # breakpoint()
             values = [
                 through_model(roadclass=rc, roadattributevalue=v)
                 for rc, vals in roadclasses_to_create
                 for v in vals
             ]
+
             through_model.objects.bulk_create(values)
 
 
