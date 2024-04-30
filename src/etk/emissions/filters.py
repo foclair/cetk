@@ -31,7 +31,7 @@ def create_polygon_where_clause(polygon):
     settings = Settings.get_current()
     sql = f"""\
        ST_Intersects(
-         sources.geom,
+         ST_transform(sources.geom, {settings.srid}),
          ST_Transform(GeomFromEWKT('{polygon_ewkt}'), {settings.srid})
        )
     """
