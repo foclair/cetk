@@ -23,6 +23,7 @@ from etk.edb.models import (
     GridSource,
     Parameter,
     PointSource,
+    RoadSource,
     Settings,
     Timevar,
     get_gridsource_raster,
@@ -35,9 +36,10 @@ from etk.emissions.calc import calculate_source_emissions
 POINT = PointSource.sourcetype
 AREA = AreaSource.sourcetype
 GRID = GridSource.sourcetype
+ROAD = RoadSource.sourcetype
 
 # supported source types
-SOURCETYPES = (POINT, AREA, GRID)
+SOURCETYPES = (POINT, AREA, GRID, ROAD)
 
 
 class Output:

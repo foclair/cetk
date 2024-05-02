@@ -12,6 +12,7 @@ from etk.emissions.filters import (
     create_raster_share_in_polygon_sql,
     create_substance_emis_where_clause,
     create_tag_where_clause,
+    create_veh_ef_substance_where_clause,
 )
 
 
@@ -89,13 +90,18 @@ def create_aggregate_emis_query(
     point_ids=None,
     area_ids=None,
     grid_ids=None,
+    road_ids=None,
     raster_share_in_polygon=None,
 ):
     sql = load_sql("aggregate_emissions.sql")
+    traffic_work_subst_id = Substance.objects.values_list("id", flat=True).get(
+        slug="traffic_work"
+    )
+
     if isinstance(substances, Substance):
         substances = [substances]
 
-    sourcetypes = sourcetypes or ("point", "area", "grid")
+    sourcetypes = sourcetypes or ("point", "area", "grid", "road")
     if not isinstance(sourcetypes, Sequence):
         sourcetypes = [sourcetypes]
 
@@ -144,6 +150,19 @@ def create_aggregate_emis_query(
     else:
         area_source_filter_sql = ""
 
+    # road source filters
+    road_source_filters = list(*source_filters)
+    if polygon is not None:
+        road_source_filters.append(create_polygon_where_clause(polygon))
+    if road_ids is not None:
+        road_source_filters.append(create_ids_where_clause(road_ids))
+    if "road" not in sourcetypes:
+        road_source_filters.append("1=0")
+    if len(road_source_filters) > 0:
+        road_source_filter_sql = "WHERE " + " AND ".join(road_source_filters)
+    else:
+        road_source_filter_sql = ""
+
     if substances is not None:
         emis_subst_filter = " AND " + create_substance_emis_where_clause(substances)
         ef_subst_filter = " AND " + create_ef_substance_where_clause(substances)
@@ -164,6 +183,10 @@ def create_aggregate_emis_query(
         grid_source_filter_sql = ""
 
     raster_share_sql = create_raster_share_in_polygon_sql(polygon)
+    if substances is not None:
+        substances_id = [s.id for s in substances]
+    else:
+        substances_id = [s.id for s in Substance.objects.all()]
 
     sql = sql.format(
         srid=settings.srid,
@@ -172,10 +195,14 @@ def create_aggregate_emis_query(
         point_source_filter=point_source_filter_sql,
         area_source_filter=area_source_filter_sql,
         grid_source_filter=grid_source_filter_sql,
+        road_source_filter=road_source_filter_sql,
         emis_substance_filter=emis_subst_filter,
         ef_substance_filter=ef_subst_filter,
         raster_share_sql=raster_share_sql,
+        traffic_work_subst_id=traffic_work_subst_id,
+        substances=substances_id,
     )
+    # breakpoint()
     return sql
 
 
@@ -185,3 +212,83 @@ def create_used_substances_query():
     in the inventory
     """
     return load_sql("used_substances.sql")
+
+
+def create_road_emis_query(
+    srid,
+    ids=None,
+    name=None,
+    tags=None,
+    polygon=None,
+    substances=None,
+    ac1=None,
+    ac2=None,
+    ac3=None,
+    min_aadt=0,
+    tolerance=1.0,
+):
+    """Create sql for road emissions.
+
+    returns(query, params)
+
+    query gives emissions in kg/s.
+
+    args:
+        srid: sources will be transformed to this srid
+    optional:
+        ids: sequence of source id's for which to include sources
+        name: filter by source name(accepts regexp)
+        tags: filter by tags(specify as dictionary)
+        polygon: polygon in Polygon or EWKT format
+        substances: iterable of substance model instances(default is all)
+        ac1: iterable of activitycode instances
+        ac2: iterable of activitycode instances
+        ac3: iterable of activitycode instances
+        min_aadt: only include roads with aadt above this value
+        tolerance: geometry tolerance (default is 1.0m)
+    """
+
+    sql = load_sql("road_emissions.sql")
+    traffic_work_subst_id = Substance.objects.values_list("id", flat=True).get(
+        slug="traffic_work"
+    )
+    params = {
+        "srid": srid,
+        "min_aadt": min_aadt,
+    }
+
+    # ac_filter, ac_params = create_activitycode_where_clauses(
+    #     ac1, ac2, ac3, first_cond=False
+    # )
+    tags_filter, tags_params = create_tag_where_clause(tags)
+    ids_filter, ids_params = create_ids_where_clause(ids)
+    name_filter, name_params = create_name_where_clause(name)
+    ef_subst_filter, ef_subst_params = create_veh_ef_substance_where_clause(substances)
+    if len(ef_subst_filter) > 4:
+        # filter should not start with "AND"
+        ef_subst_filter = ef_subst_filter[4:]
+    emis_subst_filter, emis_subst_params = create_substance_emis_where_clause(
+        substances
+    )
+    polygon_filter, polygon_params = create_polygon_where_clause("road", polygon)
+
+    # params.update(ac_params)
+    params.update(tags_params)
+    params.update(name_params)
+    params.update(ids_params)
+    params.update(ef_subst_params)
+    params.update(emis_subst_params)
+    params.update(polygon_params)
+
+    # replace place-holders by generated sql
+    sql = sql.format(
+        ac_filter="",  # ac_filter,
+        id_filter=ids_filter,
+        name_filter=name_filter,
+        tag_filter=tags_filter,
+        ef_substance_filter=ef_subst_filter,
+        polygon_filter=polygon_filter,
+        tolerance=tolerance,
+        traffic_work_subst_id=traffic_work_subst_id,
+    )
+    return sql, params
