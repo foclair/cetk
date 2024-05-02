@@ -19,7 +19,10 @@ from etk.edb.const import WGS84_SRID
 from etk.edb.models import (
     CongestionProfile,
     Fleet,
+    RoadAttribute,
+    RoadClass,
     Substance,
+    TrafficSituation,
     VehicleFuel,
     VehicleFuelComb,
     write_gridsource_raster,
@@ -346,6 +349,47 @@ def roadsources(roadclasses, fleets):
     )
 
     return [road1, road2, road3]
+
+
+@pytest.fixture
+def roadefset(db):
+    RoadAttribute.objects.create(name="Road type", slug="roadtype", order=1)
+    RoadAttribute.objects.create(name="Posted speed", slug="speed", order=2)
+    attr1 = RoadAttribute.objects.get(name="Road type")
+    attr2 = RoadAttribute.objects.get(name="Posted speed")
+
+    roadclass_attr1_vals = ["0", "1", "2", "3", "4", "5", "6"]
+    roadclass_attr2_vals = [
+        "0",
+        "5",
+        "10",
+        "20",
+        "30",
+        "40",
+        "50",
+        "60",
+        "70",
+        "80",
+        "90",
+        "100",
+        "110",
+        "120",
+    ]
+    for val in roadclass_attr1_vals:
+        attr1.values.create(value=val)
+
+    for val in roadclass_attr2_vals:
+        attr2.values.create(value=val)
+
+    TrafficSituation.objects.create(ts_id="default")
+    traffic_situation = TrafficSituation.objects.get(ts_id="default")
+
+    for v1 in roadclass_attr1_vals:
+        for v2 in roadclass_attr2_vals:
+            RoadClass.objects.create_from_attributes(
+                {"roadtype": v1, "speed": v2}, traffic_situation=traffic_situation
+            )
+    return roadefset
 
 
 def congestionprofiles():

@@ -230,3 +230,43 @@ def test_import_fleets(db, get_data_file):
     fleet1 = Fleet.objects.get(name="europavägar tätort")
     assert fleet1.vehicles.all().count() == 2
     assert fleet1.vehicles.get(vehicle__name="car").fuels.all().count() == 2
+
+
+class TestImportRoads:
+    def test_import_roads(self, roadefset, get_data_file):
+        config = get_yaml_data("roads.yaml")
+        import_roads(get_data_file("roaddata.gpkg"), config)
+
+        assert RoadSource.objects.all().count() == 26
+        road1 = RoadSource.objects.get(name="Nynäsvägen")
+        assert road1.speed == 90
+        assert road1.width == 11.5
+        assert road1.nolanes == 2
+        assert road1.aadt == 24053
+        assert road1.fleet.name == "default"
+        assert road1.congestion_profile is None
+        assert road1.roadclass.attributes == {"roadtype": "1", "speed": "90"}
+
+    def test_import_roads_exclude(self, roadefset, get_data_file):
+        config = get_yaml_data("roads.yaml")
+        import_roads(
+            get_data_file("roaddata.gpkg"),
+            config,
+            exclude={"KOMMUNKOD": "0126"},
+        )
+
+        assert RoadSource.objects.all().count() == 25
+        with pytest.raises(RoadSource.DoesNotExist):
+            RoadSource.objects.get(name="Nynäsvägen")
+
+    def test_import_roads_only(self, roadefset, get_data_file):
+        config = get_yaml_data("roads.yaml")
+        import_roads(
+            get_data_file("roaddata.gpkg"),
+            config,
+            only={"KOMMUNKOD": "0126"},
+        )
+
+        nroads = RoadSource.objects.all().count()
+        assert nroads > 0
+        assert RoadSource.objects.filter(tags__KOMMUNKOD="0126").count() == nroads
