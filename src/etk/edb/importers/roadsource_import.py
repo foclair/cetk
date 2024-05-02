@@ -603,8 +603,8 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             # count=0
             RoadClass.objects.bulk_create(map(itemgetter(0), roadclasses_to_create))
             # count =2
-            # for rctuple in roadclasses_to_create:
-            #    rctuple[0].save()
+            for rctuple in roadclasses_to_create:
+                rctuple[0].save()
             # count=4, so something goes wrong here!
             # need to do assignment of roadclass in another way to make sure no problem
             # unsaved related bojects
@@ -680,7 +680,6 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
     for name, fleet_data in data.items():
         fleet_data_tmp = copy.deepcopy(fleet_data)
         try:
-            is_template = fleet_data_tmp.pop("is_template", None)
             members_data = fleet_data_tmp.pop("vehicles", [])
             default_heavy_vehicle_share = fleet_data_tmp["default_heavy_vehicle_share"]
         except KeyError:
@@ -691,7 +690,6 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
             fleets[name], _ = Fleet.objects.update_or_create(
                 name=name,
                 defaults={
-                    "is_template": is_template,
                     "default_heavy_vehicle_share": default_heavy_vehicle_share,
                 },
             )
@@ -699,7 +697,6 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
             try:
                 fleets[name] = Fleet.objects.create(
                     name=name,
-                    is_template=is_template,
                     default_heavy_vehicle_share=default_heavy_vehicle_share,
                 )
             except IntegrityError:

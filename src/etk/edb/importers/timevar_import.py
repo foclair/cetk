@@ -53,6 +53,10 @@ def import_timevars(timevar_data, overwrite=False, validation=False):
             try:
                 typeday = timevar_data["typeday"]
                 month = timevar_data["month"]
+                if type(typeday) == list:
+                    typeday = str(typeday)
+                if type(month) == list:
+                    month = str(month)
                 if overwrite:
                     newobj, _ = timevarclass.objects.update_or_create(
                         name=name,

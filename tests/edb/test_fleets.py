@@ -53,7 +53,6 @@ class TestFleet:
                 "name": "my fleet",
                 "default_heavy_vehicle_share": 0.05,
                 "tags": {"tag_key": "tag_value"},
-                "is_template": True,
                 "members": [
                     {
                         "fraction": 1,

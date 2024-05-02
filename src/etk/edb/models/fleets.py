@@ -37,7 +37,6 @@ class FleetManager(models.Manager):
                 name=f["name"],
                 default_heavy_vehicle_share=f["default_heavy_vehicle_share"],
                 tags=f.get("tags", {}),
-                # is_template=f.get("is_template", False),
             )
             for f in data
         ]
