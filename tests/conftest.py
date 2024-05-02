@@ -167,7 +167,7 @@ def vehicles(db):
 
 @pytest.fixture()
 def vehicle_ef(vehicles, vehicle_fuels):
-    substances = list(Substance.objects.filter(slug__in=("NOx", "SOx")))
+    substances = list(Substance.objects.filter(slug__in={"NOx", "SOx"}))
     # add emission factors for vehicles in different traffic situations
     efs = []
     for roadtype in ROADTYPES:
@@ -190,11 +190,12 @@ def vehicle_ef(vehicles, vehicle_fuels):
                             )
                         )
     models.VehicleEF.objects.bulk_create(efs)
+    efs = models.VehicleEF.objects.all()
     return efs
 
 
 @pytest.fixture
-def roadclasses(vehicles, vehicle_ef):
+def roadclasses(vehicles, vehicle_fuels, vehicle_ef):
     rca_roadtype = models.RoadAttribute.objects.create(
         name="road type", slug="roadtype", order=1
     )
@@ -206,7 +207,9 @@ def roadclasses(vehicles, vehicle_ef):
     roadclasses = []
     for roadtype in ROADTYPES:
         for speed in SPEEDS:
+            # if adding vehicle_ef as argument, ts already created
             ts = models.TrafficSituation.objects.get(ts_id=f"{roadtype}_{speed}")
+            # ts = models.TrafficSituation.objects.create(ts_id=f"{roadtype}_{speed}")
             rc = models.RoadClass.objects.create(traffic_situation=ts)
 
             rc.attribute_values.add(
