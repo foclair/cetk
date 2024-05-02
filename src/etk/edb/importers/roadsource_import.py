@@ -603,8 +603,17 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             # count=0
             RoadClass.objects.bulk_create(map(itemgetter(0), roadclasses_to_create))
             # count =2
-            for rctuple in roadclasses_to_create:
-                rctuple[0].save()
+            roadclasses_to_create_saved = []
+
+            created_roadclasses = [
+                RoadClass.objects.get(
+                    traffic_situation_id=rctuple[0].traffic_situation.id
+                )
+                for rctuple in roadclasses_to_create
+            ]
+            for i, rc in enumerate(created_roadclasses):
+                roadclasses_to_create_saved.append((rc, roadclasses_to_create[i][1]))
+
             # count=4, so something goes wrong here!
             # need to do assignment of roadclass in another way to make sure no problem
             # unsaved related bojects
@@ -613,7 +622,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             # breakpoint()
             values = [
                 through_model(roadclass=rc, roadattributevalue=v)
-                for rc, vals in roadclasses_to_create
+                for rc, vals in roadclasses_to_create_saved
                 for v in vals
             ]
 

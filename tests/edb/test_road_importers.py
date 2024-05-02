@@ -130,7 +130,8 @@ def test_import_roadclasses(code_sets, get_data_file):
     assert RoadClass.objects.all().count() == 2
 
 
-def test_import_roadclasses_1attr(db, get_data_file):
+def test_import_roadclasses_1attr(code_sets, get_data_file):
+    code_set1, code_set2 = code_sets[:2]
     vehiclefile = get_data_file("vehicles.csv")
     vehiclesettings = get_yaml_data("vehicles.yaml")
     import_vehicles(vehiclefile, vehiclesettings, 2019, unit="kg/m", encoding="utf-8")
