@@ -1,5 +1,4 @@
 from .common_models import Parameter, Settings, Substance  # noqa
-from .eea_emfacs import EEAEmissionFactor  # noqa
 from .gridsource_models import (  # noqa
     GridSource,
     GridSourceActivity,

@@ -71,7 +71,7 @@ def worksheet_to_dataframe(data):
     df = pd.DataFrame(data, columns=cols)
     # remove empty rows
     empty_count = 0
-    for ind in range(-1, -1 * len(df), -1):
+    for ind in range(-1, -1 * (len(df) + 1), -1):
         if all([pd.isnull(val) for val in df.iloc[ind]]):
             empty_count += 1
         else:

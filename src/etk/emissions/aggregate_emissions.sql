@@ -90,7 +90,7 @@ area_emis as (
         ) all_emis
       GROUP BY substance_id, source_id
     ) aggr_emis
-  JOIN point_source ON aggr_emis.source_id = point_source.source_id
+  JOIN area_source ON aggr_emis.source_id = area_source.source_id
 ),
 grid_emis as (
   SELECT aggr_emis.substance_id, ac1, ac2, ac3, aggr_emis.emis

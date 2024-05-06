@@ -32,9 +32,7 @@ from etk.edb.exporters import export_sources  # noqa
 from etk.edb.importers import (  # noqa
     import_activitycodesheet,
     import_codesetsheet,
-    import_eea_emfacs,
     import_gridsources,
-    import_residentialheating,
     import_sourceactivities,
     import_sources,
     import_timevarsheet,
@@ -108,43 +106,21 @@ class Editor(object):
             with transaction.atomic():
                 for sheet in import_sheets:
                     if sheet not in workbook.sheetnames:
-                        log.error(f"Workbook has not sheet named {sheet}")
-                        sys.exit(1)
-                    log.info(f"importing sheet '{sheet}'")
-
-                    if sheet == "CodeSet":
-                        updates, msgs = import_codesetsheet(
-                            workbook, validation=dry_run
-                        )
-                    elif sheet == "ActivityCode":
-                        updates, msgs = import_activitycodesheet(
-                            workbook, validation=dry_run
-                        )
-                    elif sheet == "Activity":
-                        updates, msgs = import_sourceactivities(
-                            filename,
-                            import_sheets=("Activity", "EmissionFactor"),
-                            validation=dry_run,
-                        )
-                    elif sheet == "Timevar":
-                        updates, msgs = import_timevarsheet(
-                            workbook, validation=dry_run
-                        )
-                    elif sheet == "PointSource":
-                        updates, msgs = import_sources(
-                            filename, validation=dry_run, type="point"
-                        )
-                    elif sheet == "AreaSource":
-                        updates, msgs = import_sources(
-                            filename, validation=dry_run, type="area"
-                        )
+                        log.info(f"Workbook has no sheet named {sheet}, skipped import")
+                if any(name != "GridSource" for name in import_sheets):
+                    updates, msgs = import_sourceactivities(
+                        filename,
+                        import_sheets=import_sheets,
+                        validation=dry_run,
+                    )
                     db_updates.update(updates)
                     if len(msgs) != 0:
                         return_msg += msgs
-                        raise ImportError(return_msg)
+                        if not dry_run:
+                            raise ImportError(return_msg)
                 if dry_run:
                     raise DryrunAbort
-            # gris-sources imported outside atomic transaction
+            # grid sources imported outside atomic transaction
             # to avoid errors when writing rasters using rasterio
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename, validation=dry_run)
@@ -153,17 +129,28 @@ class Editor(object):
                     return_msg += msgs
                     raise ImportError(return_msg)
         except DryrunAbort:
-            # grid sources imported for real (dry-run no)
+            # validate grid sources
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename, validation=True)
-            if len(msgs) != 0:
-                log.error(f"Errors during import:{os.linesep}{os.linesep.join(msgs)}")
+                return_msg += msgs
+            if len(return_msg) != 0:
+                log.error(
+                    f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}"
+                )
+                log.info("Finished dry-run")
             else:
-                log.info("Successful dry-run")
+                log.info("Successful dry-run, no errors, the file is ready to import.")
+                log.info(
+                    datetime.datetime.now().strftime("%H:%M:%S")
+                    + f" data to be imported {db_updates}"
+                )
         except ImportError:
             log.error(f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}")
         else:
-            log.info(f"imported data {db_updates}")
+            log.info(
+                datetime.datetime.now().strftime("%H:%M:%S")
+                + f" imported data {db_updates}"
+            )
         return db_updates, return_msg
 
     def update_emission_tables(
@@ -184,7 +171,6 @@ class Editor(object):
         codeset=None,
         substances=None,
     ):
-        print(f"substances: {substances}")
         df = aggregate_emissions(
             sourcetypes=sourcetypes, unit=unit, codeset=codeset, substances=substances
         )
@@ -239,7 +225,6 @@ def main():
         create   create an sqlite inventory
         migrate  migrate an sqlite inventory
         import   import data
-        import_eea_emfacs   import emission factors from EEA/EMEP database
         export   export data
         calc     calculate emissions
 
@@ -250,7 +235,7 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "import", "import_eea_emfacs", "export", "calc"),
+        choices=("migrate", "create", "import", "export", "calc"),
     )
     verbosity = [arg for arg in sys.argv if arg == "-v"]
     sys_args = [arg for arg in sys.argv if arg != "-v"]
@@ -341,19 +326,6 @@ def main():
             sys.exit(1)
 
         editor.import_workbook(args.filename, sheets=args.sheets, dry_run=args.dryrun)
-        sys.exit(0)
-    elif main_args.command == "import_eea_emfacs":
-        sub_parser = argparse.ArgumentParser(
-            description="Import EEA emission factors from an xlsx-file",
-            usage="etk import_eea_emfacs <filename> ",
-        )
-        sub_parser.add_argument(
-            "filename", help="Path to xslx-file", type=check_and_get_path
-        )
-        args = sub_parser.parse_args(sub_args)
-        status = editor.import_eea_emfacs(args.filename)
-        log.debug("Imported emfacs from '{args.filename}' to '{db_path}")
-        sys.stdout.write(str(status) + "\n")
         sys.exit(0)
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(

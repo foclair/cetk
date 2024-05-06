@@ -23,36 +23,40 @@ def validate_columns(
         col for col in required_cols if col not in df.columns and df.index.name != col
     ]
     if len(missing_cols) > 0:
-        messages.append(f"Missing required columns: '{', '.join(missing_cols)}'")
+        messages.append(
+            f"GridSource: Missing required columns: '{', '.join(missing_cols)}'"
+        )
 
     if code_sets is not None:
         for codeset_slug in code_sets:
             col_name = f"activitycode_{codeset_slug}"
             if col_name not in df.columns:
-                messages.append(f"Missing column 'activitycode_{codeset_slug}'")
+                messages.append(
+                    f"GridSource: Missing column for code-set '{codeset_slug}'"
+                )
     if substances is not None:
         expected_substances = {
             col[6:] for col in df.columns if col.startswith("subst:")
         }
         invalid_substances = expected_substances.difference(substances.keys())
         if len(invalid_substances) > 0:
-            messages.append(f"Invalid substances: {invalid_substances}")
+            messages.append(f"GridSource: Invalid substances: {invalid_substances}")
     if activities is not None:
         expected_activities = {col[4:] for col in df.columns if col.startswith("act:")}
         invalid_activities = expected_activities.difference(activities.keys())
         if len(invalid_activities) > 0:
-            messages.append(f"Invalid activities: {invalid_activities}")
+            messages.append(f"GridSource: Invalid activities: {invalid_activities}")
     return messages
 
 
 def validate_unit(values, row_nr):
     """validate substance emission unit."""
     messages = []
-    unit = values["unit"]
+    unit = values["emission_unit"]
     try:
         emission_unit_to_si(1.0, unit)
     except (KeyError, ValueError) as err:
-        messages.append(with_rownr(f"invalid unit, {err}", row_nr))
+        messages.append(with_rownr(f"GridSource: invalid unit, {err}", row_nr))
     return messages
 
 
@@ -65,11 +69,11 @@ def validate_activitycodes(values, code_sets, row_nr, src=None):
         code_col = f"activitycode_{codeset_slug}"
         code = values[code_col]
         if code is None:
-            messages.append(f"missing value in column '{code_col}'")
+            messages.append(f"GridSource: missing value in column '{code_col}'")
         try:
             activitycode = codes[code]
         except KeyError:
-            messages.append(f"unknown code '{code}' in column '{code_col}'")
+            messages.append(f"GridSource: unknown code '{code}' in column '{code_col}'")
         if src is not None:
             setattr(src, code_attribute, activitycode)
     return [with_rownr(msg, row_nr) for msg in messages]
@@ -83,7 +87,7 @@ def validate_timevar(values, timevars, row_nr, src=None):
         try:
             timevar = timevars[timevar_name]
         except KeyError:
-            messages.append(f"timevar '{timevar_name}' does not exist")
+            messages.append(f"GridSource: timevar '{timevar_name}' does not exist")
     else:
         timevar = None
     if src is not None:

@@ -35,6 +35,27 @@ from .timevar_import import import_timevarsheet
 from .utils import cache_codeset, import_error, worksheet_to_dataframe
 
 # from etk.edb.models.common_models import Settings
+# import sys
+# from datetime import datetime
+# uncomment for automatic debugging when receiving error
+# def info(type, value, tb):
+#     # if hasattr(sys, "ps1") or not sys.stderr.isatty():
+#     #     # we are in interactive mode or we don't have a tty-like
+#     #     # device, so we call the default hook
+#     #     sys.__excepthook__(type, value, tb)
+#     # else:
+#     import pdb
+#     import traceback
+
+#     # we are NOT in interactive mode, print the exception...
+#     traceback.print_exception(type, value, tb)
+#     print
+#     # ...then start the debugger in post-mortem mode.
+#     # pdb.pm() # deprecated
+#     pdb.post_mortem(tb)  # more "modern"
+
+
+# sys.excepthook = info
 
 
 # column facility and name are used as index and is therefore not included here
@@ -43,7 +64,6 @@ REQUIRED_COLUMNS_AREA = {
     "facility_name": np.str_,
     "source_name": np.str_,
     "geometry": np.str_,
-    "EPSG": int,
     "timevar": np.str_,
 }
 
@@ -53,12 +73,15 @@ REQUIRED_COLUMNS_POINT = {
     "source_name": np.str_,
     "lat": float,
     "lon": float,
+}
+
+OPTIONAL_COLUMNS_POINT = {
     "timevar": np.str_,
     "chimney_height": float,
     "outer_diameter": float,
     "inner_diameter": float,
     "gas_speed": float,
-    "gas_temperature": float,
+    "gas_temperature[K]": float,
     "house_width": float,
     "house_height": float,
 }
@@ -83,9 +106,10 @@ def import_sources(
     validation=False,
     encoding=None,
     srid=None,
-    type="point",
+    sourcetype="point",
 ):
     """Import point- or area-sources from xlsx or csv-file.
+    PointSource- and AreaSourceSubstances only, not Activities.
 
     args
         filepath: path to file
@@ -94,46 +118,11 @@ def import_sources(
         encoding: encoding of file (default is utf-8)
         srid: srid of file, default is same srid as domain
     """
-    # user defined SRID for import or WGS84 if nothing specified
-    # as long as we do not have functions in Eclair to edit the "settings_SRID"
-    # it does not make sense to use that SRID as default for import.
-
     return_message = []
-    srid = srid or WGS84_SRID
-    # cache related models
-    substances = cache_queryset(Substance.objects.all(), "slug")
-    timevars = cache_queryset(Timevar.objects.all(), "name")
-    facilities = cache_queryset(Facility.objects.all(), "official_id")
-
-    if type == "point":
-        sources = cache_sources(
-            PointSource.objects.select_related("facility")
-            .prefetch_related("substances")
-            .all()
-        )
-    elif type == "area":
-        sources = cache_sources(
-            AreaSource.objects.select_related("facility")
-            .prefetch_related("substances")
-            .all()
-        )
-    else:
-        return_message.append(
-            import_error(
-                "this sourcetype is not implemented",
-                validation=validation,
-            )
-        )
-
-    # using filter.first() here, not get() because code_set{i} does not have to exist
-    code_sets = [
-        cache_codeset(CodeSet.objects.filter(id=i).first()) for i in range(1, 4)
-    ]
-
     extension = filepath.suffix
     if extension == ".csv":
         # read csv-file
-        if type == "point":
+        if sourcetype == "point":
             with open(filepath, encoding=encoding or "utf-8") as csvfile:
                 log.debug("reading point-sources from csv-file")
                 df = pd.read_csv(
@@ -156,17 +145,17 @@ def import_sources(
     elif extension == ".xlsx":
         # read spreadsheet
         try:
-            workbook = load_workbook(filename=filepath, data_only=True)
+            workbook = load_workbook(filename=filepath, data_only=True, read_only=True)
         except Exception as exc:
-            return_message = import_error(str(exc), return_message, validation)
+            return_message.append(import_error(str(exc), validation))
         worksheet = workbook.worksheets[0]
         if len(workbook.worksheets) > 1:
-            if type == "point":
+            if sourcetype == "point":
                 log.debug(
                     "Multiple sheets in spreadsheet, importing sheet 'PointSource'."
                 )
                 data = workbook["PointSource"].values
-            elif type == "area":
+            elif sourcetype == "area":
                 log.debug(
                     "Multiple sheets in spreadsheet, importing sheet 'AreaSource'."
                 )
@@ -174,12 +163,7 @@ def import_sources(
         else:
             data = worksheet.values
         df = worksheet_to_dataframe(data)
-        if type == "point":
-            df = df.astype(dtype=REQUIRED_COLUMNS_POINT)
-        else:
-            df = df.astype(dtype=REQUIRED_COLUMNS_AREA)
-        # below is necessary not to create facilities with name 'None'
-        df = df.replace(to_replace="None", value=None)
+        workbook.close()
     else:
         return_message.append(
             import_error(
@@ -187,7 +171,83 @@ def import_sources(
                 validation=validation,
             )
         )
-    if type == "point":
+
+    df = set_datatypes(df, sourcetype)
+
+    return create_or_update_sources(
+        df,
+        return_message="",
+        validation=validation,
+        srid=None,
+        sourcetype=sourcetype,
+    )
+
+
+def set_datatypes(df, sourcetype):
+    if sourcetype == "point":
+        df = df.astype(dtype=REQUIRED_COLUMNS_POINT)
+        optional_columns = {
+            k: OPTIONAL_COLUMNS_POINT[k]
+            for k in OPTIONAL_COLUMNS_POINT
+            if k in df.columns
+        }
+        df = df.astype(dtype=optional_columns)
+    else:
+        df = df.astype(dtype=REQUIRED_COLUMNS_AREA)
+    # below is necessary not to create facilities with name 'None'
+    df = df.replace(to_replace="None", value=None)
+    df = df.replace(to_replace="nan", value=None)
+    return df
+
+
+# @profile
+def create_or_update_sources(
+    df,
+    return_message="",
+    validation=False,
+    srid=None,
+    sourcetype="point",
+    cache=True,
+):
+    return_message = []
+    # user defined SRID for import or WGS84 if nothing specified
+    # as long as we do not have functions in Eclair to edit the "settings_SRID"
+    # it does not make sense to use that SRID as default for import.
+    srid = srid or WGS84_SRID
+    # cache related models
+    substances = cache_queryset(Substance.objects.all(), "slug")
+    timevars = cache_queryset(Timevar.objects.all(), "name")
+    facilities = cache_queryset(Facility.objects.all(), "official_id")
+
+    if cache:
+        if sourcetype == "point":
+            sources = cache_sources(
+                PointSource.objects.select_related("facility").all()
+            )  # .prefetch_related("substances")
+        elif sourcetype == "area":
+            sources = cache_sources(
+                AreaSource.objects.select_related("facility").all()
+            )  # .prefetch_related("substances")
+        else:
+            return_message.append(
+                import_error(
+                    "this sourcetype is not implemented",
+                    validation=validation,
+                )
+            )
+
+    code_sets = [
+        cache_codeset(CodeSet.objects.filter(id=i).first()) for i in range(1, 4)
+    ]
+    code_set_slugs = {}
+    for i in range(1, 4):
+        try:
+            code_set_slug = CodeSet.objects.get(id=i).slug
+        except CodeSet.DoesNotExist:
+            code_set_slug = None
+        code_set_slugs[i] = code_set_slug
+
+    if sourcetype == "point":
         for col in REQUIRED_COLUMNS_POINT.keys():
             if col not in df.columns:
                 return_message.append(
@@ -234,10 +294,10 @@ def import_sources(
             "activitycode3": None,
         }
 
-        if type == "point":
+        if sourcetype == "point":
             # get pointsource coordinates
             try:
-                if pd.isnull(row_dict["lat"]) or pd.isnull(row_dict["lon"]):
+                if pd.isna(row_dict["lat"]) or pd.isna(row_dict["lon"]):
                     return_message.append(
                         import_error(
                             f"missing coordinates for source '{row_key}'",
@@ -249,7 +309,7 @@ def import_sources(
             except ValueError:
                 return_message.append(
                     import_error(
-                        f"Invalid {type} coordinates on row {row_nr}",
+                        f"Invalid {sourcetype} coordinates on row {row_nr}",
                         validation=validation,
                     )
                 )
@@ -261,7 +321,7 @@ def import_sources(
                 "chimney_inner_diameter": "inner_diameter",
                 "chimney_outer_diameter": "outer_diameter",
                 "chimney_gas_speed": "gas_speed",
-                "chimney_gas_temperature": "gas_temperature",
+                "chimney_gas_temperature": "gas_temperature[K]",
             }.items():
                 if pd.isna(row_dict[key]):
                     return_message.append(
@@ -275,17 +335,26 @@ def import_sources(
                     source_data[attr] = row_dict[key]
 
             # get downdraft parameters
-            if not pd.isnull(row_dict["house_width"]):
-                source_data["house_width"] = row_dict["house_width"]
-            if not pd.isnull(row_dict["house_height"]):
-                source_data["house_height"] = row_dict["house_height"]
-        elif type == "area":
             try:
-                if pd.isnull(row_dict["geometry"]):
+                if not pd.isna(row_dict["house_width"]):
+                    source_data["house_width"] = row_dict["house_width"]
+            except KeyError:
+                if row_nr == 2:
+                    log.debug("house_width is skipped from import.")
+            try:
+                if not pd.isna(row_dict["house_height"]):
+                    source_data["house_height"] = row_dict["house_height"]
+            except KeyError:
+                if row_nr == 2:
+                    log.debug("house_heigth is skipped from import.")
+
+        elif sourcetype == "area":
+            try:
+                if pd.isna(row_dict["geometry"]):
                     return_message.append(
                         import_error(
                             f"missing area polygon for source '{row_key}'",
-                            validation,
+                            validation=validation,
                         )
                     )
                 wkt_polygon = row_dict["geometry"]
@@ -297,11 +366,7 @@ def import_sources(
                         validation=validation,
                     )
                 )
-            # create geometry
-            EPSG = row_dict["EPSG"]
-            if pd.isnull(EPSG):
-                EPSG = 4326
-            source_data["geom"] = GEOSGeometry(f"SRID={int(EPSG)};" + wkt_polygon)
+            source_data["geom"] = GEOSGeometry(f"SRID={4326};" + wkt_polygon)
         else:
             return_message.append(
                 import_error(
@@ -312,7 +377,7 @@ def import_sources(
         # get activitycodes
         for code_ind, code_set in enumerate(code_sets, 1):
             try:
-                code_set_slug = CodeSet.objects.filter(id=code_ind).first().slug
+                code_set_slug = code_set_slugs[code_ind]
                 code_attribute = f"activitycode_{code_set_slug}"
                 if code_attribute in row_dict:
                     code = row_dict[code_attribute]
@@ -321,11 +386,11 @@ def import_sources(
                             return_message.append(
                                 import_error(
                                     f"Unknown activitycode_{code_set_slug} '{code}'"
-                                    f" for {type} source on row {row_nr}",
+                                    f" for {sourcetype} source on row {row_nr}",
                                     validation=validation,
                                 )
                             )
-                    if not pd.isnull(code):
+                    if not pd.isna(code):
                         try:
                             # note this can be problematic with codes 01 etc as SNAP
                             # TODO activitycodes should be string directly on import!
@@ -336,7 +401,7 @@ def import_sources(
                             return_message.append(
                                 import_error(
                                     f"Unknown activitycode_{code_set_slug} '{code}'"
-                                    f" for {type} source on row {row_nr}",
+                                    f" for {sourcetype} source on row {row_nr}",
                                     validation=validation,
                                 )
                             )
@@ -348,7 +413,7 @@ def import_sources(
                         column.split("_", 1)[-1] for column in activitycode_columns
                     ]
                     for index, column in enumerate(activitycode_columns):
-                        if not pd.isnull(row_dict[column]):
+                        if not pd.isna(row_dict[column]):
                             try:
                                 CodeSet.objects.get(slug=codeset_slug[index])
                             except CodeSet.DoesNotExist:
@@ -357,7 +422,7 @@ def import_sources(
                                         "Specified activitycode "
                                         f"{row_dict[column]} for "
                                         f" unknown codeset {codeset_slug[index]}"
-                                        f" for {type} source on row {row_nr}",
+                                        f" for {sourcetype} source on row {row_nr}",
                                         validation=validation,
                                     )
                                 )
@@ -379,7 +444,7 @@ def import_sources(
                 return_message.append(
                     import_error(
                         f"Timevar '{timevar_name}' "
-                        f"on row {row_nr} for {type} source does not exist",
+                        f"on row {row_nr} for {sourcetype} source does not exist",
                         validation=validation,
                     )
                 )
@@ -402,32 +467,38 @@ def import_sources(
             try:
                 emis["substance"] = substances[subst]
             except KeyError:
-                return_message = import_error(
-                    f"Undefined substance {subst}", return_message, validation
+                return_message.append(
+                    import_error(f"Undefined substance {subst}", validation)
                 )
 
             try:
-                if not pd.isnull(row_dict["unit"]):
+                if not pd.isna(row_dict["emission_unit"]):
                     emis["value"] = emission_unit_to_si(
-                        float(row_dict[subst_key]), row_dict["unit"]
+                        float(row_dict[subst_key]), row_dict["emission_unit"]
                     )
                 else:
                     return_message.append(
                         import_error(
-                            f"No unit specified for {type} emissions on row {row_nr}",
+                            f"No unit specified for {sourcetype} sources"
+                            + f" on row {row_nr}",
                             validation=validation,
                         )
                     )
             except ValueError:
                 return_message.append(
                     import_error(
-                        f"Invalid {type} emission value {row_dict[subst_key]}"
-                        f" on row {row_nr}",
+                        f"Invalid {sourcetype} emission value {row_dict[subst_key]}"
+                        + f" on row {row_nr} for {sourcetype} sources.",
                         validation=validation,
                     )
                 )
             except KeyError as err:
-                return_message.append(import_error(f"{err}", validation=validation))
+                return_message.append(
+                    import_error(
+                        f"Missing data {err} on row {row_nr} for {sourcetype} sources.",
+                        validation=validation,
+                    )
+                )
 
         official_facility_id, source_name = row_key
         if pd.isna(official_facility_id):
@@ -436,7 +507,7 @@ def import_sources(
         if pd.isna(source_name):
             return_message.append(
                 import_error(
-                    f"No name specified for {type} source on row {row_nr}",
+                    f"No name specified for {sourcetype} source on row {row_nr}",
                     validation=validation,
                 )
             )
@@ -473,23 +544,39 @@ def import_sources(
         source_data["facility"] = facility
         source_key = (official_facility_id, source_name)
         try:
-            source = sources[source_key]
+            if cache:
+                source = sources[source_key]
+            else:
+                if official_facility_id is None:
+                    facility_id = None
+                else:
+                    # this could through a keyerror for the wrong reason,
+                    # because facility is None, not because pointsource exists already
+                    facility_id = facilities[str(official_facility_id)].id
+                if sourcetype == "point":
+                    source = PointSource.objects.get(
+                        name=str(source_name), facility_id=facility_id
+                    )
+                elif sourcetype == "area":
+                    source = AreaSource.objects.get(
+                        name=str(source_name), facility_id=facility_id
+                    )
             for key, val in source_data.items():
                 setattr(source, key, val)
             update_sources.append(source)
             drop_substances += list(source.substances.all())
-            if type == "point":
+            if sourcetype == "point":
                 create_substances += [
                     PointSourceSubstance(source=source, **emis)
                     for emis in emissions.values()
                 ]
-            elif type == "area":
+            elif sourcetype == "area":
                 create_substances += [
                     AreaSourceSubstance(source=source, **emis)
                     for emis in emissions.values()
                 ]
-        except KeyError:
-            if type == "point":
+        except (PointSource.DoesNotExist, AreaSource.DoesNotExist, KeyError):
+            if sourcetype == "point":
                 source = PointSource(name=source_name, **source_data)
                 if source_key not in create_sources:
                     create_sources[source_key] = source
@@ -556,13 +643,25 @@ def import_sources(
     Facility.objects.bulk_create(create_facilities.values())
     Facility.objects.bulk_update(update_facilities, ["name"])
 
-    # ensure PointSource.facility_id is not None
+    facilities = cache_queryset(Facility.objects.all(), "id")
+    # ensure PointSource.facility_id is not None if facility exists.
     for source in create_sources.values():
         if source.facility is not None:
-            # changed by Eef, because IDs were None
-            source.facility_id = Facility.objects.get(official_id=source.facility).id
-
-    if type == "point":
+            # find the facility_id corresponding to official id, or set None
+            source.facility_id = next(
+                (
+                    key
+                    for key, value in facilities.items()
+                    if str(value) == str(source.facility)
+                ),
+                None,
+            )
+            if source.facility_id is None:
+                raise ImportError(
+                    f"Could not link pointsource {source.name} to "
+                    + f"facility {source.facility.name}"
+                )
+    if sourcetype == "point":
         PointSource.objects.bulk_create(create_sources.values())
         PointSource.objects.bulk_update(
             update_sources,
@@ -604,7 +703,7 @@ def import_sources(
                 "created": len(create_sources),
             },
         }
-    if type == "area":
+    if sourcetype == "area":
         AreaSource.objects.bulk_create(create_sources.values())
         AreaSource.objects.bulk_update(
             update_sources,
@@ -639,9 +738,11 @@ def import_sources(
                 "created": len(create_sources),
             },
         }
+    # print(datetime.now().strftime("%H:%M:%S") + "finish point import")
     return return_dict, return_message
 
 
+# @profile
 def import_sourceactivities(
     filepath,
     encoding=None,
@@ -649,20 +750,23 @@ def import_sourceactivities(
     import_sheets=SHEET_NAMES,
     validation=False,
 ):
-    """Import point-sources and/or area-sources from xlsx or csv-file.
+    """Import sheets Timevar, Codeset, ActivityCode, EmissionFactor,
+    PointSource and AreaSource from xlsx. If GridSource in import_sheets,
+    it will be ignored.
 
     args
         filepath: path to file
 
     options
         encoding: encoding of file (default is utf-8)
-        srid: srid of file, default is same srid as domain
+        srid: srid of file, default is wgs84
+        import_sheets: sheets to be imported, default is all.
     """
     return_message = []
     try:
-        workbook = load_workbook(filename=filepath, data_only=True)
+        workbook = load_workbook(filename=filepath, data_only=True, read_only=True)
     except Exception as exc:
-        return_message = import_error(str(exc), return_message, validation)
+        return_message.append(import_error(str(exc), validation))
 
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
@@ -680,61 +784,57 @@ def import_sourceactivities(
         updates, msgs = import_activitycodesheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
-    # Could be that activities are linked to previously imported pointsources,
-    # or pointsources to be imported later, therefore not requiring PointSource-sheet.
-    if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        ps, msgs = import_sources(
-            filepath,
-            srid=srid,
-            validation=validation,
-            type="point",
-        )
-        return_dict.update(ps)
-        return_message += msgs
 
-    if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
-        ps, msgs = import_sources(
-            filepath,
-            srid=srid,
-            validation=validation,
-            type="area",
-        )
-        return_message += msgs
-        return_dict.update(ps)
-
-    if ("Activity" in sheet_names) and ("Activity" in import_sheets):
+    if ("EmissionFactor" in sheet_names) and ("EmissionFactor" in import_sheets):
         activities = cache_queryset(
             Activity.objects.prefetch_related("emissionfactors").all(), "name"
         )
-        data = workbook["Activity"].values
+        data = workbook["EmissionFactor"].values
         df_activity = worksheet_to_dataframe(data)
         activity_names = df_activity["activity_name"]
-        update_activities = []
+        update_activities = {}
         create_activities = {}
         drop_emfacs = []
         for row_nr, activity_name in enumerate(activity_names):
             try:
                 activity = activities[activity_name]
-                setattr(activity, "name", activity_name)
-                setattr(activity, "unit", df_activity["activity_unit"][row_nr])
-                update_activities.append(activity)
-                drop_emfacs += list(activities[activity_name].emissionfactors.all())
+                if activity_name not in update_activities.keys():
+                    setattr(activity, "name", activity_name)
+                    setattr(activity, "unit", df_activity["activity_unit"][row_nr])
+                    update_activities[activity_name] = activity
+                    drop_emfacs += list(activities[activity_name].emissionfactors.all())
+                else:
+                    if (
+                        df_activity["activity_unit"][row_nr]
+                        != update_activities[activity_name].unit
+                    ):
+                        return_message.append(
+                            import_error(
+                                f"conflicting units for activity '{activity_name}'",
+                                validation=validation,
+                            )
+                        )
             except KeyError:
-                activity = Activity(
-                    name=activity_name, unit=df_activity["activity_unit"][row_nr]
-                )
                 if activity_name not in create_activities:
+                    activity = Activity(
+                        name=activity_name, unit=df_activity["activity_unit"][row_nr]
+                    )
                     create_activities[activity_name] = activity
                 else:
-                    return_message.append(
-                        import_error(
-                            f"multiple rows for the same activity '{activity_name}'",
-                            validation=validation,
+                    if (
+                        df_activity["activity_unit"][row_nr]
+                        != create_activities[activity_name].unit
+                    ):
+                        return_message.append(
+                            import_error(
+                                "multiple rows for the same activity "
+                                + str(activity_name),
+                                validation=validation,
+                            )
                         )
-                    )
         Activity.objects.bulk_create(create_activities.values())
         Activity.objects.bulk_update(
-            update_activities,
+            update_activities.values(),
             [
                 "name",
                 "unit",
@@ -750,8 +850,6 @@ def import_sourceactivities(
                 }
             }
         )
-
-    if ("EmissionFactor" in sheet_names) and ("EmissionFactor" in import_sheets):
         data = workbook["EmissionFactor"].values
         df_emfac = worksheet_to_dataframe(data)
         substances = cache_queryset(Substance.objects.all(), "slug")
@@ -839,22 +937,32 @@ def import_sourceactivities(
         )
 
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
-        # now that activities, pointsources and emission factors are created,
-        # pointsourceactivities can be created.
-        # should not matter whether activities and emission factors were imported from
-        # same file or existed already in database.
-        pointsourceactivities = cache_queryset(
-            PointSourceActivity.objects.all(), ["activity", "source"]
-        )
-        # TODO check unique activity for source
         data = workbook["PointSource"].values
         df_pointsource = worksheet_to_dataframe(data)
-        activities = cache_queryset(Activity.objects.all(), "name")
-        pointsources = cache_sources(
-            PointSource.objects.select_related("facility")
-            .prefetch_related("substances")
-            .all()
+        df_pointsource = set_datatypes(df_pointsource, "point")
+        # import pointsources and pointsourcesubstances
+        caching_sources = len(df_pointsource) > PointSource.objects.count()
+        ps, return_message = create_or_update_sources(
+            df_pointsource,
+            srid=srid,
+            return_message=return_message,
+            validation=validation,
+            sourcetype="point",
+            cache=caching_sources,
         )
+        return_dict.update(ps)
+
+        # import pointsourceactivities
+        activities = cache_queryset(Activity.objects.all(), "name")
+        facilities = cache_queryset(Facility.objects.all(), "official_id")
+        if caching_sources:
+            pointsourceactivities = cache_queryset(
+                PointSourceActivity.objects.select_related("activity", "source").all(),
+                ["activity", "source"],
+            )
+            pointsources = cache_sources(
+                PointSource.objects.select_related("facility").all()
+            )
         create_pointsourceactivities = []
         update_pointsourceactivities = []
         for row_key, row in df_pointsource.iterrows():
@@ -874,21 +982,40 @@ def import_sourceactivities(
                                 validation=validation,
                             )
                         )
-                    rate = activity_rate_unit_to_si(rate, activity.unit)
-                    # original unit stored in activity.unit, but
-                    # pointsourceactivity.rate stored as activity / s.
-                    pointsource = pointsources[
-                        str(row["facility_id"]), str(row["source_name"])
-                    ]
-                    try:
-                        psa = pointsourceactivities[activity, pointsource]
-                        setattr(psa, "rate", rate)
-                        update_pointsourceactivities.append(psa)
-                    except KeyError:
-                        psa = PointSourceActivity(
-                            activity=activity, source=pointsource, rate=rate
-                        )
-                        create_pointsourceactivities.append(psa)
+                        rate = activity_rate_unit_to_si(rate, activity.unit)
+                        # original unit stored in activity.unit, but
+                        # pointsourceactivity.rate stored as activity / s.
+                        if pd.isna(row.name[0]):
+                            facility_id = None
+                        else:
+                            facility_id = str(row.name[0])
+                        if caching_sources:
+                            # row index set as ["facility_id", "source_name"]
+                            # in create_or_update_source
+                            pointsource = pointsources[facility_id, str(row.name[1])]
+                        else:
+                            facility = (
+                                facilities[facility_id]
+                                if facility_id is not None
+                                else None
+                            )
+                            pointsource = PointSource.objects.get(
+                                name=str(row.name[1]), facility=facility
+                            )
+                        try:
+                            if caching_sources:
+                                psa = pointsourceactivities[activity, pointsource]
+                            else:
+                                psa = PointSourceActivity.objects.get(
+                                    activity_id=activity.id, source_id=pointsource.id
+                                )
+                            setattr(psa, "rate", rate)
+                            update_pointsourceactivities.append(psa)
+                        except (PointSourceActivity.DoesNotExist, KeyError):
+                            psa = PointSourceActivity(
+                                activity=activity, source=pointsource, rate=rate
+                            )
+                            create_pointsourceactivities.append(psa)
 
         PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
         PointSourceActivity.objects.bulk_update(
@@ -902,14 +1029,24 @@ def import_sourceactivities(
                 }
             }
         )
-
     if ("AreaSource" in sheet_names) and ("AreaSource" in import_sheets):
-        areasourceactivities = cache_queryset(
-            AreaSourceActivity.objects.all(), ["activity", "source"]
-        )
-        # TODO check unique activity for source
         data = workbook["AreaSource"].values
         df_areasource = worksheet_to_dataframe(data)
+        df_areasource = set_datatypes(df_areasource, "area")
+        ps, return_message = create_or_update_sources(
+            df_areasource,
+            srid=srid,
+            return_message=return_message,
+            validation=validation,
+            sourcetype="area",
+        )
+        return_dict.update(ps)
+        # for now always caching areasources, change if case with many areasources
+        # becomes relevant.
+        areasourceactivities = cache_queryset(
+            AreaSourceActivity.objects.select_related("activity", "source").all(),
+            ["activity", "source"],
+        )
         activities = cache_queryset(Activity.objects.all(), "name")
         areasources = cache_sources(
             AreaSource.objects.select_related("facility")
@@ -922,8 +1059,8 @@ def import_sourceactivities(
             # NB: does not work if column header starts with space, but same for subst:
             activity_keys = [k for k in row.keys() if k.startswith("act:")]
             for activity_key in activity_keys:
-                if not pd.isnull(row[activity_key]):
-                    rate = row[activity_key]
+                if not pd.isna(row[activity_key]):
+                    rate = float(row[activity_key])
                     try:
                         activity = activities[activity_key[4:]]
                     except KeyError:
@@ -937,9 +1074,12 @@ def import_sourceactivities(
                     rate = activity_rate_unit_to_si(rate, activity.unit)
                     # original unit stored in activity.unit, but
                     # areasourceactivity.rate stored as activity / s.
-                    areasource = areasources[
-                        str(row["facility_id"]), str(row["source_name"])
-                    ]
+                    # facility_id and source_name set as df index
+                    if pd.isna(row.name[0]):
+                        facility_id = None
+                    else:
+                        facility_id = str(row.name[0])
+                    areasource = areasources[facility_id, str(row.name[1])]
                     try:
                         psa = areasourceactivities[activity, areasource]
                         setattr(psa, "rate", rate)
@@ -962,4 +1102,7 @@ def import_sourceactivities(
                 }
             }
         )
+
+    workbook.close()
+    # print(datetime.now().strftime("%H:%M:%S") + "finish import")
     return return_dict, return_message

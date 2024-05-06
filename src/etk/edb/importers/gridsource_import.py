@@ -37,7 +37,7 @@ from .validation import (
     with_rownr_and_substance,
 )
 
-REQUIRED_COLUMNS = ["name", "rastername", "timevar", "path", "unit"]
+REQUIRED_COLUMNS = ["name", "rastername", "timevar", "path", "emission_unit"]
 
 
 log = logging.getLogger(__name__)
@@ -175,12 +175,14 @@ def import_gridsources(filepath, validation=False, encoding=None):
         code_sets=code_sets,
     )
     if len(messages) > 0:
+        messages += ["Could not validate gridsources, due to error in columns."]
         return {}, messages
 
     row_nr = 2
-    rasters, messages = validate_gridsources(
+    rasters, messages_sources = validate_gridsources(
         df, timevars, code_sets, raster_names, datadir
     )
+    messages += messages_sources
     if len(messages) > 0:
         return {}, messages
 
@@ -220,7 +222,7 @@ def import_gridsources(filepath, validation=False, encoding=None):
                 )
                 emis = {"substance": substances[subst], "raster": rname}
                 emis_value = row_dict[col]
-                unit = row_dict["unit"]
+                unit = row_dict["emission_unit"]
                 if emis_value == "sum":
                     emis["value"] = emission_unit_to_si(rasters[rname]["sum"], unit)
                 else:
