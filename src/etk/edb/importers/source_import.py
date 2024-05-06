@@ -969,20 +969,19 @@ def import_sourceactivities(
             # NB: does not work if column header starts with space, but same for subst:
             activity_keys = [k for k in row.keys() if k.startswith("act:")]
             for activity_key in activity_keys:
-                if not pd.isna(row[activity_key]):
-                    rate = float(row[activity_key])
-                    if rate > 0.0:
-                        # residential heating template has many zeroes, skip these.
-                        try:
-                            activity = activities[activity_key[4:]]
-                        except KeyError:
-                            return_message.append(
-                                import_error(
-                                    f"unknown activity '{activity_name}'"
-                                    + f" for pointsource '{row['source_name']}'",
-                                    validation=validation,
-                                )
+                if not pd.isnull(row[activity_key]):
+                    rate = row[activity_key]
+                    activity_name = activity_key[4:]
+                    try:
+                        activity = activities[activity_name]
+                    except KeyError:
+                        return_message.append(
+                            import_error(
+                                f"unknown activity '{activity_name}'"
+                                + f" for pointsource '{row['source_name']}'",
+                                validation=validation,
                             )
+                        )
                         rate = activity_rate_unit_to_si(rate, activity.unit)
                         # original unit stored in activity.unit, but
                         # pointsourceactivity.rate stored as activity / s.
