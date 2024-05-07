@@ -90,7 +90,6 @@ def filter_out(feature, exclude):
 def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     vehicles_file,
     config,
-    year,
     *,
     only_ef=False,
     overwrite=False,
@@ -100,9 +99,8 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     """Import vehicles, fuels and traffic situations to ef-set.
 
     args
-        vehicles_file: a csv-file with vehicles and emission-factors
+        vehicles_file: a csv-file or xlsx-file with vehicles and emission-factors
         config: a dict with definitions of vehicle, fuels and codes
-        year: filter emission-factors to load by year
 
     optional
         only_ef: if True, only load emission factors - do not modify base-set tables
@@ -161,37 +159,37 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     messages = {}
     with Path(vehicles_file).open(encoding=encoding) as veh_file:
         log.info("reading emission-factor table")
-        df = pd.read_csv(
-            veh_file,
-            sep=";",
-            dtype={
-                "year": int,
-                "vehicle": str,
-                "fuel": str,
-                "traffic_situation": str,
-                "substance": str,
-                "freeflow": float,
-                "heavy": float,
-                "saturated": float,
-                "stopngo": float,
-                "coldstart": float,
-            },
-        )
+        dtype_dict = {
+            "vehicle": str,
+            "fuel": str,
+            "traffic_situation": str,
+            "substance": str,
+            "freeflow": float,
+            "heavy": float,
+            "saturated": float,
+            "stopngo": float,
+            "coldstart": float,
+        }
+        if Path(vehicles_file).suffix == ".csv":
+            df = pd.read_csv(
+                veh_file,
+                sep=";",
+                dtype=dtype_dict,
+            )
+        elif Path(vehicles_file).suffix == ".xlsx":
+            df = pd.read_excel(
+                vehicles_file, dtype=dtype_dict, sheet_name="VehicleEmissionFactor"
+            )
+        else:
+            raise ValueError(
+                "File for import vehicle emissions factors should be " + ".csv or .xlsx"
+            )
         # indexes are set after reading csv in order to allow
         # specification of dtypes for index columns
         try:
-            df = df.set_index(
-                ["year", "vehicle", "fuel", "traffic_situation", "substance"]
-            )
+            df = df.set_index(["vehicle", "fuel", "traffic_situation", "substance"])
         except KeyError as err:
             raise ImportError(f"Invalid csv-file: {err}")
-        try:
-            df = df.loc[year]
-        except KeyError:
-            raise ImportError(f"year {year} not found in emission factor csv-file")
-
-        if df.size == 0:
-            raise ImportError(f"no emission factors found for year {year}")
 
         for col in ("freeflow", "heavy", "saturated", "stopngo", "coldstart"):
             if col not in df.columns:

@@ -56,7 +56,7 @@ def test_import_vehicles(code_sets, get_data_file):
     code_set1, code_set2 = code_sets[:2]
     vehiclefile = get_data_file("vehicles.csv")
     vehiclesettings = get_yaml_data("vehicles.yaml")
-    import_vehicles(vehiclefile, vehiclesettings, 2019, unit="kg/m", encoding="utf-8")
+    import_vehicles(vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8")
     assert VehicleFuel.objects.filter(name="diesel").exists()
     assert VehicleFuel.objects.filter(name="petrol").exists()
     assert Vehicle.objects.filter(name="car").exists()
@@ -80,7 +80,6 @@ def test_import_vehicles(code_sets, get_data_file):
     import_vehicles(
         vehiclefile,
         vehiclesettings,
-        2019,
         unit="kg/m",
         encoding="utf-8",
         overwrite=True,
@@ -96,6 +95,16 @@ def test_import_vehicles(code_sets, get_data_file):
 
     assert lorry_diesel.activitycode1.code == "1.3.2"
     assert lorry_diesel.activitycode2.code == "A"
+
+
+def test_import_vehicles_xlsx(code_sets, get_data_file):
+    """test importing vehicles from xlsx."""
+
+    code_set1, code_set2 = code_sets[:2]
+    vehiclefile = get_data_file("vehicles.xlsx")
+    vehiclesettings = get_yaml_data("vehicles.yaml")
+    import_vehicles(vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8")
+    assert VehicleFuel.objects.filter(name="diesel").exists()
 
 
 def test_import_roadclasses(code_sets, get_data_file):

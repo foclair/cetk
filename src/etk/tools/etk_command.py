@@ -301,22 +301,6 @@ def main():
             action="store_true",
             help="Do dry run to validate import file without actually importing data",
         )
-        sub_parser.add_argument(
-            "--residential-heating",
-            action="store_true",
-            help="Import file with energy demand for residential heating",
-        )
-        sub_parser.add_argument(
-            "--substances",
-            nargs="*",
-            help="Only import residential heating emissions for these substances"
-            + " (default is all with emissions)",
-            choices=Substance.objects.values_list("slug", flat=True),
-            metavar=("NOx", "PM10"),
-        )
-        # pointsource_grp = sub_parser.add_argument_group(
-        #     "pointsources", description="Options for pointsource import"
-        # )
         args = sub_parser.parse_args(sub_args)
         if not Path(db_path).exists():
             sys.stderr.write(
