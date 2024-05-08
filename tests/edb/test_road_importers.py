@@ -6,12 +6,15 @@ import pytest
 from ruamel.yaml import YAML
 
 from etk.edb.importers import (  # noqa
+    fleet_excel_to_dict,
     import_congestion_profiles,
     import_fleets,
     import_roadclasses,
     import_roads,
     import_timevars,
     import_vehicles,
+    roadclass_excel_to_dict,
+    vehicles_excel_to_dict,
 )
 from etk.edb.models import (  # noqa
     CodeSet,
@@ -77,6 +80,8 @@ def test_import_vehicles(code_sets, get_data_file):
     assert ef.stopngo == 4
     assert ef.coldstart == 5
 
+    settingsfile = get_data_file("vehicle_settings.xlsx")
+    vehiclesettings = vehicles_excel_to_dict(settingsfile)
     import_vehicles(
         vehiclefile,
         vehiclesettings,
@@ -114,7 +119,7 @@ def test_import_roadclasses(code_sets, get_data_file):
     assert RoadClass.objects.count() == 0
     vehiclefile = get_data_file("vehicles.csv")
     vehiclesettings = get_yaml_data("vehicles.yaml")
-    import_vehicles(vehiclefile, vehiclesettings, 2019, unit="kg/m", encoding="utf-8")
+    import_vehicles(vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8")
     assert RoadClass.objects.count() == 0
     roadclassfile = get_data_file("roadclasses.csv")
     roadclass_settings = get_yaml_data("roadclasses.yaml")
@@ -129,6 +134,10 @@ def test_import_roadclasses(code_sets, get_data_file):
     # assert rc_tree["values"]["primary road"]["attribute"] == "speed"
     # assert "70" in rc_tree["values"]["primary road"]["values"]
 
+    # test excel
+    roadclass_settings = roadclass_excel_to_dict(
+        get_data_file("roadclass_settings.xlsx")
+    )
     # test overwrite
     import_roadclasses(
         roadclassfile,
@@ -143,7 +152,7 @@ def test_import_roadclasses_1attr(code_sets, get_data_file):
     code_set1, code_set2 = code_sets[:2]
     vehiclefile = get_data_file("vehicles.csv")
     vehiclesettings = get_yaml_data("vehicles.yaml")
-    import_vehicles(vehiclefile, vehiclesettings, 2019, unit="kg/m", encoding="utf-8")
+    import_vehicles(vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8")
 
     roadclassfile = get_data_file("roadclasses_1attr.csv")
     roadclass_settings = get_yaml_data("roadclasses_1attr.yaml")
@@ -235,7 +244,9 @@ def test_import_fleets(db, get_data_file):
     assert fleet2.vehicles.all().count() == 1
 
     # test overwrite
-    import_fleets(get_yaml_data(fleetfile), overwrite=True)
+
+    fleet_data2 = fleet_excel_to_dict(get_data_file("fleets.xlsx"))
+    import_fleets(fleet_data2, overwrite=True)
     fleet1 = Fleet.objects.get(name="europavägar tätort")
     assert fleet1.vehicles.all().count() == 2
     assert fleet1.vehicles.get(vehicle__name="car").fuels.all().count() == 2

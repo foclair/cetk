@@ -87,6 +87,89 @@ def filter_out(feature, exclude):
     return True
 
 
+def vehicles_excel_to_dict(file_path):
+    df = pd.read_excel(file_path, sheet_name="VehicleFuel")
+
+    # Extract the code sets from the DataFrame
+    activity_columns = [col for col in df.columns if col.startswith("activitycode_")]
+    code_sets = {
+        f"code_set{i+1}": col.split("_")[1] for i, col in enumerate(activity_columns)
+    }
+
+    data = {**code_sets, "vehicles": []}
+    vehicles = []
+    for index, row in df.iterrows():
+        activitycodes = {}
+        for i, col in enumerate(activity_columns):
+            activitycodes[f"activitycode{i+1}"] = row[col]
+        # Check if the vehicle already exists in the data dictionary
+        if row["name"] in vehicles:
+            vehicle = next(
+                (
+                    vehicle
+                    for vehicle in data["vehicles"]
+                    if vehicle["name"] == row["name"]
+                ),
+                None,
+            )
+            # vehicle exists, set fuel type
+            # first check that fuel type didn't exist yet
+            vehicle["fuels"][row["fuel"]] = activitycodes
+        else:
+            vehicle_data = {
+                "name": row["name"],
+                "isheavy": row["isheavy"],
+                "info": row["info"],
+                "fuels": {},
+            }
+            vehicle_data["fuels"][row["fuel"]] = activitycodes
+            data["vehicles"].append(vehicle_data)
+            vehicles.append(row["name"])
+    return data
+
+
+def roadclass_excel_to_dict(file_path):
+    df = pd.read_excel(file_path, sheet_name="RoadAttribute")
+    df_values = pd.read_excel(file_path, sheet_name="TrafficSituation", dtype=str)
+    data = {"attributes": []}
+    for index, row in df.iterrows():
+        unique_values = list(set(df_values["attr:" + row["slug"]]))
+        data["attributes"].append(
+            {"name": row["name"], "slug": row["slug"], "values": unique_values}
+        )
+    return data
+
+
+def fleet_excel_to_dict(file_path):
+    df = pd.read_excel(file_path, sheet_name="Fleet")
+    data = {}
+    fuel_columns = [col for col in df.columns if col.startswith("fuel:")]
+    for index, row in df.iterrows():
+        fuels = {}
+        for i, col in enumerate(fuel_columns):
+            if row[col] > 0:
+                fuels[col[5:]] = row[col]
+        vehicle_data = {
+            "fraction": row["vehicle_fraction"],
+            "coldstart_fraction": row["coldstart_fraction"],
+            "timevar": row["flow_timevar"],
+            "coldstart_timevar": row["coldstart_timevar"],
+            "fuels": fuels,
+        }
+        if row["name"] in data.keys():
+            if row["vehicle"] in data[row["name"]]["vehicles"].keys():
+                raise ValueError(
+                    f"duplicated vehicle {row['vehicle']} for fleet {row['name']}"
+                )
+            data[row["name"]]["vehicles"][row["vehicle"]] = vehicle_data
+        else:
+            data[row["name"]] = {
+                "default_heavy_vehicle_share": row["default_heavy_vehicle_share"],
+                "vehicles": {row["vehicle"]: vehicle_data},
+            }
+    return data
+
+
 def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     vehicles_file,
     config,
