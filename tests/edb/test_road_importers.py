@@ -14,6 +14,7 @@ from etk.edb.importers import (  # noqa
     import_timevars,
     import_vehicles,
     roadclass_excel_to_dict,
+    roadsource_excel_to_dict,
     vehicles_excel_to_dict,
 )
 from etk.edb.models import (  # noqa
@@ -55,7 +56,6 @@ def get_yaml_data(filename):
 
 def test_import_vehicles(code_sets, get_data_file):
     """test importing vehicles from csv."""
-
     code_set1, code_set2 = code_sets[:2]
     vehiclefile = get_data_file("vehicles.csv")
     vehiclesettings = get_yaml_data("vehicles.yaml")
@@ -83,11 +83,7 @@ def test_import_vehicles(code_sets, get_data_file):
     settingsfile = get_data_file("vehicle_settings.xlsx")
     vehiclesettings = vehicles_excel_to_dict(settingsfile)
     import_vehicles(
-        vehiclefile,
-        vehiclesettings,
-        unit="kg/m",
-        encoding="utf-8",
-        overwrite=True,
+        vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8", overwrite=True
     )
     assert car.emissionfactors.filter(substance__slug="SOx").count() == 2
 
@@ -140,12 +136,12 @@ def test_import_roadclasses(code_sets, get_data_file):
     )
     # test overwrite
     import_roadclasses(
-        roadclassfile,
+        get_data_file("TrafficImportFormat.xlsx"),
         roadclass_settings,
         encoding="utf-8",
         overwrite=True,
     )
-    assert RoadClass.objects.all().count() == 2
+    assert RoadClass.objects.all().count() == 6
 
 
 def test_import_roadclasses_1attr(code_sets, get_data_file):
@@ -266,6 +262,12 @@ class TestImportRoads:
         assert road1.fleet.name == "default"
         assert road1.congestion_profile is None
         assert road1.roadclass.attributes == {"roadtype": "1", "speed": "90"}
+
+        # import roads from xlsx
+        config2 = roadsource_excel_to_dict(get_data_file("TrafficImportFormat.xlsx"))
+        import_roads(config2["filepath"], config2)
+        assert RoadSource.objects.all().count() == 2 * 26
+        # roadsources are not updated as other sources are
 
     def test_import_roads_exclude(self, roadefset, get_data_file):
         config = get_yaml_data("roads.yaml")

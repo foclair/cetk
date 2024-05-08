@@ -8,6 +8,7 @@ from .roadsource_import import (  # noqa
     import_roads,
     import_vehicles,
     roadclass_excel_to_dict,
+    roadsource_excel_to_dict,
     vehicles_excel_to_dict,
 )
 from .source_import import import_sourceactivities, import_sources  # noqa
@@ -22,4 +23,13 @@ SHEETS = (
     "PointSource",
     "AreaSource",
     "GridSource",
+    "RoadSource",
+    "VehicleFuel",
+    "Fleet",
+    "CongestionProfile",
+    "FlowTimevar",
+    "ColdstartTimevar",
+    "RoadAttriute",
+    "TrafficSituation",
+    "VehicleEmissionFactor",
 )

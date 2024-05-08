@@ -170,6 +170,26 @@ def fleet_excel_to_dict(file_path):
     return data
 
 
+def roadsource_excel_to_dict(file_path):
+    df = pd.read_excel(file_path, sheet_name="RoadSource")
+    attribute_columns = [col for col in df.columns if col.startswith("attr:")]
+    attributes = {col[5:]: str(df[col].values[0]) for col in attribute_columns}
+    tag_columns = [col for col in df.columns if col.startswith("tag:")]
+    tags = {col[4:]: str(df[col].values[0]) for col in tag_columns}
+    data = {
+        col: str(df[col].values[0])
+        for col in df.columns
+        if not (
+            col.startswith("attr:")
+            or col.startswith("tag:")
+            or pd.isnull(df[col].values[0])
+        )
+    }
+    data["roadclass"] = attributes
+    data["tags"] = tags
+    return data
+
+
 def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     vehicles_file,
     config,
@@ -626,16 +646,42 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
     log.info("reading roadclass table")
     with Path(roadclass_file).open(encoding=encoding) as roadclass_stream:
         roadclass_attributes = [a.slug for a in defined_attributes]
-        column_names = [*roadclass_attributes, "traffic_situation"]
-        try:
-            df = pd.read_csv(
-                roadclass_stream, sep=";", dtype=str, usecols=column_names
-            ).set_index([a.slug for a in defined_attributes])
-        except Exception as err:
+        if Path(roadclass_file).suffix == ".csv":
+            try:
+                column_names = [*roadclass_attributes, "traffic_situation"]
+                df = pd.read_csv(
+                    roadclass_stream, sep=";", dtype=str, usecols=column_names
+                ).set_index([a.slug for a in defined_attributes])
+            except Exception as err:
+                raise ImportError(
+                    "could not read csv, are all roadclass attributes "
+                    f"{roadclass_attributes} and 'traffic_situation' "
+                    f"given as columns? (error message: {err})"
+                )
+        elif Path(roadclass_file).suffix == ".xlsx":
+            try:
+                column_names = ["attr:" + rc for rc in roadclass_attributes]
+                column_names.append("traffic_situation")
+                df = pd.read_excel(
+                    roadclass_file,
+                    dtype=str,
+                    sheet_name="TrafficSituation",
+                    usecols=column_names,
+                )
+                df.rename(
+                    columns={"attr:" + rc: rc for rc in roadclass_attributes},
+                    inplace=True,
+                )
+                df.set_index([a.slug for a in defined_attributes], inplace=True)
+            except Exception as err:
+                raise ImportError(
+                    "could not read xlsx, are all roadclass attributes "
+                    f"{roadclass_attributes} and 'traffic_situation' "
+                    f"given as columns? (error message: {err})"
+                )
+        else:
             raise ImportError(
-                "could not read csv, are all roadclass attributes "
-                f"{roadclass_attributes} and 'traffic_situation' "
-                f"given as columns? (error message: {err})"
+                "File for import vehicle emissions factors should be " + ".csv or .xlsx"
             )
 
         invalid_traffic_situations = []
@@ -681,26 +727,18 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                 else:
                     raise ImportError(f"roadclass '{rc}' already exists.")
         if len(roadclasses_to_create) > 0:
-            # count=0
             RoadClass.objects.bulk_create(map(itemgetter(0), roadclasses_to_create))
-            # count =2
+            # list of saved roadclasses to avoid problem unsaved related attributes
             roadclasses_to_create_saved = []
-
-            created_roadclasses = [
-                RoadClass.objects.get(
-                    traffic_situation_id=rctuple[0].traffic_situation.id
-                )
-                for rctuple in roadclasses_to_create
-            ]
+            # created roadclasses should only be those who have no attribute values yet!
+            # this could go wrong if none of the roadclasses has attributes
+            # but then does not make sense to have several roadclasses anyhow.
+            created_roadclasses = RoadClass.objects.filter(attribute_values=None)
             for i, rc in enumerate(created_roadclasses):
                 roadclasses_to_create_saved.append((rc, roadclasses_to_create[i][1]))
 
-            # count=4, so something goes wrong here!
-            # need to do assignment of roadclass in another way to make sure no problem
-            # unsaved related bojects
             through_model = RoadClass.attribute_values.through
-            # need to somehow redefine roadclasses_to_create without creating new ones
-            # breakpoint()
+
             values = [
                 through_model(roadclass=rc, roadattributevalue=v)
                 for rc, vals in roadclasses_to_create_saved
