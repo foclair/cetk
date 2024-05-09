@@ -16,6 +16,11 @@ def pointsourceactivities_xlsx():
 
 
 @pytest.fixture
+def traffic_xlsx():
+    return resources.files("edb.data") / "TrafficImportFormat.xlsx"
+
+
+@pytest.fixture
 def validation_xlsx():
     return resources.files("tools.data") / "validation.xlsx"
 
@@ -56,3 +61,22 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
     #    print(error)
     assert "ERROR" in str(stdout)
     assert "Finished dry-run" in str(stdout)
+
+
+def test_import_traffic(tmp_db, traffic_xlsx):
+    run_migrate(db_path=tmp_db)
+
+    # Regular expression pattern to extract the dictionary part
+    pattern = r"imported data (.+)\\n"
+
+    (stderr, stdout) = run_import(traffic_xlsx, db_path=tmp_db)
+    match = re.search(pattern, str(stdout))
+    expected_dict = {
+        "codeset": {"updated": 0, "created": 3},
+        "activitycode": {"updated": 0, "created": 9},
+        "roads": {"created": 26},
+        "vehicle_emission_factors": {"updated": 0, "created": 6},
+    }
+    # TODO this test is now expected to fail, because traffix_xlsx contains a
+    # hardcoded filepath, is it possible to make this depend on the location of etk?
+    assert eval(match.group(1)) == expected_dict
