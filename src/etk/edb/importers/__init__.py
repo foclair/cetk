@@ -6,6 +6,7 @@ from .roadsource_import import (  # noqa
     import_fleets,
     import_roadclasses,
     import_roads,
+    import_traffic,
     import_vehicles,
     roadclass_excel_to_dict,
     roadsource_excel_to_dict,

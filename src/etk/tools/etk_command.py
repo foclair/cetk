@@ -36,6 +36,7 @@ from etk.edb.importers import (  # noqa
     import_sourceactivities,
     import_sources,
     import_timevarsheet,
+    import_traffic,
 )
 from etk.edb.models import Settings, Substance  # noqa
 from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
@@ -108,16 +109,47 @@ class Editor(object):
                     if sheet not in workbook.sheetnames:
                         log.info(f"Workbook has no sheet named {sheet}, skipped import")
                 if any(name != "GridSource" for name in import_sheets):
-                    updates, msgs = import_sourceactivities(
-                        filename,
-                        import_sheets=import_sheets,
-                        validation=dry_run,
-                    )
-                    db_updates.update(updates)
-                    if len(msgs) != 0:
-                        return_msg += msgs
-                        if not dry_run:
-                            raise ImportError(return_msg)
+                    # import Timevar, Codeset, ActivityCode, EmissionFactor,
+                    # PointSource and AreaSource
+                    sourceact = [
+                        "CodeSet",
+                        "ActivityCode",
+                        "EmissionFactor",
+                        "Timevar",
+                        "PointSource",
+                        "AreaSource",
+                    ]
+                    if any(name in sourceact for name in import_sheets):
+                        updates, msgs = import_sourceactivities(
+                            filename,
+                            import_sheets=import_sheets,
+                            validation=dry_run,
+                        )
+                        db_updates.update(updates)
+                        if len(msgs) != 0:
+                            return_msg += msgs
+                            if not dry_run:
+                                raise ImportError(return_msg)
+                    traffic = [
+                        "RoadSource",
+                        "VehicleFuel",
+                        "Fleet",
+                        "CongestionProfile",
+                        "FlowTimevar",
+                        "ColdstartTimevar",
+                        "RoadAttribute",
+                        "TrafficSituation",
+                        "VehicleEmissionFactor",
+                    ]
+                    if any(name in traffic for name in import_sheets):
+                        updates, msgs = import_traffic(
+                            filename, sheets=import_sheets, validation=dry_run
+                        )
+                        db_updates.update(updates)
+                        if len(msgs) != 0:
+                            return_msg += msgs
+                            if not dry_run:
+                                raise ImportError(return_msg)
                 if dry_run:
                     raise DryrunAbort
             # grid sources imported outside atomic transaction

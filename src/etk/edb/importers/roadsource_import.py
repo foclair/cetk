@@ -16,6 +16,7 @@ from django.contrib.gis.geos import Point, Polygon  # noqa
 from django.core.exceptions import ObjectDoesNotExist, ValidationError  # noqa
 from django.core.management.base import CommandError  # noqa
 from django.db import IntegrityError  # noqa
+from openpyxl import load_workbook
 
 from etk.edb.const import WGS84_SRID
 from etk.edb.models import (  # noqa
@@ -40,6 +41,9 @@ from etk.edb.models import (  # noqa
 )
 from etk.edb.units import emission_unit_to_si, vehicle_ef_unit_to_si  # noqa
 from etk.utils import inbatch
+
+from .timevar_import import import_timevarsheet
+from .utils import import_error, worksheet_to_dataframe
 
 log = logging.getLogger(__name__)
 
@@ -190,12 +194,69 @@ def roadsource_excel_to_dict(file_path):
     return data
 
 
+def import_traffic(filename, sheets, validation=False):
+    # in case the excel file is a big file, using workbook as argument instead
+    # of filename would be a good way to optimize import
+    workbook = load_workbook(filename=filename, data_only=True, read_only=True)
+    return_dict = {}
+    return_message = []
+    if "VehicleFuel" in sheets:
+        vehiclesettings = vehicles_excel_to_dict(filename)
+    elif "VehicleEmissionFactor" in sheets:
+        raise ImportError(
+            "Cannot import vehicle emfacs if VehicleFuel is not "
+            "set in the same file."
+        )
+    if "VehicleEmissionFactor" in sheets:
+        # TODO set unit from spreadsheet?
+        updates = import_vehicles(
+            filename, vehiclesettings, unit="kg/m", encoding="utf-8", overwrite=True
+        )
+        return_dict.update(updates)
+    if ("RoadAttribute" in sheets) and ("TrafficSituation" in sheets):
+        roadclass_settings = roadclass_excel_to_dict(filename)
+        import_roadclasses(
+            filename,
+            roadclass_settings,
+            encoding="utf-8",
+            overwrite=True,
+        )
+    elif ("RoadAttribute" in sheets) and ("TrafficSituation" in sheets):
+        raise ImportError(
+            "Have to import TrafficSituation and RoadAttribute simultaneously."
+        )
+    if "CongestionProfile" in sheets:
+        import_congestionsheet(workbook)
+    if "FlowTimevar" in sheets:
+        import_timevarsheet(workbook, validation=False, sheetname="FlowTimevar")
+    if "ColdstartTimevar" in sheets:
+        import_timevarsheet(workbook, validation=False, sheetname="ColdstartTimevar")
+    if "Fleet" in sheets:
+        try:
+            fleet_data = fleet_excel_to_dict(filename)
+            import_fleets(fleet_data, overwrite=True)
+        except ImportError as err:
+            return {}, [f"{err}"]
+    if "RoadSource" in sheets:
+        try:
+            config = roadsource_excel_to_dict(filename)
+            updates = import_roads(config["filepath"], config)
+            return_dict.update(updates)
+        except ImportError as err:
+            return {}, [f"{err}"]
+    return return_dict, return_message  # update dict and messages
+
+
+# TODO continue replacing ImportError by import_error where possible for validation
+
+
 def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     vehicles_file,
     config,
     *,
     only_ef=False,
     overwrite=False,
+    validation=False,
     unit="mg/km",
     encoding="utf-8",
 ):
@@ -215,6 +276,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     valid_codes = OrderedDict()
     code_sets = [None, None, None]
     config = copy.deepcopy(config)
+    return_message = []
 
     # cache activity-codes for code-sets specified in config file
     for i in range(3):
@@ -225,32 +287,51 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
             try:
                 code_sets[i] = CodeSet.objects.get(slug=code_sets[i])
             except ObjectDoesNotExist:
-                raise ImportError(f"Invalid codeset slug: {code_sets[i]}")
+                return_message.append(
+                    import_error(
+                        f"Invalid codeset slug: {code_sets[i]}",
+                        validation=validation,
+                    )
+                )
 
             valid_codes[code_sets[i].slug] = {
                 ac.code: ac for ac in code_sets[i].codes.all()
             }
 
-    def validate_ac(code_data, valid_codes):
+    def validate_ac(code_data, valid_codes, validation=False, return_message=[]):
         if "activitycode1" in code_data and len(valid_codes) == 0:
-            raise ImportError("no activity codes defined, but codes given for vehicle")
+            return_message.append(
+                import_error(
+                    "no activity codes defined, but codes given for vehicle",
+                    validation=validation,
+                )
+            )
 
         code_nr = 1
         for code_set_name, codes in valid_codes.items():
             try:
                 ac = code_data[f"activitycode{code_nr}"]
             except KeyError:
-                raise ImportError(
-                    f"no value specified for activity code {code_nr} ({code_set_name})"
-                    f" of vehicle/fuel combination '{vehicle_name}' - '{fuel_name}'"
+                return_message.append(
+                    import_error(
+                        f"no value specified for activity code {code_nr}"
+                        f" ({code_set_name}) of vehicle/fuel combination "
+                        f"'{vehicle_name}' - '{fuel_name}'",
+                        validation=validation,
+                    )
                 )
             if ac not in codes:
-                raise ImportError(
-                    f"invalid value '{ac}' for activity code "
-                    f"{code_nr} ({code_set_name})"
-                    f" of vehicle/fuel combination '{vehicle_name}' - '{fuel_name}'"
+                return_message.append(
+                    import_error(
+                        f"invalid value '{ac}' for activity code "
+                        f"{code_nr} ({code_set_name})"
+                        f" of vehicle/fuel combination "
+                        f"'{vehicle_name}' - '{fuel_name}'",
+                        validation=validation,
+                    )
                 )
             code_nr += 1
+        return return_message
 
     try:
         mass_unit, length_unit = unit.split("/")
@@ -367,7 +448,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                         raise ImportError(
                             f"fuel {fuel_name} does not exist in database"
                         )
-                validate_ac(code_data, valid_codes)
+                return_message = validate_ac(code_data, valid_codes)
 
                 # get activity code model instances for each activity code
                 ac_codes = [None, None, None]
@@ -563,24 +644,32 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
             ("freeflow", "heavy", "saturated", "stopngo", "coldstart"),
         )
         log.info(f"updated {len(efs_to_update)} emission-factors")
+        return_dict = {"vehicle_emission_factors": {"updated": len(efs_to_update)}}
+    else:
+        return_dict = {"vehicle_emission_factors": {"updated": 0}}
     for msg, nr in messages.items():
         log.warning("warning: " + msg + f": {nr}")
 
-    try:
-        VehicleEF.objects.bulk_create(efs_to_create)
-        log.info(f"wrote {len(efs_to_create)} emission-factors")
-    except IntegrityError:
-        for ef in efs_to_create:
-            try:
-                ef.save()
-            except IntegrityError:
-                raise ImportError(
-                    "duplicate emission-factors for: "
-                    f"substance '{ef.substance.slug}, "
-                    f"vehicle: '{ef.vehicle.name}', "
-                    f"fuel:  '{ef.fuel.name}', "
-                    f"traffic-situation: '{ef.traffic_situation.ts_id}'"
-                )
+    if len(efs_to_create) > 0:
+        try:
+            VehicleEF.objects.bulk_create(efs_to_create)
+            log.info(f"wrote {len(efs_to_create)} emission-factors")
+            return_dict["vehicle_emission_factors"]["created"] = len(efs_to_create)
+        except IntegrityError:
+            for ef in efs_to_create:
+                try:
+                    ef.save()
+                except IntegrityError:
+                    raise ImportError(
+                        "duplicate emission-factors for: "
+                        f"substance '{ef.substance.slug}, "
+                        f"vehicle: '{ef.vehicle.name}', "
+                        f"fuel:  '{ef.fuel.name}', "
+                        f"traffic-situation: '{ef.traffic_situation.ts_id}'"
+                    )
+    else:
+        return_dict["vehicle_emission_factors"]["created"] = 0
+    return return_dict
 
 
 def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
@@ -677,7 +766,8 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                 raise ImportError(
                     "could not read xlsx, are all roadclass attributes "
                     f"{roadclass_attributes} and 'traffic_situation' "
-                    f"given as columns? (error message: {err})"
+                    "given as columns? and does the sheet TrafficSituation exist? "
+                    f"(error message: {err})"
                 )
         else:
             raise ImportError(
@@ -746,6 +836,33 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             ]
 
             through_model.objects.bulk_create(values)
+
+
+def import_congestionsheet(workbook, sheetname="CongestionProfile"):
+    congestion_data = workbook[sheetname].values
+    df_congestion = worksheet_to_dataframe(congestion_data)
+    congestion_dict = {}
+    # NB this only works if Excel file has exact same format
+    nr_profiles = (len(df_congestion["ID"]) + 1) // 25
+    for i in range(nr_profiles):
+        label = df_congestion["ID"][i * 25]
+        typeday = np.asarray(
+            df_congestion[
+                [
+                    "monday",
+                    "tuesday",
+                    "wednesday",
+                    "thursday",
+                    "friday",
+                    "saturday",
+                    "sunday",
+                ]
+            ][i * 25 : i * 25 + 24]
+        )
+        congestion_dict[label] = {"traffic_condition": typeday}
+    import_congestion_profiles(congestion_dict, overwrite=True)
+    return_dict = {"congestion": {"updated or created": len(congestion_dict)}}
+    return return_dict
 
 
 def import_congestion_profiles(profile_data, *, overwrite=False):
@@ -1259,7 +1376,10 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
         if progress_callback:
             progress_callback(count)
     log.info(f"created {ncreated} roads")
+    return_dict = {"roads": {"created": ncreated}}
     if len(messages) > 0:
         log.warning("Summary: ")
         for msg, nr in messages.items():
             log.warning("- " + msg + f": {nr} roads")
+
+    return return_dict

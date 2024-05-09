@@ -10,7 +10,13 @@ def import_timevarsheet(workbook, validation, sheetname="Timevar"):
     return_message = []
     timevar_data = workbook[sheetname].values
     df_timevar = worksheet_to_dataframe(timevar_data)
-    timevar_dict = {"emission": {}}
+    if sheetname == "Timevar":
+        keyname = "emission"
+    if sheetname == "FlowTimevar":
+        keyname = "flow"
+    if sheetname == "ColdstartTimevar":
+        keyname = "coldstart"
+    timevar_dict = {keyname: {}}
     # NB this only works if Excel file has exact same format
     nr_timevars = (len(df_timevar["ID"]) + 1) // 27
     for i in range(nr_timevars):
@@ -31,14 +37,14 @@ def import_timevarsheet(workbook, validation, sheetname="Timevar"):
         month = np.asarray(df_timevar.iloc[i * 27 + 25, 2:14])
         typeday_str = np.array2string(typeday).replace("\n", "").replace(" ", ", ")
         month_str = np.array2string(month).replace("\n", "").replace(" ", ", ")
-        timevar_dict["emission"].update(
+        timevar_dict[keyname].update(
             {label: {"typeday": typeday_str, "month": month_str}}
         )
     tv, return_append = import_timevars(
         timevar_dict, overwrite=True, validation=validation
     )
     return_message += return_append
-    return_dict = {"timevar": {"updated or created": len(tv["emission"])}}
+    return_dict = {"timevar": {"updated or created": len(tv[keyname])}}
     return return_dict, return_message
 
 
