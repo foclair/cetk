@@ -263,8 +263,7 @@ class TestImportRoads:
         assert road1.congestion_profile is None
         assert road1.roadclass.attributes == {"roadtype": "1", "speed": "90"}
 
-        # import roads from xlsx
-        config2 = roadsource_excel_to_dict(get_data_file("TrafficImportFormat.xlsx"))
+        config2 = roadsource_excel_to_dict(get_data_file("roads.xlsx"))
         import_roads(config2["filepath"], config2)
         assert RoadSource.objects.all().count() == 2 * 26
         # roadsources are not updated as other sources are

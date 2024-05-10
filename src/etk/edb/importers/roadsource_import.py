@@ -695,13 +695,19 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             raise ImportError("keyword 'values' not found for in config")
 
         try:
-            attr, _ = RoadAttribute.objects.get_or_create(
-                name=attr_dict_tmp["name"], slug=attr_dict_tmp["slug"], order=ind
+            attr = RoadAttribute.objects.get(
+                name=attr_dict_tmp["name"], slug=attr_dict_tmp["slug"]
             )
-        except IntegrityError as err:
-            raise ImportError(
-                f"invalid or duplicate road class attribute: {attr_dict['name']}: {err}"
-            )
+        except RoadAttribute.DoesNotExist:
+            try:
+                attr = RoadAttribute.objects.create(
+                    name=attr_dict_tmp["name"], slug=attr_dict_tmp["slug"], order=ind
+                )
+            except IntegrityError as err:
+                raise ImportError(
+                    "invalid or duplicate road class attribute: "
+                    f"{attr_dict['name']}: {err}"
+                )
 
         defined_attributes[attr] = {"attribute": attr}
         for val in values:
