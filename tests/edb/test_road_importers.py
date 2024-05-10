@@ -136,7 +136,7 @@ def test_import_roadclasses(code_sets, get_data_file):
     )
     # test overwrite
     import_roadclasses(
-        get_data_file("TrafficImportFormat.xlsx"),
+        get_data_file("roadclass_settings.xlsx"),
         roadclass_settings,
         encoding="utf-8",
         overwrite=True,
