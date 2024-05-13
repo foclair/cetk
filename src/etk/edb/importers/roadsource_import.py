@@ -1246,13 +1246,30 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
             else:
                 road_data[target_name] = val
 
-        if "width" in road_data and road_data["width"] == 0:
+        if "width" in road_data and (
+            road_data["width"] == 0 or road_data["width"] == ""
+        ):
             road_data["width"] = RoadSource._meta.get_field("width").default
             handle_msg(
                 messages,
                 "invalid value (0m) for road width, "
                 f"using default value {road_data['width']}m",
             )
+
+        if (
+            "width" in road_data
+            and type(road_data["width"]) == str
+            and ("m" in road_data["width"])
+        ):
+            try:
+                road_data["width"] = float(road_data["width"].replace("m", ""))
+            except ValueError:
+                road_data["width"] = RoadSource._meta.get_field("width").default
+                handle_msg(
+                    messages,
+                    "invalid value (including unit m) for road width, "
+                    f"using default value {road_data['width']}m",
+                )
 
         road = RoadSource(**road_data)
 
@@ -1382,7 +1399,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
         if progress_callback:
             progress_callback(count)
     log.info(f"created {ncreated} roads")
-    return_dict = {"roads": {"created": ncreated}}
+    return_dict = {"roads": {"created": ncreated, "updated": 0}}
     if len(messages) > 0:
         log.warning("Summary: ")
         for msg, nr in messages.items():

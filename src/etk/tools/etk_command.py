@@ -183,6 +183,7 @@ class Editor(object):
                 datetime.datetime.now().strftime("%H:%M:%S")
                 + f" imported data {db_updates}"
             )
+        log.info(return_msg)
         return db_updates, return_msg
 
     def update_emission_tables(
