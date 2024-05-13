@@ -131,7 +131,7 @@ def test_import_roadclasses(code_sets, get_data_file):
     # assert "70" in rc_tree["values"]["primary road"]["values"]
 
     # test excel
-    roadclass_settings = roadclass_excel_to_dict(
+    roadclass_settings, _ = roadclass_excel_to_dict(
         get_data_file("roadclass_settings.xlsx")
     )
     # test overwrite
@@ -241,7 +241,7 @@ def test_import_fleets(db, get_data_file):
 
     # test overwrite
 
-    fleet_data2 = fleet_excel_to_dict(get_data_file("fleets.xlsx"))
+    fleet_data2, _ = fleet_excel_to_dict(get_data_file("fleets.xlsx"))
     import_fleets(fleet_data2, overwrite=True)
     fleet1 = Fleet.objects.get(name="europavägar tätort")
     assert fleet1.vehicles.all().count() == 2

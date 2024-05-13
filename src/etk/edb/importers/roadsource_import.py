@@ -132,22 +132,30 @@ def vehicles_excel_to_dict(file_path):
     return data
 
 
-def roadclass_excel_to_dict(file_path):
+def roadclass_excel_to_dict(file_path, validation=False):
+    msg = []
     df = pd.read_excel(file_path, sheet_name="RoadAttribute")
     df_values = pd.read_excel(file_path, sheet_name="TrafficSituation", dtype=str)
     data = {"attributes": []}
     for index, row in df.iterrows():
-        unique_values = list(set(df_values["attr:" + row["slug"]]))
-        data["attributes"].append(
-            {"name": row["name"], "slug": row["slug"], "values": unique_values}
-        )
-    return data
+        try:
+            unique_values = list(set(df_values["attr:" + row["slug"]]))
+            data["attributes"].append(
+                {"name": row["name"], "slug": row["slug"], "values": unique_values}
+            )
+        except KeyError:
+            msg = import_error(
+                f"Attribute not found in TrafficSituation sheet: {row['slug']}",
+                validation=validation,
+            )
+    return data, msg
 
 
-def fleet_excel_to_dict(file_path):
+def fleet_excel_to_dict(file_path, validation=False):
     df = pd.read_excel(file_path, sheet_name="Fleet")
     data = {}
     fuel_columns = [col for col in df.columns if col.startswith("fuel:")]
+    msg = []
     for index, row in df.iterrows():
         fuels = {}
         for i, col in enumerate(fuel_columns):
@@ -162,16 +170,18 @@ def fleet_excel_to_dict(file_path):
         }
         if row["name"] in data.keys():
             if row["vehicle"] in data[row["name"]]["vehicles"].keys():
-                raise ValueError(
-                    f"duplicated vehicle {row['vehicle']} for fleet {row['name']}"
+                msg = import_error(
+                    f"duplicated vehicle {row['vehicle']} for fleet {row['name']}",
+                    validation=validation,
                 )
-            data[row["name"]]["vehicles"][row["vehicle"]] = vehicle_data
+            else:
+                data[row["name"]]["vehicles"][row["vehicle"]] = vehicle_data
         else:
             data[row["name"]] = {
                 "default_heavy_vehicle_share": row["default_heavy_vehicle_share"],
                 "vehicles": {row["vehicle"]: vehicle_data},
             }
-    return data
+    return data, msg
 
 
 def roadsource_excel_to_dict(file_path):
@@ -203,9 +213,12 @@ def import_traffic(filename, sheets, validation=False):
     if "VehicleFuel" in sheets:
         vehiclesettings = vehicles_excel_to_dict(filename)
     elif "VehicleEmissionFactor" in sheets:
-        raise ImportError(
-            "Cannot import vehicle emfacs if VehicleFuel is not "
-            "set in the same file."
+        return_message.append(
+            import_error(
+                "Cannot import vehicle emfacs if VehicleFuel is not "
+                "set in the same file.",
+                validation=validation,
+            )
         )
     if "VehicleEmissionFactor" in sheets:
         # TODO set unit from spreadsheet?
@@ -214,34 +227,42 @@ def import_traffic(filename, sheets, validation=False):
         )
         return_dict.update(updates)
     if ("RoadAttribute" in sheets) and ("TrafficSituation" in sheets):
-        roadclass_settings = roadclass_excel_to_dict(filename)
+        roadclass_settings, msg = roadclass_excel_to_dict(filename, validation)
+        return_message += msg
         import_roadclasses(
             filename,
             roadclass_settings,
             encoding="utf-8",
             overwrite=True,
+            validation=validation,
         )
     elif ("RoadAttribute" in sheets) and ("TrafficSituation" in sheets):
         raise ImportError(
             "Have to import TrafficSituation and RoadAttribute simultaneously."
         )
     if "CongestionProfile" in sheets:
-        import_congestionsheet(workbook)
+        _, msg = import_congestionsheet(workbook, validation=validation)
+        return_message += msg
     if "FlowTimevar" in sheets:
-        import_timevarsheet(workbook, validation=False, sheetname="FlowTimevar")
+        _, msg = import_timevarsheet(workbook, validation, sheetname="FlowTimevar")
+        return_message += msg
     if "ColdstartTimevar" in sheets:
-        import_timevarsheet(workbook, validation=False, sheetname="ColdstartTimevar")
+        _, msg = import_timevarsheet(workbook, validation, sheetname="ColdstartTimevar")
+        return_message += msg
     if "Fleet" in sheets:
         try:
-            fleet_data = fleet_excel_to_dict(filename)
-            import_fleets(fleet_data, overwrite=True)
+            fleet_data, msg = fleet_excel_to_dict(filename, validation)
+            return_message += msg
+            _, msg = import_fleets(fleet_data, overwrite=True, validation=validation)
+            return_message += msg
         except ImportError as err:
             return {}, [f"{err}"]
     if "RoadSource" in sheets:
         try:
             config = roadsource_excel_to_dict(filename)
-            updates = import_roads(config["filepath"], config)
+            updates, msg = import_roads(config["filepath"], config)
             return_dict.update(updates)
+            return_message += msg
         except ImportError as err:
             return {}, [f"{err}"]
     return return_dict, return_message  # update dict and messages
@@ -388,7 +409,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                 substances[subst] = Substance.objects.get(slug=subst)
             except ObjectDoesNotExist:
                 msg = f"substance {subst} does not exist in database"
-                raise ImportError(msg)
+                return_message.append(import_error(msg), validation=validation)
 
         # create vehicles
         vehicle_defs = config.get("vehicles", [])
@@ -412,24 +433,33 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                             name=vehicle_name, defaults=veh_tmp
                         )
                     except IntegrityError:
-                        raise ImportError(
-                            "either duplicate specification or vehicle "
-                            f"'{vehicle_name}' already exists."
+                        return_message.append(
+                            import_error(
+                                "either duplicate specification or vehicle "
+                                f"'{vehicle_name}' already exists.",
+                                validation=validation,
+                            )
                         )
                     if created:
                         log.debug(f"created vehicle {vehicle_name}")
                 elif not Vehicle.objects.filter(name=vehicle_name).exists():
-                    raise ImportError(  # noqa: TRY301
-                        f"vehicle '{vehicle_name}' does not exist "
+                    return_message.append(
+                        import_error(  # noqa: TRY301
+                            f"vehicle '{vehicle_name}' does not exist ",
+                            validation=validation,
+                        )
                     )
             except Exception as err:
-                raise ImportError(
-                    f"invalid specification of vehicle in config-file: {err}"
+                return_message.append(
+                    import_error(
+                        f"invalid specification of vehicle in config-file: {err}",
+                        validation=validation,
+                    )
                 )
             if vehicle_name not in df_vehicles:
                 log.warning(
                     "warning: no emission-factors specified for vehicle"
-                    f" '{vehicle_name}'"
+                    f" '{vehicle_name}'",
                 )
 
             vehicles = {veh.name: veh for veh in Vehicle.objects.all()}
@@ -445,10 +475,13 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                     try:
                         fuel = VehicleFuel.objects.get(name=fuel_name)
                     except ObjectDoesNotExist:
-                        raise ImportError(
-                            f"fuel {fuel_name} does not exist in database"
+                        return_message.append(
+                            import_error(
+                                f"fuel {fuel_name} does not exist in database",
+                                validation=validation,
+                            )
                         )
-                return_message = validate_ac(code_data, valid_codes)
+                return_message.append(validate_ac(code_data, valid_codes))
 
                 # get activity code model instances for each activity code
                 ac_codes = [None, None, None]
@@ -489,10 +522,13 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                 elif not VehicleFuelComb.objects.filter(
                     vehicle=vehicles[vehicle_name], fuel=fuel
                 ).exists():
-                    raise ImportError(
-                        "vehicle/fuel combination "
-                        f"'{vehicle_name}' - '{fuel_name}' "
-                        "does not exist."
+                    return_message.append(
+                        import_error(
+                            "vehicle/fuel combination "
+                            f"'{vehicle_name}' - '{fuel_name}' "
+                            "does not exist.",
+                            validation=validation,
+                        )
                     )
         fuels = {fuel.name: fuel for fuel in VehicleFuel.objects.all()}
         veh_fuel_combs = {
@@ -527,7 +563,12 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
             # traffic-situations are defined by ts_id only
             # this means overwriting/updating is not relevant
             if only_ef:
-                raise ImportError(f"traffic-situation {ts_id} does not exist.")
+                return_message.append(
+                    import_error(
+                        f"traffic-situation {ts_id} does not exist.",
+                        validation=validation,
+                    )
+                )
             traffic_situations.append(TrafficSituation(ts_id=ts_id))
     # create any new traffic-situations
     if len(traffic_situations) > 0:
@@ -634,8 +675,11 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
             )
             for ef in efs_to_update
         )
-        raise ImportError(
-            f"The following emission factors already exist in the ef-set: {msg}"
+        return_message.append(
+            import_error(
+                f"The following emission factors already exist in the ef-set: {msg}",
+                validation=validation,
+            )
         )
 
     if len(efs_to_update) > 0:
@@ -660,12 +704,15 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                 try:
                     ef.save()
                 except IntegrityError:
-                    raise ImportError(
-                        "duplicate emission-factors for: "
-                        f"substance '{ef.substance.slug}, "
-                        f"vehicle: '{ef.vehicle.name}', "
-                        f"fuel:  '{ef.fuel.name}', "
-                        f"traffic-situation: '{ef.traffic_situation.ts_id}'"
+                    return_message.append(
+                        import_error(
+                            "duplicate emission-factors for: "
+                            f"substance '{ef.substance.slug}, "
+                            f"vehicle: '{ef.vehicle.name}', "
+                            f"fuel:  '{ef.fuel.name}', "
+                            f"traffic-situation: '{ef.traffic_situation.ts_id}'",
+                            validation=validation,
+                        )
                     )
     else:
         return_dict["vehicle_emission_factors"]["created"] = 0
@@ -673,15 +720,15 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
 
 
 def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
-    roadclass_file, config, *, overwrite=False, **kwargs
+    roadclass_file, config, *, overwrite=False, validation=False, **kwargs
 ):
     """import roadclasses (traffic-situations must already exist in database)."""
-
+    return_message = []
     encoding = kwargs.get("encoding", "utf-8")
     try:
         attributes = config["attributes"]
     except KeyError:
-        raise ImportError("keyword 'attributes' not found in config")
+        ImportError("keyword 'attributes' not found in config")
 
     log.info("create road attributes")
 
@@ -692,7 +739,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
         try:
             values = attr_dict_tmp.pop("values")
         except KeyError:
-            raise ImportError("keyword 'values' not found for in config")
+            ImportError("keyword 'values' not found for in config")
 
         try:
             attr = RoadAttribute.objects.get(
@@ -704,9 +751,12 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                     name=attr_dict_tmp["name"], slug=attr_dict_tmp["slug"], order=ind
                 )
             except IntegrityError as err:
-                raise ImportError(
-                    "invalid or duplicate road class attribute: "
-                    f"{attr_dict['name']}: {err}"
+                return_message.append(
+                    import_error(
+                        "invalid or duplicate road class attribute: "
+                        f"{attr_dict['name']}: {err}",
+                        validation=validation,
+                    )
                 )
 
         defined_attributes[attr] = {"attribute": attr}
@@ -718,16 +768,22 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             if overwrite:
                 attr.delete()
             else:
-                raise ImportError(
-                    "Unused road attribute '{attr.slug}' found in base-set"
+                return_message.append(
+                    import_error(
+                        "Unused road attribute '{attr.slug}' found",
+                        validation=validation,
+                    )
                 )
         for label, value in values.items():
             if label not in defined_attributes[attr]:
                 if overwrite:
                     value.delete()
                 else:
-                    raise ImportError(
-                        "Unused road attribute value '{label}' found in base-set"
+                    return_message.append(
+                        import_error(
+                            "Unused road attribute value '{label}' found",
+                            validation=validation,
+                        )
                     )
 
     # cache all existing traffic situations and road-classes
@@ -748,7 +804,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                     roadclass_stream, sep=";", dtype=str, usecols=column_names
                 ).set_index([a.slug for a in defined_attributes])
             except Exception as err:
-                raise ImportError(
+                ImportError(
                     "could not read csv, are all roadclass attributes "
                     f"{roadclass_attributes} and 'traffic_situation' "
                     f"given as columns? (error message: {err})"
@@ -790,8 +846,11 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             indexes = [index] if isinstance(index, str) else index
             for attr, val in zip(defined_attributes, indexes):
                 if val not in defined_attributes[attr]:
-                    raise ImportError(
-                        f"Invalid value '{val}' for road attribute '{attr.slug}'"
+                    return_message.append(
+                        import_error(
+                            f"Invalid value '{val}' for road attribute '{attr.slug}'",
+                            validation=validation,
+                        )
                     )
                 attribute_values[attr] = defined_attributes[attr][val]
 
@@ -810,9 +869,12 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                 roadclasses_to_create.append((rc, attribute_values.values()))
 
         if len(invalid_traffic_situations) > 0:
-            raise ImportError(
-                "invalid traffic-situations:\n"
-                + "\n  ".join(invalid_traffic_situations)
+            return_message.append(
+                import_error(
+                    "invalid traffic-situations:\n"
+                    + "\n  ".join(invalid_traffic_situations),
+                    validation=validation,
+                )
             )
 
         if len(roadclasses_to_update) > 0:
@@ -821,7 +883,11 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
                     rc.save()
                     rc.attribute_values.set(attribute_values)
                 else:
-                    raise ImportError(f"roadclass '{rc}' already exists.")
+                    return_message.append(
+                        import_error(
+                            f"roadclass '{rc}' already exists.", validation=validation
+                        )
+                    )
         if len(roadclasses_to_create) > 0:
             RoadClass.objects.bulk_create(map(itemgetter(0), roadclasses_to_create))
             # list of saved roadclasses to avoid problem unsaved related attributes
@@ -844,7 +910,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
             through_model.objects.bulk_create(values)
 
 
-def import_congestionsheet(workbook, sheetname="CongestionProfile"):
+def import_congestionsheet(workbook, sheetname="CongestionProfile", validation=False):
     congestion_data = workbook[sheetname].values
     df_congestion = worksheet_to_dataframe(congestion_data)
     congestion_dict = {}
@@ -866,16 +932,19 @@ def import_congestionsheet(workbook, sheetname="CongestionProfile"):
             ][i * 25 : i * 25 + 24]
         )
         congestion_dict[label] = {"traffic_condition": typeday}
-    import_congestion_profiles(congestion_dict, overwrite=True)
+    return_dict, return_message = import_congestion_profiles(
+        congestion_dict, overwrite=True, validation=validation
+    )
     return_dict = {"congestion": {"updated or created": len(congestion_dict)}}
-    return return_dict
+    return return_dict, return_message
 
 
-def import_congestion_profiles(profile_data, *, overwrite=False):
+def import_congestion_profiles(profile_data, *, overwrite=False, validation=False):
     """import congestion profiles."""
-
+    return_message = []
     # Profile instances must not be created by bulk_create as the save function
     # is overloaded to calculate the normation constant.
+
     def make_profiles(data):
         retdict = {}
         for name, timevar_data in data.items():
@@ -898,18 +967,23 @@ def import_congestion_profiles(profile_data, *, overwrite=False):
                         )
                 retdict[name] = newobj
             except KeyError:
-                raise ImportError(
-                    f"Invalid specification of congestion-profile {name}"
-                    f", is 'traffic_condition' specified?"
+                return_message.append(
+                    import_error(
+                        f"Invalid specification of congestion-profile {name}"
+                        f", is 'traffic_condition' specified?",
+                        validation=validation,
+                    )
                 )
-        return retdict
+        return retdict, return_message
 
     profiles = {}
-    profiles["profiles"] = make_profiles(profile_data)
-    return profiles
+    profiles["profiles"], return_message = make_profiles(profile_data)
+    return profiles, return_message
 
 
-def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
+def import_fleets(
+    data, *, overwrite=False, validation=False
+):  # noqa: C901, PLR0912, PLR0915
     """import fleets
 
     args
@@ -928,14 +1002,18 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
     }
 
     fleets = {}
+    return_message = []
     for name, fleet_data in data.items():
         fleet_data_tmp = copy.deepcopy(fleet_data)
         try:
             members_data = fleet_data_tmp.pop("vehicles", [])
             default_heavy_vehicle_share = fleet_data_tmp["default_heavy_vehicle_share"]
         except KeyError:
-            raise ImportError(
-                f"no 'default_heavy_vehicle_share' specified for fleet '{name}'"
+            return_message.append(
+                import_error(
+                    f"no 'default_heavy_vehicle_share' specified for fleet '{name}'",
+                    validation=validation,
+                )
             )
         if overwrite:
             fleets[name], _ = Fleet.objects.update_or_create(
@@ -951,9 +1029,12 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
                     default_heavy_vehicle_share=default_heavy_vehicle_share,
                 )
             except IntegrityError:
-                raise ImportError(
-                    f"either duplicate specification in file or "
-                    f"fleet '{name}' already exist in inventory"
+                return_message.append(
+                    import_error(
+                        f"either duplicate specification in file or "
+                        f"fleet '{name}' already exist in inventory",
+                        validation=validation,
+                    )
                 )
 
         members = OrderedDict()
@@ -964,8 +1045,17 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
             timevar_name = member_data.pop("timevar")
             coldstart_timevar_name = member_data.pop("coldstart_timevar")
 
-            veh = existing_vehicles[vehicle_name]
-
+            try:
+                veh = existing_vehicles[vehicle_name]
+            except KeyError:
+                return_message.append(
+                    import_error(
+                        f"Vehicle {vehicle_name} specified in sheet Fleet "
+                        "does not exist in sheet VehicleFuel.",
+                        validation=validation,
+                    )
+                )
+                continue
             # accumulate member fractions to ensure they sum up to 1.0
             if veh.isheavy:
                 heavy_member_sum += member_data["fraction"]
@@ -976,10 +1066,13 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
                 try:
                     member_data["timevar"] = existing_flow_timevars[timevar_name]
                 except KeyError:
-                    raise ImportError(
-                        f"timevar '{timevar_name}' specified for vehicle "
-                        f"'{vehicle_name}' in fleet '{name}' does not "
-                        f"exist in inventory"
+                    return_message.append(
+                        import_error(
+                            f"timevar '{timevar_name}' specified for vehicle "
+                            f"'{vehicle_name}' in fleet '{name}' does not "
+                            f"exist in inventory",
+                            validation=validation,
+                        )
                     )
             else:
                 member_data["timevar"] = None
@@ -990,10 +1083,13 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
                         coldstart_timevar_name
                     ]
                 except KeyError:
-                    raise ImportError(
-                        f"coldstart timevar '{coldstart_timevar_name}' specified for "
-                        f"vehicle '{vehicle_name}' "
-                        f"in fleet '{name}' does not exist in inventory"
+                    return_message.append(
+                        import_error(
+                            f"coldstart timevar '{coldstart_timevar_name}' "
+                            f"specified for vehicle '{vehicle_name}' "
+                            f"in fleet '{name}' does not exist in inventory",
+                            validation=validation,
+                        )
                     )
             else:
                 member_data["coldstart_timevar"] = None
@@ -1014,24 +1110,33 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
                             vehicle=existing_vehicles[vehicle_name], **member_data
                         )
                     except IntegrityError:
-                        raise ImportError(
-                            "Either duplicate specification of fleet member in"
-                            "config-file, or fleet-member already exist in inventory"
+                        return_message.append(
+                            import_error(
+                                "Either duplicate specification of fleet member in"
+                                "config, or fleetmember already exist in inventory",
+                                validation=validation,
+                            )
                         )
             except (KeyError, TypeError):
-                raise ImportError(
-                    f"invalid specification of vehicle '{vehicle_name}' in "
-                    f"fleet '{name}', must specify 'timevar' "
-                    "'coldstart_timevar', fraction, 'coldstart_fraction' and 'fuels'"
+                return_message.append(
+                    import_error(
+                        f"invalid specification of vehicle '{vehicle_name}' in "
+                        f"fleet '{name}', must specify 'timevar','coldstart_timevar', "
+                        "fraction, 'coldstart_fraction' and 'fuels'",
+                        validation=validation,
+                    )
                 )
 
             fuel_sum = 0
             member_fuels = []
             if not isinstance(fuels_data, dict):
-                raise ImportError(
-                    f"invalid specification of fuels for '{vehicle_name}'"
-                    f"in fleet '{name}', fuels should be specified as:\n"
-                    f"fuels:\n  fuel1: 0.4\n  fuel2: 0.6"
+                return_message.append(
+                    import_error(
+                        f"invalid specification of fuels for '{vehicle_name}'"
+                        f"in fleet '{name}', fuels should be specified as:\n"
+                        f"fuels:\n  fuel1: 0.4\n  fuel2: 0.6",
+                        validation=validation,
+                    )
                 )
             for fuel_name, fuel_fraction in fuels_data.items():
                 fuel_sum += fuel_fraction
@@ -1043,24 +1148,33 @@ def import_fleets(data, *, overwrite=False):  # noqa: C901, PLR0912, PLR0915
                     )
                 )
             if fuel_sum != 1.0:
-                raise ImportError(
-                    f"sum of fuel fractions does not sum up to 1.0 (sum={fuel_sum}) "
-                    f"for '{vehicle_name}s' of fleet '{name}' in inventory "
+                return_message.append(
+                    import_error(
+                        f"sum of fuel fractions does not sum up to 1.0 (sum={fuel_sum})"
+                        f" for '{vehicle_name}s' of fleet '{name}' in inventory ",
+                        validation=validation,
+                    )
                 )
             FleetMemberFuel.objects.bulk_create(member_fuels)
         if heavy_member_sum > 0 and abs(heavy_member_sum - 1.0) >= 0.005:
-            raise ImportError(
-                f"sum of heavy fleet members does not sum up to 1.0 "
-                f"(sum={heavy_member_sum}) "
-                f"for fleet '{name}' in inventory "
+            return_message.append(
+                import_error(
+                    f"sum of heavy fleet members does not sum up to 1.0 "
+                    f"(sum={heavy_member_sum}) "
+                    f"for fleet '{name}' in inventory ",
+                    validation=validation,
+                )
             )
         if light_member_sum > 0 and abs(light_member_sum - 1.0) >= 0.005:
-            raise ImportError(
-                f"sum of light fleet members does not sum up to 1.0 "
-                f"(sum={light_member_sum}) "
-                f"for fleet '{name}' in inventory "
+            return_message.append(
+                import_error(
+                    f"sum of light fleet members does not sum up to 1.0 "
+                    f"(sum={light_member_sum}) "
+                    f"for fleet '{name}' in inventory ",
+                    validation=validation,
+                )
             )
-    return len(fleets)
+    return len(fleets), return_message
 
 
 def import_roads(  # noqa: C901, PLR0912, PLR0915
@@ -1070,9 +1184,10 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
     only=None,
     chunksize=1000,
     progress_callback=None,
+    validation=False,
 ):
     """Import a road network."""
-
+    return_message = []
     datasource = DataSource(roadfile)
 
     layer = datasource[0]
@@ -1128,9 +1243,12 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                     default_congestion_profile_name
                 ]
             except KeyError:
-                raise ImportError(
-                    "default congestin profile "
-                    f"'{default_congestion_profile_name}' does not exist"
+                return_message.append(
+                    import_error(
+                        "default congestin profile "
+                        f"'{default_congestion_profile_name}' does not exist",
+                        validation=validation,
+                    )
                 )
 
     valid_values = get_valid_road_attribute_values()
@@ -1140,14 +1258,20 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
         for attr, values in valid_values.items():
             value = defaults["roadclass"][attr.slug]
             if attr.slug not in defaults["roadclass"]:
-                raise ImportError(
-                    f"incomplete default roadclass attribute mappings,"
-                    f" missing '{attr.slug}'"
+                return_message.append(
+                    import_error(
+                        f"incomplete default roadclass attribute mappings,"
+                        f" missing '{attr.slug}'",
+                        validation=validation,
+                    )
                 )
             if value not in values:
-                raise ImportError(
-                    f"invalid roadclass attribute value {value} for"
-                    f" attribute {attr.slug}"
+                return_message.append(
+                    import_error(
+                        f"invalid roadclass attribute value {value} for"
+                        f" attribute {attr.slug}",
+                        validation=validation,
+                    )
                 )
             default_roadclass_attributes[attr.slug] = value
     else:
@@ -1170,8 +1294,12 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
         # prefetch roadclasses and store in dict for quick lookups
         for attr in valid_values:
             if attr.slug not in roadclass_attr_dict:
-                raise ImportError(
-                    f"incomplete roadclass attribute mappings, missing '{attr.slug}'"
+                return_message.append(
+                    import_error(
+                        "incomplete roadclass attribute mappings,"
+                        + f" missing '{attr.slug}'",
+                        validation=validation,
+                    )
                 )
     else:
         log.warning(
@@ -1219,14 +1347,20 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                 try:
                     val = feature.get(source_name)
                 except UnicodeDecodeError:
-                    raise ImportError(
-                        f"could not decode string in field {source_name}, "
-                        "only encoding utf-8 is supported"
+                    return_message.append(
+                        import_error(
+                            f"could not decode string in field {source_name}, "
+                            "only encoding utf-8 is supported",
+                            validation=validation,
+                        )
                     )
                 except KeyError:
-                    raise ImportError(
-                        f"No field named '{source_name}' found in "
-                        f"input file '{roadfile}'"
+                    return_message.append(
+                        import_error(
+                            f"No field named '{source_name}' found in "
+                            f"input file '{roadfile}'",
+                            validation=validation,
+                        )
                     )
                 if val is None:
                     val = default_value
@@ -1282,9 +1416,12 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                     ]
                 )
             except (ValueError, IndexError):
-                raise ImportError(
-                    f"No field named '{roadclass_attr_dict[attr.slug]}' found in "
-                    f"input file '{roadfile}'"
+                return_message.append(
+                    import_error(
+                        f"No field named '{roadclass_attr_dict[attr.slug]}' found in "
+                        f"input file '{roadfile}'",
+                        validation=validation,
+                    )
                 )
 
             try:
@@ -1304,12 +1441,20 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                 field_name = config["congestion_profile"]
                 name = feature.get(field_name) if field_name is not None else None
             except ValueError:
-                raise ImportError(
-                    f"No field named '{field_name}' found in input file '{roadfile}'"
+                return_message.append(
+                    import_error(
+                        f"No field named '{field_name}' found "
+                        f"in input file '{roadfile}'",
+                        validation=validation,
+                    )
                 )
             except KeyError:
-                raise ImportError(
-                    f"No field named '{field_name}' found in input file '{roadfile}'"
+                return_message.append(
+                    import_error(
+                        f"No field named '{field_name}' found "
+                        f"in input file '{roadfile}'",
+                        validation=validation,
+                    )
                 )
             if name is None:
                 road.congestion_profile = default_congestion_profile
@@ -1330,8 +1475,12 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                 field_name = config["fleet"]
                 name = feature.get(field_name)
             except (KeyError, IndexError):
-                raise ImportError(
-                    f"No field named '{field_name}' found in input file '{roadfile}'"
+                return_message.append(
+                    import_error(
+                        f"No field named '{field_name}' found "
+                        f"in input file '{roadfile}'",
+                        validation=validation,
+                    )
                 )
 
             if name is None or name not in fleets:
@@ -1354,9 +1503,12 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                     try:
                         val = feature.get(source_name)
                     except KeyError:
-                        raise ImportError(
-                            f"No field named '{source_name}' found in "
-                            f"input file '{roadfile}'"
+                        return_message.append(
+                            import_error(
+                                f"No field named '{source_name}' found in "
+                                f"input file '{roadfile}'",
+                                validation=validation,
+                            )
                         )
                 else:
                     val = None
@@ -1380,7 +1532,8 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
 
             progress = count / nroads * 100
             if int(progress) > old_progress:
-                log.info(f"done {int(progress)}%")
+                if not validation:
+                    log.info(f"done {int(progress)}%")
                 old_progress = int(progress)
 
             if exclude is not None and filter_out(feature, exclude):
@@ -1405,4 +1558,4 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
         for msg, nr in messages.items():
             log.warning("- " + msg + f": {nr} roads")
 
-    return return_dict
+    return return_dict, return_message
