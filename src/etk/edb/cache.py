@@ -60,17 +60,22 @@ class EmissionCache:
         self._weights = {}
         self._emissions = {}
         # counter for features
-        self._feature_index = {"point": 0}
+        self._feature_index = {"point": 0, "road": 0}
         self._rasterized_sources = set()
 
         # nr of emission records not yet written to disk
-        self._recs_in_memory = {"point": 0, "area": 0, "grid": 0}
+        self._recs_in_memory = {"road": 0, "point": 0, "area": 0, "grid": 0}
 
         # map feature id to index in narc variable
         self.feature_ids = {"road": {}, "point": {}}
 
         # keep track of all sources that have already been gridded
-        self.gridded_sources = {"point": set(), "area": set(), "grid": set()}
+        self.gridded_sources = {
+            "road": set(),
+            "point": set(),
+            "area": set(),
+            "grid": set(),
+        }
 
         # create mapping between column name and index using a named tuple
         self.col_maps = {}

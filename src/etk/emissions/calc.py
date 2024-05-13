@@ -29,7 +29,6 @@ def calculate_source_emissions(
     polygon=None,
     unit="kg/year",
 ):
-    cur = connection.cursor()
     settings = Settings.get_current()
     srid = srid or settings.srid
     sql = create_source_emis_query(
@@ -41,6 +40,7 @@ def calculate_source_emissions(
         tags=tags,
         polygon=polygon,
     )
+    cur = connection.cursor()
     cur.execute(sql)
     return cur
 
@@ -66,9 +66,18 @@ def calculate_source_emissions_df(
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
     if sourcetype == "grid":
         df.set_index(["source_id", "substance", "raster"], inplace=True)
+    elif sourcetype == "road":
+        df.set_index(["source_id", "substance", "vehicle"], inplace=True)
+        traffic_work = df.loc[(slice(None), "traffic_work"), :]["emis"]
+        traffic_work.name = "traffic_work"
+        traffic_work.index = traffic_work.index.droplevel("substance")
+        df.drop(level="substance", labels=["traffic_work"], inplace=True)
+        df = df.join(traffic_work)
+        df = df.reorder_levels(["source_id", "substance", "vehicle"])
     else:
         df.set_index(["source_id", "substance"], inplace=True)
     df.loc[:, "emis"] *= emis_conversion_factor_from_si(unit)
+    df.sort_index(inplace=True)
     return df
 
 
@@ -81,6 +90,7 @@ def aggregate_emissions(
     point_ids=None,
     area_ids=None,
     unit="ton/year",
+    name=None,
 ):
 
     settings = Settings.get_current()
@@ -90,6 +100,7 @@ def aggregate_emissions(
         sourcetypes=sourcetypes,
         codeset_index=codeset_index,
         polygon=polygon,
+        name=name,
         tags=tags,
         point_ids=point_ids,
         area_ids=area_ids,
@@ -117,8 +128,20 @@ def aggregate_emissions(
         df.insert(1, "activity", "total")
         df.set_index(["activity"], inplace=True)
         df = df.pivot(columns="substance")
-
-    df *= emis_conversion_factor_from_si(unit)
     df.columns = df.columns.set_names(["quantity", "substance"])
-    # df.rename(columns={"emission": f"emission [{unit}]"})
+    if "traffic_work" in df.columns.get_level_values("substance"):
+        # set quantity to traffic if substance is traffic_work
+        df.columns = pd.MultiIndex.from_tuples(
+            [
+                (q, s) if s != "traffic_work" else ("traffic", "veh*km")
+                for q, s in df.columns
+            ]
+        )
+        df.columns.names = ["quantity", "substance"]
+        # convert from veh*m to veh*km
+        df.loc[:, ("traffic", "veh*km")] /= 1000.0
+
+    # convert emission unit
+    if len(df) > 0:
+        df.loc[:, ("emission", slice(None))] *= emis_conversion_factor_from_si(unit)
     return df

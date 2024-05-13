@@ -78,7 +78,7 @@ def activities(db):
 
 
 @pytest.fixture()
-def vertical_dist(transactional_db):
+def vertical_dist(db):
     vdist = models.VerticalDist.objects.create(
         name="vdist1", weights="[[5.0, 0.4], [10.0, 0.6]]"
     )
@@ -86,7 +86,7 @@ def vertical_dist(transactional_db):
 
 
 @pytest.fixture()
-def test_timevar(transactional_db):
+def test_timevar(db):
     # array representing daytime activity
     daytime_profile = np.ones((24, 7)) * 100
     daytime_profile[:7, :] = 0
@@ -395,17 +395,19 @@ def roadefset(db):
     return roadefset
 
 
+@pytest.fixture()
 def congestionprofiles():
     # array representing heavy level of service
     test_profile = np.ones((24, 7)) * 1
     test_profile[:7, :] = 2
     test_profile[23:, :] = 2
-    CongestionProfile.objects.create(
+    congestion_profile1 = CongestionProfile.objects.create(
         name="free-flow", traffic_condition=str(test_profile.tolist())
     )
-    CongestionProfile.objects.create(
+    congestion_profile2 = CongestionProfile.objects.create(
         name="heavy", traffic_condition=str(test_profile.tolist())
     )
+    return [congestion_profile1, congestion_profile2]
 
 
 @pytest.fixture()

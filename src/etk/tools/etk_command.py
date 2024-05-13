@@ -41,12 +41,9 @@ from etk.edb.importers import (  # noqa
 from etk.edb.models import Settings, Substance  # noqa
 from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
-from etk.emissions.views import (  # noqa
-    create_areasource_emis_table,
-    create_pointsource_emis_table,
-)
+from etk.emissions.views import create_emission_table  # noqa
 
-SOURCETYPES = ("point", "area", "grid")
+SOURCETYPES = ("point", "area", "grid", "road")
 DEFAULT_EMISSION_UNIT = "kg/year"
 
 sheet_choices = ["All"]
@@ -186,14 +183,14 @@ class Editor(object):
         return db_updates, return_msg
 
     def update_emission_tables(
-        self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
+        self,
+        sourcetypes=("point", "area", "road"),
+        unit=DEFAULT_EMISSION_UNIT,
+        substances=None,
     ):
-        sourcetypes = sourcetypes or SOURCETYPES
         substances = substances or get_used_substances()
-        if "point" in sourcetypes:
-            create_pointsource_emis_table(substances=substances, unit=unit)
-        if "area" in sourcetypes:
-            create_areasource_emis_table(substances=substances, unit=unit)
+        for sourcetype in sourcetypes:
+            create_emission_table(sourcetype, substances=substances, unit=unit)
 
     def aggregate_emissions(
         self,
@@ -401,13 +398,13 @@ def main():
             "--begin",
             help="when hourly rasters are desired, specify begin date."
             + " Time 00:00 assumed",
-            metavar="2022-01-01",
+            metavar="YYMMDDHH",
         )
         rasterize_grp.add_argument(
             "--end",
             help="when hourly rasters are desired, specify end date"
             + " Time 00:00 assumed",
-            metavar="2023-01-01",
+            metavar="YYMMDDHH",
         )
         # TODO add argument begin/end for rasterize
         # TODO add argument to aggregate emissions within polygon
@@ -441,11 +438,11 @@ def main():
             sys.exit(0)
         if args.rasterize is not None:
             if args.begin is not None:
-                args.begin = datetime.datetime.strptime(args.begin, "%Y-%m-%d").replace(
+                args.begin = datetime.datetime.strptime(args.begin, "%y%m%d%H").replace(
                     tzinfo=datetime.timezone.utc
                 )
                 if args.end is not None:
-                    args.end = datetime.datetime.strptime(args.end, "%Y-%m-%d").replace(
+                    args.end = datetime.datetime.strptime(args.end, "%y%m%d%H").replace(
                         tzinfo=datetime.timezone.utc
                     )
                 else:

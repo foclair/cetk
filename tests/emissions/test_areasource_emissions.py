@@ -7,24 +7,24 @@ from etk.emissions.calc import calculate_source_emissions_df
 from etk.emissions.views import create_emission_table, create_emission_view
 
 
-def test_create_view(pointsources):
+def test_create_view(areasources):
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
-    create_emission_view("point", [NOx, SOx], unit="kg/year")
+    create_emission_view("area", [NOx, SOx], unit="kg/year")
 
 
-def test_create_table(pointsources):
+def test_create_table(areasources):
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
-    create_emission_table("point", [NOx, SOx], unit="kg/year")
+    create_emission_table("area", [NOx, SOx], unit="kg/year")
     cur = connection.cursor()
-    cur.execute("SELECT * from pointsource_emissions")
+    cur.execute("SELECT * from areasource_emissions")
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
     assert df.loc[0, "SOx"] == pytest.approx(2001000.0)
 
 
-def test_calculate_emissions(pointsources):
+def test_calculate_emissions(areasources):
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
-    df = calculate_source_emissions_df("point", [NOx, SOx], unit="kg/year")
+    df = calculate_source_emissions_df("area", [NOx, SOx], unit="kg/year")
     assert df.loc[(1, "SOx"), "emis"] == pytest.approx(2001000.0)

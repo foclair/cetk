@@ -333,12 +333,10 @@ class RoadSource(SourceBase):
                 rec.activitycode2,
                 rec.activitycode3,
             )
-        # TODO should it really be this SRID? And should that be editable in Eclair?
         srid = Settings.get_current().srid
         emis_by_veh_and_subst = {}
         for fleet_member in self.fleet.vehicles.all():
             veh = fleet_member.vehicle
-
             if self.congestion_profile is None:
                 conditions = {
                     "freeflow": 1.0,

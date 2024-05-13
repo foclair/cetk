@@ -33,8 +33,7 @@ road_source as (
       ST_Transform(geom, {srid}) as geom, aadt, heavy_vehicle_share,
       congestion_profile_id,nolanes,speed,width,slope,roadclass_id,fleet_id
     FROM edb_roadsource as sources
-    WHERE sources.aadt > 0
-{road_source_filter}
+    {road_source_filter}
 ),
 fleet_veh as (
   SELECT
@@ -53,9 +52,9 @@ fleet_veh as (
     saturated_ef,
     stopngo_ef,
     coldstart_ef,
-    veh_fuel_ef.ac1,
-    veh_fuel_ef.ac2,
-    veh_fuel_ef.ac3
+    ef.ac1,
+    ef.ac2,
+    ef.ac3
   FROM
     (
       SELECT
@@ -111,41 +110,35 @@ fleet_veh as (
       LEFT JOIN edb_activitycode as ac1 ON vfc.activitycode1_id=ac1.id
       LEFT JOIN edb_activitycode as ac2 ON vfc.activitycode2_id=ac2.id
       LEFT JOIN edb_activitycode as ac3 ON vfc.activitycode3_id=ac3.id
-    ) as veh_fuel_ef
-    JOIN edb_fleetmember fm ON veh_fuel_ef.fleetmember_id = fm.id
-    JOIN edb_vehicle veh ON veh_fuel_ef.vehicle_id=veh.id
+    ) as ef
+    JOIN edb_fleetmember fm ON ef.fleetmember_id = fm.id
+    JOIN edb_vehicle veh ON ef.vehicle_id=veh.id
     LEFT JOIN edb_roadclass rc
-      ON veh_fuel_ef.traffic_situation=rc.traffic_situation_id
+      ON ef.traffic_situation=rc.traffic_situation_id
     JOIN edb_fleet as fleet ON fm.fleet_id = fleet.id
-    -- WHERE veh_fuel_ef.substance_id = ANY({substances})
+   WHERE  (
+     ef.freeflow_ef != 0 OR ef.coldstart_ef != 0 OR
+     ef.stopngo_ef != 0 OR ef.heavy_ef != 0 OR ef.saturated_ef != 0
+   ) {ef_substance_filter}
 ),
+/*
+Calculate weight of each LOS (Level Of Service) for all valid combinations
+of congestion profile and timevar. A custom sqlite function in python called
+condition_weight is used (see etk.edb.signals).
+*/
 congestion as (
-  SELECT used_congestion.congestion_profile_id as congestion_id,
-    weighted.timevar_id as timevar_id,
-    COALESCE(weighted.freeflow, 1.0) as freeflow,
-    COALESCE(weighted.heavy, 0.0) as heavy,
-    COALESCE(weighted.saturated, 0.0) as saturated,
-    COALESCE(weighted.stopngo, 0.0) as stopngo
-   FROM (SELECT DISTINCT congestion_profile_id FROM road_source) as used_congestion
-   LEFT JOIN
-     (
-       SELECT timevar_id, congestion_id,
-         sum(case when cond='1' then flow else 0 end) / typeday_sum as freeflow,
-         sum(case when cond='2' then flow else 0 end) / typeday_sum as heavy,
-         sum(case when cond='3' then flow else 0 end) / typeday_sum as saturated,
-         sum(case when cond='4' then flow else 0 end) / typeday_sum as stopngo,
-         max(cond) as dummy
-       FROM
-         (
-           SELECT t.id as timevar_id, c.id as congestion_id,
-             t.typeday_sum as typeday_sum,
-             unnest(c.traffic_condition) as cond,
-             unnest(t.typeday) as flow
-           FROM edb_flowtimevar as t CROSS JOIN edb_congestionprofile as c
-         ) as profiles
-       GROUP BY timevar_id, congestion_id, typeday_sum
-     ) as weighted
-     ON weighted.congestion_id = used_congestion.congestion_profile_id
+    SELECT c.id as congestion_profile_id, t.id as timevar_id,
+      condition_weight(c.traffic_condition, t.typeday, t.typeday_sum, 1) as freeflow_share,
+      condition_weight(c.traffic_condition, t.typeday, t.typeday_sum, 2) as heavy_share,
+      condition_weight(c.traffic_condition, t.typeday, t.typeday_sum, 3) as saturated_share,
+      condition_weight(c.traffic_condition, t.typeday, t.typeday_sum, 4) as stopngo_share
+    FROM (
+      SELECT DISTINCT congestion_profile_id, timevar_id
+      FROM road_source as src
+      JOIN edb_fleetmember AS fm ON src.fleet_id = fm.fleet_id
+    ) as ct
+    JOIN edb_flowtimevar as t ON ct.congestion_profile_id = c.id
+    JOIN edb_congestionprofile as c ON ct.timevar_id = t.id
 ),
 road_emis as (
 SELECT substance_id, ac1, ac2, ac3,
@@ -160,10 +153,10 @@ FROM
   (
     SELECT
       fleet_veh.coldstart_fraction,
-      congestion.freeflow as freeflow_share,
-      congestion.heavy as heavy_share,
-      congestion.saturated as saturated_share,
-      congestion.stopngo as stopngo_share,
+      congestion.freeflow_share,
+      congestion.heavy_share,
+      congestion.saturated_share,
+      congestion.stopngo_share,
       fleet_veh.substance_id,
       fleet_veh.freeflow_ef,
       fleet_veh.heavy_ef,
@@ -193,7 +186,7 @@ FROM
       ON road_source.roadclass_id=fleet_veh.roadclass_id
       AND road_source.fleet_id=fleet_veh.fleet_id
     LEFT JOIN congestion
-      ON congestion.congestion_id=road_source.congestion_profile_id
+      ON congestion.congestion_profile_id=road_source.congestion_profile_id
       AND congestion.timevar_id=fleet_veh.timevar_id
   ) as road_veh_ef
 ),
@@ -301,9 +294,9 @@ FROM
     SELECT * FROM area_emis
     UNION ALL
     SELECT * FROM point_emis
-   UNION ALL
-   SELECT * FROM grid_emis
-   UNION ALL
+    UNION ALL
+    SELECT * FROM grid_emis
+    UNION ALL
     SELECT * FROM road_emis
   ) as all_emis
 JOIN substances ON substance_id = substances.id

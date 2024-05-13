@@ -7,6 +7,7 @@ from etk.edb.models import (
     ActivityCode,
     GridSource,
     Substance,
+    get_gridsource_raster,
     list_gridsource_rasters,
     write_gridsource_raster,
 )
@@ -49,41 +50,42 @@ def db_raster(rasterfile, transactional_db):
 
 
 def test_aggregate_emissions(
-    testsettings, pointsources, areasources, gridsources, db_raster
+    testsettings, pointsources, areasources, gridsources, roadsources, db_raster
 ):
     """test aggregation of emissions"""
 
     assert "raster1" in list_gridsource_rasters()
-    df = aggregate_emissions(unit="ton/year")
-    assert df.loc["total", ("emission", "NOx")] == 2530.0
+    df = aggregate_emissions(sourcetypes=["point", "area", "grid"], unit="ton/year")
+    assert df.loc["total", ("emission", "NOx")] == pytest.approx(2530.0)
 
     poly = Polygon.from_bbox((0, 0, 500, 500))
     poly.srid = 3006
 
     # test with polygon only covering half the grid source raster
-    df = aggregate_emissions(unit="ton/year", polygon=poly)
+    df = aggregate_emissions(
+        sourcetypes=["point", "area", "grid"], unit="ton/year", polygon=poly
+    )
     assert df.loc["total", ("emission", "NOx")] < 2530.0
+
+    df = aggregate_emissions(sourcetypes=["road"], unit="ton/year")
+    assert df.loc["total", ("emission", "NOx")] > 0
 
 
 def test_aggregate_emissions_all_sourcetypes(
-    roadsources, pointsources, areasources, activities, code_sets, rasterfile
+    roadsources, pointsources, areasources, activities, code_sets, db_raster
 ):
     NOx = Substance.objects.get(slug="NOx")
     SOx = Substance.objects.get(slug="SOx")
-
-    raster_name = "raster1"
-    with rio.open(rasterfile, "r") as raster:
-        write_gridsource_raster(raster, raster_name)
 
     src1 = GridSource.objects.create(
         name="gridsource1",
         activitycode1=ActivityCode.objects.get(code="3"),
     )
     src1.substances.create(
-        substance=NOx, value=emission_unit_to_si(1000, "ton/year"), raster=raster_name
+        substance=NOx, value=emission_unit_to_si(1000, "ton/year"), raster=db_raster
     )
     src1.substances.create(
-        substance=SOx, value=emission_unit_to_si(1.0, "kg/s"), raster=raster_name
+        substance=SOx, value=emission_unit_to_si(1.0, "kg/s"), raster=db_raster
     )
     src2 = GridSource.objects.create(
         name="gridsource2",
@@ -92,7 +94,7 @@ def test_aggregate_emissions_all_sourcetypes(
     src2.activities.create(
         activity=activities[0],
         rate=activity_rate_unit_to_si(1000, "m3/year"),
-        raster=raster_name,
+        raster=db_raster,
     )
 
     df = aggregate_emissions()
@@ -111,8 +113,8 @@ def test_aggregate_emissions_all_sourcetypes(
     assert df.max().max() > 0
     # gdal_raster.extent (367000.0, 6368000.0, 369000.0, 6370000.0)
 
-    RASTER_EXTENT = (0, 0, 1200, 1000)
-    x1, y1, x2, y2 = RASTER_EXTENT
+    raster_data, metadata = get_gridsource_raster(db_raster)
+    x1, y1, x2, y2 = metadata["extent"]
     left_half_extent = Polygon(
         (
             (x1, y1),
@@ -123,18 +125,22 @@ def test_aggregate_emissions_all_sourcetypes(
         ),
         srid=3006,
     )
+    clipped_raster_data, metadata = get_gridsource_raster(db_raster, left_half_extent)
 
+    # fraction of raster sum inside polygon
+    raster_share = clipped_raster_data.sum() / raster_data.sum()
+
+    codeset = code_sets[0]
     df = aggregate_emissions(
         name="gridsource1",
         substances=[SOx],
-        code_set_index=1,
+        codeset=codeset,
         polygon=left_half_extent,
         sourcetypes=["grid"],
     )
     assert len(df) == 1
     assert df.index[0] == ("3", "Diffuse sources")
-    assert df.columns[0] == ("emission [ton/year]", "SOx")
+    assert df.columns[0] == ("emission", "SOx")
     # reference emission: "seconds of year" * "grid fraction in polygon" / "kg/ton"
-    # NB different raster here than in gadget? scaling could be different?
-    ref_emis = 1.0 * 365.25 * 24 * 3600 * 0.4 / 1000
+    ref_emis = 1.0 * 365.25 * 24 * 3600 * raster_share / 1000
     assert ref_emis == pytest.approx(df.iloc[0, 0], 1e-5)

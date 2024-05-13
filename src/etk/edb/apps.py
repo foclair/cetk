@@ -2,6 +2,8 @@ from django.apps import AppConfig
 
 
 class EdbConfig(AppConfig):
-    default_auto_field = "django.db.models.AutoField"
     name = "etk.edb"
-    verbose_name = "EDB"
+    verbose_name = "ETK Emission Database"
+
+    def ready(self):
+        from . import signals  # noqa
