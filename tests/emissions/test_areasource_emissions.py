@@ -20,11 +20,11 @@ def test_create_table(areasources):
     cur = connection.cursor()
     cur.execute("SELECT * from areasource_emissions")
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
-    assert df.loc[0, "SOx"] == pytest.approx(2001000.0)
+    assert df.loc[:, "SOx"].sum() == pytest.approx(2001000.0)
 
 
 def test_calculate_emissions(areasources):
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
     df = calculate_source_emissions_df("area", [NOx, SOx], unit="kg/year")
-    assert df.loc[(1, "SOx"), "emis"] == pytest.approx(2001000.0)
+    assert df.loc[(slice(None), "SOx"), "emis"].sum() == pytest.approx(2001000.0)
