@@ -423,7 +423,12 @@ def main():
             sys.stderr.write("Database does not exist.\n")
             sys.exit(1)
         if args.update:
-            editor.update_emission_tables(sourcetypes=args.sourcetypes, unit=args.unit)
+            if args.sourcetypes is not None:
+                editor.update_emission_tables(
+                    sourcetypes=args.sourcetypes, unit=args.unit
+                )
+            else:
+                editor.update_emission_tables(unit=args.unit)
             sys.stdout.write("Successfully updated tables\n")
             sys.exit(0)
         if args.aggregate is not None:

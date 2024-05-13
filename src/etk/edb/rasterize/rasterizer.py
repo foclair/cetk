@@ -754,7 +754,6 @@ class EmissionRasterizer:
             aggregation: aggregation label of result variables
             instance: write emissions to specified variable instance
         """
-
         self.instance = instance
         self.aggregation = aggregation
         self.levels = None

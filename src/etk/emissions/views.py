@@ -74,6 +74,7 @@ def create_emission_table(sourcetype, substances, unit="kg/year"):
     """
     cur = connection.cursor()
     cur.execute(f"DROP TABLE IF EXISTS {sourcetype}source_emissions")
+    # breakpoint()
     cur.execute(table_sql)
     cur.execute(
         f"""
