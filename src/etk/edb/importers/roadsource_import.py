@@ -1,5 +1,6 @@
 import copy
 import logging
+import os
 from collections import OrderedDict
 from operator import itemgetter
 from pathlib import Path
@@ -260,7 +261,11 @@ def import_traffic(filename, sheets, validation=False):
     if "RoadSource" in sheets:
         try:
             config = roadsource_excel_to_dict(filename)
-            updates, msg = import_roads(config["filepath"], config)
+            roadfile_path = config["filepath"]
+            if not os.path.isabs(roadfile_path):
+                datadir = os.path.dirname(filename)
+                roadfile_path = os.path.join(datadir, roadfile_path)
+            updates, msg = import_roads(roadfile_path, config, validation=validation)
             return_dict.update(updates)
             return_message += msg
         except ImportError as err:

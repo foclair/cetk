@@ -1,5 +1,7 @@
 """signals issued by edb."""
 
+from typing import Union
+
 from django.db.backends.signals import connection_created
 from django.dispatch import receiver
 
@@ -8,7 +10,10 @@ DEFAULT_TRAFFIC_FLOW = str(24 * [7 * [100.0]])
 
 
 def condition_weight(
-    cond_str: str | None, typeday_str: str | None, typeday_sum: float | None, cond: int
+    cond_str: Union[str, None],
+    typeday_str: Union[str, None],
+    typeday_sum: Union[float, None],
+    cond: int,
 ):
     """
     calculate fraction of week with a given traffic condition (level of service).

@@ -6,7 +6,7 @@ from etk.edb.models import ColdstartTimevar, FlowTimevar, Timevar
 from .utils import import_error, worksheet_to_dataframe
 
 
-def import_timevarsheet(workbook, validation, sheetname="Timevar"):
+def import_timevarsheet(workbook, validation=False, sheetname="Timevar"):
     return_message = []
     timevar_data = workbook[sheetname].values
     df_timevar = worksheet_to_dataframe(timevar_data)
