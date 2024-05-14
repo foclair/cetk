@@ -184,11 +184,16 @@ class Editor(object):
 
     def update_emission_tables(
         self,
-        sourcetypes=("point", "area", "road"),
+        sourcetypes=None,
         unit=DEFAULT_EMISSION_UNIT,
         substances=None,
     ):
+        sourcetypes = sourcetypes or ("point", "area", "road")
         substances = substances or get_used_substances()
+        if len(substances) == 0:
+            log.error("No emission factors or direct emissions found in database")
+            sys.exit(1)
+
         for sourcetype in sourcetypes:
             create_emission_table(sourcetype, substances=substances, unit=unit)
 
@@ -423,12 +428,9 @@ def main():
             sys.stderr.write("Database does not exist.\n")
             sys.exit(1)
         if args.update:
-            if args.sourcetypes is not None:
-                editor.update_emission_tables(
-                    sourcetypes=args.sourcetypes, unit=args.unit
-                )
-            else:
-                editor.update_emission_tables(unit=args.unit)
+            editor.update_emission_tables(
+                sourcetypes=args.sourcetypes, unit=args.unit, substances=args.substances
+            )
             sys.stdout.write("Successfully updated tables\n")
             sys.exit(0)
         if args.aggregate is not None:

@@ -4,6 +4,7 @@ from django.db import connection
 
 from etk.edb.models import Settings, Substance
 from etk.edb.units import emis_conversion_factor_from_si
+from etk.emissions.calc import get_used_substances
 from etk.emissions.queries import create_source_emis_query
 
 
@@ -46,7 +47,7 @@ def create_emission_view(sourcetype, substances, unit="kg/year"):
     cur.execute(view_sql)
 
 
-def create_emission_table(sourcetype, substances, unit="kg/year"):
+def create_emission_table(sourcetype, substances=None, unit="kg/year"):
     """create emission table with columns source_id, subst1, subst2...substn."""
 
     sql = make_emission_sql(sourcetype, substances)
@@ -54,6 +55,9 @@ def create_emission_table(sourcetype, substances, unit="kg/year"):
     if sourcetype == "road":
         substances = substances.copy()
         substances.append(Substance.objects.get(slug="traffic_work"))
+
+    if substances is None:
+        substances = get_used_substances()
     source_subst_cols = ",".join(
         f'sum(rec.emis*{fac if s.slug != "traffic_work" else 1.0}) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'  # noqa
         for s in substances
