@@ -93,7 +93,10 @@ def filter_out(feature, exclude):
 
 
 def vehicles_excel_to_dict(file_path):
-    df = pd.read_excel(file_path, sheet_name="VehicleFuel")
+    dtype_dict = {"name": str, "isheavy": bool, "info": str, "fuel": str}
+    for cs in CodeSet.objects.all():
+        dtype_dict["activitycode_" + cs.slug] = str
+    df = pd.read_excel(file_path, sheet_name="VehicleFuel", dtype=dtype_dict)
 
     # Extract the code sets from the DataFrame
     activity_columns = [col for col in df.columns if col.startswith("activitycode_")]
@@ -105,8 +108,9 @@ def vehicles_excel_to_dict(file_path):
     vehicles = []
     for index, row in df.iterrows():
         activitycodes = {}
-        for i, col in enumerate(activity_columns):
-            activitycodes[f"activitycode{i+1}"] = row[col]
+        for col in activity_columns:
+            ac_id = CodeSet.objects.get(slug=col.replace("activitycode_", "")).id
+            activitycodes[f"activitycode{ac_id}"] = row[col]
         # Check if the vehicle already exists in the data dictionary
         if row["name"] in vehicles:
             vehicle = next(
@@ -224,7 +228,12 @@ def import_traffic(filename, sheets, validation=False):
     if "VehicleEmissionFactor" in sheets:
         # TODO set unit from spreadsheet?
         updates = import_vehicles(
-            filename, vehiclesettings, unit="kg/m", encoding="utf-8", overwrite=True
+            filename,
+            vehiclesettings,
+            unit="kg/m",
+            encoding="utf-8",
+            overwrite=True,
+            validation=validation,
         )
         return_dict.update(updates)
     if ("RoadAttribute" in sheets) and ("TrafficSituation" in sheets):
@@ -333,8 +342,8 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                 )
             )
 
-        code_nr = 1
         for code_set_name, codes in valid_codes.items():
+            code_nr = CodeSet.objects.get(slug=code_set_name).id
             try:
                 ac = code_data[f"activitycode{code_nr}"]
             except KeyError:
@@ -486,7 +495,9 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                                 validation=validation,
                             )
                         )
-                return_message.append(validate_ac(code_data, valid_codes))
+                return_message.append(
+                    validate_ac(code_data, valid_codes, validation=validation)
+                )
 
                 # get activity code model instances for each activity code
                 ac_codes = [None, None, None]
@@ -494,7 +505,17 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                     code_nr = i + 1
                     ac_codes[i] = code_data.get(f"activitycode{code_nr}", None)
                     if ac_codes[i] is not None:
-                        ac_codes[i] = valid_codes[code_sets[i].slug][ac_codes[i]]
+                        try:
+                            ac_codes[i] = valid_codes[
+                                CodeSet.objects.get(id=code_nr).slug
+                            ][ac_codes[i]]
+                        except KeyError:
+                            return_message.append(
+                                import_error(
+                                    f"Found invalid activitycode {ac_codes[i]}",
+                                    validation=validation,
+                                )
+                            )
                     else:
                         ac_codes[i] = None
 
