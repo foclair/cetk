@@ -955,6 +955,9 @@ def import_congestion_profiles(profile_data, *, overwrite=False, validation=Fals
         for name, timevar_data in data.items():
             try:
                 traffic_condition = timevar_data["traffic_condition"]
+                traffic_condition = np.array2string(
+                    traffic_condition, separator=","
+                ).replace("\n", "")
                 if overwrite:
                     newobj = CongestionProfile.objects.update_or_create(
                         name=name,
