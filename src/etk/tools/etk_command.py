@@ -209,7 +209,7 @@ class Editor(object):
             sourcetypes=sourcetypes, unit=unit, codeset=codeset, substances=substances
         )
         try:
-            df.to_csv(filename, sep=";")
+            df.to_excel(filename)
         except Exception as err:
             log.error(
                 f"could not write aggregated emission to file {filename}: {str(err)}"
