@@ -9,6 +9,8 @@ from pathlib import Path
 
 from django.db import transaction
 from openpyxl import load_workbook
+from pyproj import CRS
+from pyproj.exceptions import CRSError
 
 import etk
 from etk import logging
@@ -27,7 +29,7 @@ log = logging.getLogger("etk")
 
 settings = etk.configure()
 
-from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
+from etk.edb.const import DEFAULT_SRID, SHEET_NAMES, WGS84_SRID  # noqa
 from etk.edb.exporters import export_sources  # noqa
 from etk.edb.importers import (  # noqa
     import_activitycodesheet,
@@ -508,8 +510,25 @@ def main():
         sub_parser.add_argument("--srid", help="Integer defining a coordinate system")
         args = sub_parser.parse_args(sub_args)
         if args.srid is not None:
+            try:
+                args.srid = int(args.srid)
+            except ValueError:
+                sys.stderr.write(
+                    f"Code '{args.srid}' does not define a valid CRS. "
+                    "It should be an integer of size 4-5.\n"
+                )
+                sys.exit(1)
+            if args.srid == WGS84_SRID:
+                sys.stdout.write(
+                    "WARNING: SRID in settings should preferably be a "
+                    "projected coordinate system in meters, not lat/lon.\n"
+                )
+            try:
+                crs = CRS.from_epsg(args.srid)  # noqa
+            except CRSError:
+                sys.stderr.write(f"Code {args.srid} does not define a valid CRS.\n")
+                sys.exit(1)
             settings = Settings.get_current()
-            # TODO check if valid srid
             settings.srid = args.srid
             settings.save()
             sys.stdout.write(f"Changed database srid to {args.srid}.\n")
