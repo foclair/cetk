@@ -266,9 +266,6 @@ class Facility(SourceBase):
 
     class Meta:
         default_related_name = "facilities"
-        # unique_together = (("inventory", "official_id"), ("inventory", "name"))
-        # TODO not sure if the unique = true in official id is sufficient
-        # to replace line above?
 
     def __str__(self):
         return str(self.official_id)

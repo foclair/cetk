@@ -43,9 +43,19 @@ SUBSTANCES = (
     ("PM25", "PM2.5", "Particulate matter < 2.5 micrometers in diameter"),
     ("PM10resusp", "PM10resusp", "Resuspended particles < 10 micrometers in diameter"),
     (
+        "PM10wear",
+        "PM10wear",
+        "Particles < 10 micrometers in diameter from road, tyre and break wear",
+    ),
+    (
         "PM25resusp",
         "PM2.5resusp",
         "Resuspended particles < 2.5 micrometers in diameter",
+    ),
+    (
+        "PM25wear",
+        "PM2.5wear",
+        "Particles < 2.5 micrometers in diameter from road, tyre and break wear",
     ),
     ("PN", "PN", "Particle Number"),
     ("Se", "Se", "Selenium"),

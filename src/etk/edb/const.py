@@ -13,4 +13,13 @@ SHEET_NAMES = [
     "PointSource",
     "AreaSource",
     "GridSource",
+    "RoadSource",
+    "VehicleFuel",
+    "Fleet",
+    "CongestionProfile",
+    "FlowTimevar",
+    "ColdstartTimevar",
+    "RoadAttribute",
+    "TrafficSituation",
+    "VehicleEmissionFactor",
 ]

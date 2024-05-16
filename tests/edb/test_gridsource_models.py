@@ -92,7 +92,6 @@ def test_create_gridsource(rasterfile, code_sets):
     ac1 = dict([(ac.code, ac) for ac in code_set1.codes.all()])
     ac2 = dict([(ac.code, ac) for ac in code_set2.codes.all()])
 
-    NOx = Substance.objects.get(slug="NOx")
     src = GridSource.objects.create(
         name="gridsource1", activitycode1=ac1["1"], activitycode2=ac2["A"]
     )

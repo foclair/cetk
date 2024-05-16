@@ -1,3 +1,6 @@
+/*
+Similar to inventory_substances.sql in gadget.
+ */
 with point_subst as (
 	select distinct psrc_emis.substance_id
 	from edb_pointsourcesubstance as psrc_emis
@@ -13,12 +16,10 @@ grid_subst as (
  	from edb_gridsourcesubstance as gsrc_emis
  	join edb_gridsource as gsrc on gsrc.id = gsrc_emis.source_id
 ),
--- road_subst as (
--- 	select distinct veh_ef.substance_id
--- 	from edb_vehicleef as veh_ef
--- 	join edb_roadefset as roadefset on veh_ef.ef_set_id = roadefset.id
--- 	where roadefset.id = %(road_ef_set_id)s
--- ),
+road_subst as (
+ 	select distinct veh_ef.substance_id
+ 	from edb_vehicleef as veh_ef
+),
 source_ef_subst as (
 	select distinct ef.substance_id
 	from edb_emissionfactor as ef
@@ -32,10 +33,10 @@ source_ef_subst as (
 			select asrc_act.activity_id
 			from edb_areasource as asrc
 			join edb_areasourceactivity as asrc_act on asrc.id = asrc_act.source_id
-			-- union all
-			-- select gsrc_act.activity_id
-			-- from edb_gridsource as gsrc
-			-- join edb_gridsourceactivity as gsrc_act on gsrc.id = gsrc_act.source_id
+			union all
+			select gsrc_act.activity_id
+			from edb_gridsource as gsrc
+			join edb_gridsourceactivity as gsrc_act on gsrc.id = gsrc_act.source_id
 		) as all_act_ids
 	) as activity_ids on activity_ids.activity_id = ef.activity_id
 )
@@ -46,8 +47,8 @@ from (
 	select * from area_subst
 	union all
 	select * from grid_subst
-	-- union all
-	-- select * from road_subst
+	union all
+	select * from road_subst
 	union all
 	select * from source_ef_subst
 ) as all_subst

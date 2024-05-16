@@ -95,3 +95,17 @@ class Timevar(TimevarBase):
 
     class Meta(TimevarBase.Meta):
         default_related_name = "timevars"
+
+
+class FlowTimevar(TimevarBase):
+    """A road time-variation profile."""
+
+    class Meta(TimevarBase.Meta):
+        default_related_name = "flow_timevars"
+
+
+class ColdstartTimevar(TimevarBase):
+    """A vehicle cold start time-variation profile."""
+
+    class Meta(TimevarBase.Meta):
+        default_related_name = "coldstart_timevars"

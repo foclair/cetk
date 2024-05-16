@@ -4,22 +4,19 @@ from django.db import connection
 
 from etk.edb import models
 from etk.emissions.calc import calculate_source_emissions_df
-from etk.emissions.views import (
-    create_pointsource_emis_table,
-    create_pointsource_emis_view,
-)
+from etk.emissions.views import create_emission_table, create_emission_view
 
 
 def test_create_view(pointsources):
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
-    create_pointsource_emis_view([NOx, SOx], unit="kg/year")
+    create_emission_view("point", [NOx, SOx], unit="kg/year")
 
 
 def test_create_table(pointsources):
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
-    create_pointsource_emis_table([NOx, SOx], unit="kg/year")
+    create_emission_table("point", [NOx, SOx], unit="kg/year")
     cur = connection.cursor()
     cur.execute("SELECT * from pointsource_emissions")
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])

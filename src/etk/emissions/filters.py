@@ -7,9 +7,9 @@ from django.contrib.gis.geos import Polygon
 from etk.edb.models import Settings, get_gridsource_raster, list_gridsource_rasters
 
 
-def create_name_where_clause(name, sql):
+def create_name_where_clause(name):
     """create SQL to filter sources by source name"""
-    return "sources.name ~ {name}"
+    return f"sources.name = '{name}'"
 
 
 def create_ids_where_clause(ids):
@@ -60,14 +60,6 @@ def create_tag_where_clause(tags):
                 val = cond
             conds.append(f"sources.tags->>%{tag} = {val}")
     return " AND ".join(conds)
-
-
-def create_veh_ef_substance_where_clause(substances):
-    if not isinstance(substances, Iterable):
-        substance_ids = str(substances.id)
-    else:
-        substance_ids = ",".join([str(s.id) for s in substances])
-    return f"veh_fuel_ef.substance_id IN ({substance_ids})"
 
 
 def create_ef_substance_where_clause(substances):

@@ -9,6 +9,8 @@ from pathlib import Path
 
 from django.db import transaction
 from openpyxl import load_workbook
+from pyproj import CRS
+from pyproj.exceptions import CRSError
 
 import etk
 from etk import logging
@@ -27,7 +29,7 @@ log = logging.getLogger("etk")
 
 settings = etk.configure()
 
-from etk.edb.const import DEFAULT_SRID, SHEET_NAMES  # noqa
+from etk.edb.const import DEFAULT_SRID, SHEET_NAMES, WGS84_SRID  # noqa
 from etk.edb.exporters import export_sources  # noqa
 from etk.edb.importers import (  # noqa
     import_activitycodesheet,
@@ -36,16 +38,14 @@ from etk.edb.importers import (  # noqa
     import_sourceactivities,
     import_sources,
     import_timevarsheet,
+    import_traffic,
 )
 from etk.edb.models import Settings, Substance  # noqa
 from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
-from etk.emissions.views import (  # noqa
-    create_areasource_emis_table,
-    create_pointsource_emis_table,
-)
+from etk.emissions.views import create_emission_table  # noqa
 
-SOURCETYPES = ("point", "area", "grid")
+SOURCETYPES = ("point", "area", "grid", "road")
 DEFAULT_EMISSION_UNIT = "kg/year"
 
 sheet_choices = ["All"]
@@ -108,16 +108,47 @@ class Editor(object):
                     if sheet not in workbook.sheetnames:
                         log.info(f"Workbook has no sheet named {sheet}, skipped import")
                 if any(name != "GridSource" for name in import_sheets):
-                    updates, msgs = import_sourceactivities(
-                        filename,
-                        import_sheets=import_sheets,
-                        validation=dry_run,
-                    )
-                    db_updates.update(updates)
-                    if len(msgs) != 0:
-                        return_msg += msgs
-                        if not dry_run:
-                            raise ImportError(return_msg)
+                    # import Timevar, Codeset, ActivityCode, EmissionFactor,
+                    # PointSource and AreaSource
+                    sourceact = [
+                        "CodeSet",
+                        "ActivityCode",
+                        "EmissionFactor",
+                        "Timevar",
+                        "PointSource",
+                        "AreaSource",
+                    ]
+                    if any(name in sourceact for name in import_sheets):
+                        updates, msgs = import_sourceactivities(
+                            filename,
+                            import_sheets=import_sheets,
+                            validation=dry_run,
+                        )
+                        db_updates.update(updates)
+                        if len(msgs) != 0:
+                            return_msg += msgs
+                            if not dry_run:
+                                raise ImportError(return_msg)
+                    traffic = [
+                        "RoadSource",
+                        "VehicleFuel",
+                        "Fleet",
+                        "CongestionProfile",
+                        "FlowTimevar",
+                        "ColdstartTimevar",
+                        "RoadAttribute",
+                        "TrafficSituation",
+                        "VehicleEmissionFactor",
+                    ]
+                    if any(name in traffic for name in import_sheets):
+                        updates, msgs = import_traffic(
+                            filename, sheets=import_sheets, validation=dry_run
+                        )
+                        db_updates.update(updates)
+                        if len(msgs) != 0:
+                            return_msg += msgs
+                            if not dry_run:
+                                raise ImportError(return_msg)
                 if dry_run:
                     raise DryrunAbort
             # grid sources imported outside atomic transaction
@@ -154,14 +185,19 @@ class Editor(object):
         return db_updates, return_msg
 
     def update_emission_tables(
-        self, sourcetypes=None, unit=DEFAULT_EMISSION_UNIT, substances=None
+        self,
+        sourcetypes=None,
+        unit=DEFAULT_EMISSION_UNIT,
+        substances=None,
     ):
-        sourcetypes = sourcetypes or SOURCETYPES
+        sourcetypes = sourcetypes or ("point", "area", "road")
         substances = substances or get_used_substances()
-        if "point" in sourcetypes:
-            create_pointsource_emis_table(substances=substances, unit=unit)
-        if "area" in sourcetypes:
-            create_areasource_emis_table(substances=substances, unit=unit)
+        if len(substances) == 0:
+            log.error("No emission factors or direct emissions found in database")
+            sys.exit(1)
+
+        for sourcetype in sourcetypes:
+            create_emission_table(sourcetype, substances=substances, unit=unit)
 
     def aggregate_emissions(
         self,
@@ -175,7 +211,7 @@ class Editor(object):
             sourcetypes=sourcetypes, unit=unit, codeset=codeset, substances=substances
         )
         try:
-            df.to_csv(filename, sep=";")
+            df.to_excel(filename)
         except Exception as err:
             log.error(
                 f"could not write aggregated emission to file {filename}: {str(err)}"
@@ -227,6 +263,7 @@ def main():
         import   import data
         export   export data
         calc     calculate emissions
+        settings change database settings
 
         Current database is {db_path} (set by $ETK_DATABASE_PATH)
         """,
@@ -235,7 +272,7 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "import", "export", "calc"),
+        choices=("migrate", "create", "import", "export", "calc", "settings"),
     )
     verbosity = [arg for arg in sys.argv if arg == "-v"]
     sys_args = [arg for arg in sys.argv if arg != "-v"]
@@ -301,22 +338,6 @@ def main():
             action="store_true",
             help="Do dry run to validate import file without actually importing data",
         )
-        sub_parser.add_argument(
-            "--residential-heating",
-            action="store_true",
-            help="Import file with energy demand for residential heating",
-        )
-        sub_parser.add_argument(
-            "--substances",
-            nargs="*",
-            help="Only import residential heating emissions for these substances"
-            + " (default is all with emissions)",
-            choices=Substance.objects.values_list("slug", flat=True),
-            metavar=("NOx", "PM10"),
-        )
-        # pointsource_grp = sub_parser.add_argument_group(
-        #     "pointsources", description="Options for pointsource import"
-        # )
         args = sub_parser.parse_args(sub_args)
         if not Path(db_path).exists():
             sys.stderr.write(
@@ -385,13 +406,13 @@ def main():
             "--begin",
             help="when hourly rasters are desired, specify begin date."
             + " Time 00:00 assumed",
-            metavar="2022-01-01",
+            metavar="YYMMDDHH",
         )
         rasterize_grp.add_argument(
             "--end",
             help="when hourly rasters are desired, specify end date"
             + " Time 00:00 assumed",
-            metavar="2023-01-01",
+            metavar="YYMMDDHH",
         )
         # TODO add argument begin/end for rasterize
         # TODO add argument to aggregate emissions within polygon
@@ -410,7 +431,9 @@ def main():
             sys.stderr.write("Database does not exist.\n")
             sys.exit(1)
         if args.update:
-            editor.update_emission_tables(sourcetypes=args.sourcetypes, unit=args.unit)
+            editor.update_emission_tables(
+                sourcetypes=args.sourcetypes, unit=args.unit, substances=args.substances
+            )
             sys.stdout.write("Successfully updated tables\n")
             sys.exit(0)
         if args.aggregate is not None:
@@ -425,11 +448,11 @@ def main():
             sys.exit(0)
         if args.rasterize is not None:
             if args.begin is not None:
-                args.begin = datetime.datetime.strptime(args.begin, "%Y-%m-%d").replace(
+                args.begin = datetime.datetime.strptime(args.begin, "%y%m%d%H").replace(
                     tzinfo=datetime.timezone.utc
                 )
                 if args.end is not None:
-                    args.end = datetime.datetime.strptime(args.end, "%Y-%m-%d").replace(
+                    args.end = datetime.datetime.strptime(args.end, "%y%m%d%H").replace(
                         tzinfo=datetime.timezone.utc
                     )
                 else:
@@ -448,7 +471,6 @@ def main():
                 begin=args.begin,
                 end=args.end,
             )  # TODO add arguments for codeset, substances, begin/end, timezone!
-            # could also add for polygon, but this filtering is not implemented yet!!
             sys.stdout.write("Successfully rasterized emissions\n")
             sys.exit(0)
 
@@ -479,3 +501,35 @@ def main():
         else:
             sys.stderr.write("Did not export data, something went wrong.")
             sys.exit(1)
+
+    elif main_args.command == "settings":
+        sub_parser = argparse.ArgumentParser(
+            description="Change settings database",
+            usage="etk settings [options]",
+        )
+        sub_parser.add_argument("--srid", help="Integer defining a coordinate system")
+        args = sub_parser.parse_args(sub_args)
+        if args.srid is not None:
+            try:
+                args.srid = int(args.srid)
+            except ValueError:
+                sys.stderr.write(
+                    f"Code '{args.srid}' does not define a valid CRS. "
+                    "It should be an integer of size 4-5.\n"
+                )
+                sys.exit(1)
+            if args.srid == WGS84_SRID:
+                sys.stdout.write(
+                    "WARNING: SRID in settings should preferably be a "
+                    "projected coordinate system in meters, not lat/lon.\n"
+                )
+            try:
+                crs = CRS.from_epsg(args.srid)  # noqa
+            except CRSError:
+                sys.stderr.write(f"Code {args.srid} does not define a valid CRS.\n")
+                sys.exit(1)
+            settings = Settings.get_current()
+            settings.srid = args.srid
+            settings.save()
+            sys.stdout.write(f"Changed database srid to {args.srid}.\n")
+            sys.exit(0)

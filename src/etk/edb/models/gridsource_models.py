@@ -83,7 +83,12 @@ def get_gridsource_raster(name, clip_by=None):
         metadata = {
             "srid": srid,
             "nodata": nodata,
-            "extent": dset.bounds,
+            "extent": (
+                dset.bounds.left,
+                dset.bounds.bottom,
+                dset.bounds.right,
+                dset.bounds.top,
+            ),
             "transform": dset.transform,
         }
         if clip_by is not None:

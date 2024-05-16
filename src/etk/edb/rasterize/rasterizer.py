@@ -4,6 +4,8 @@ import datetime
 import logging
 import os
 from copy import copy
+from functools import cache
+from itertools import product
 from math import ceil
 from pathlib import Path
 from typing import Optional
@@ -13,21 +15,26 @@ import numpy as np
 import pandas as pd
 import rasterio as rio
 from django.contrib.gis.geos import GEOSGeometry, Polygon
-from rastafari import even_odd_polygon_fill, resample_band
+from rastafari import ddaf_line_subpixel, even_odd_polygon_fill, resample_band
 
-# TODO EmissionCache needs to be updated when road and grid sources introduced
 from etk import __version__
 from etk.edb.cache import EmissionCache, NotInCacheError
 from etk.edb.models import (
+    VELOCITY_CHOICES,
     AreaSource,
+    ColdstartTimevar,
+    CongestionProfile,
+    FlowTimevar,
     GridSource,
     Parameter,
     PointSource,
+    RoadSource,
     Settings,
     Timevar,
     get_gridsource_raster,
     timevar_to_series,
 )
+from etk.edb.traffic import los_to_velocity
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.calc import calculate_source_emissions
 
@@ -35,9 +42,16 @@ from etk.emissions.calc import calculate_source_emissions
 POINT = PointSource.sourcetype
 AREA = AreaSource.sourcetype
 GRID = GridSource.sourcetype
+ROAD = RoadSource.sourcetype
 
 # supported source types
-SOURCETYPES = (POINT, AREA, GRID)
+SOURCETYPES = (POINT, AREA, GRID, ROAD)
+
+# slug for traffic work parameter and traffic condition parameter
+TRAFFIC_WORK_PARAMETER_SLUG = "traffic_work"
+TRAFFIC_CONDITION_PARAMETER_SLUG = "traffic_condition"
+TRAFFIC_WORK_SUBSTANCE_SLUG = "traffic_work"
+VEHICLE_SPEED_PARAMETER_SLUG = "vehicle_speed"
 
 
 class Output:
@@ -48,6 +62,27 @@ class Output:
         self.path = path
         self.srid = srid
         self.timezone = timezone
+
+
+@cache
+def time_step_as_delta(time_step):
+    """Return timedelta corresponding to a time_step.
+    For Y and M, returns an approximate time-delta.
+    """
+
+    if time_step.endswith("Y"):
+        nyears = int(time_step[:-1])
+        return pd.Timedelta(days=nyears * 365)
+
+    if time_step.endswith("M"):
+        nmonths = int(time_step[:-1])
+        return pd.Timedelta(days=nmonths * 30)
+
+    ts = time_step.lower() if time_step.endswith("h") else time_step
+    try:
+        return pd.Timedelta(ts)
+    except ValueError:
+        raise ValueError(f"invalid time step abbreviation {ts}")
 
 
 class EmissionRasterizer:
@@ -68,6 +103,9 @@ class EmissionRasterizer:
             ny: raster dimension in y-direction
         """
         self.timevars = {}
+        self.flow_timevars = {}
+        self.coldstart_timevars = {}
+        self.congestion_profiles = {}
         self.level_weights = {}
         self.output = output
         self.extent = output.extent
@@ -121,13 +159,31 @@ class EmissionRasterizer:
     def _get_timevars(self, sourcetypes):
         """Get all time-variations."""
         self.timevars = {}
+        self.flow_timevars = {}
+        self.coldstart_timevars = {}
+        self.congestion_profiles = {}
 
         if POINT in sourcetypes or AREA in sourcetypes:
             for tvar in Timevar.objects.all():
                 self.timevars[tvar.id] = tvar
-            # TODO, should this be created for empty inventory already?
             default = Timevar()
             self.timevars["default"] = default
+
+        if ROAD in sourcetypes:
+            for tvar in FlowTimevar.objects.all():
+                self.flow_timevars[tvar.id] = tvar
+            default = FlowTimevar()
+            self.flow_timevars["default"] = default
+
+            for tvar in ColdstartTimevar.objects.all():
+                self.coldstart_timevars[tvar.id] = tvar
+            default = ColdstartTimevar()
+            self.coldstart_timevars["default"] = default
+
+            for prof in CongestionProfile.objects.all():
+                self.congestion_profiles[prof.id] = prof
+            default = CongestionProfile()
+            self.congestion_profiles["default"] = default
 
     def _get_level_weights(self):
         """redistribute vertical distr. into levels of result dataset."""
@@ -195,6 +251,37 @@ class EmissionRasterizer:
         time_index = pd.date_range(begin, end, freq="H")
         one_hour = datetime.timedelta(hours=1)
         shifted_index = pd.date_range(begin - one_hour, end - one_hour, freq="H")
+
+        self.flow_timevar_scalings = pd.DataFrame(
+            {
+                fvar.id
+                or "default": timevar_to_series(
+                    shifted_index, fvar, timezone=self.timezone
+                ).to_numpy()  # discard the shifted index by converting to ndarray
+                for fvar in self.flow_timevars.values()
+            },
+            index=time_index,
+        )
+        self.traffic_conditions = pd.DataFrame(
+            {
+                prof.id
+                or "default": prof.to_series(
+                    shifted_index, timezone=self.timezone
+                ).to_numpy()
+                for prof in self.congestion_profiles.values()
+            },
+            index=time_index,
+        )
+
+        # calculate vehicle velocity from level-of-service and posted speed
+        self.velocity_light = {}
+        self.velocity_heavy = {}
+        for key, vel in product(self.traffic_conditions, VELOCITY_CHOICES):
+            lvehspd, hvehspd = los_to_velocity(self.traffic_conditions[key], vel)
+            # convert to SI units, km/h to m/s
+            self.velocity_light[(key, vel)] = lvehspd / 3.6
+            self.velocity_heavy[(key, vel)] = hvehspd / 3.6
+
         self.source_timevar_scalings = pd.DataFrame(
             {
                 tvar.id
@@ -214,6 +301,7 @@ class EmissionRasterizer:
         point_ids=None,
         area_ids=None,
         grid_ids=None,
+        road_ids=None,
         polygon=None,
         substances=None,
         ac1=None,
@@ -223,8 +311,7 @@ class EmissionRasterizer:
         cur=None,
     ):
         """Get querysets for emissions."""
-        # TODO cannot use calculate_source_emissions() because need to filter for ac!
-        # TODO is substances only used for traffic work, or also something else?
+
         sourcetypes = sourcetypes or SOURCETYPES
         # not used; srid = Settings.get_current().srid
 
@@ -284,6 +371,10 @@ class EmissionRasterizer:
                 if not AreaSource.objects.exists():
                     continue
                 ids = area_ids
+            elif sourcetype == ROAD:
+                if not RoadSource.objects.exists():
+                    continue
+                ids = road_ids
             elif sourcetype == GRID:
                 if not GridSource.objects.exists():
                     continue
@@ -312,6 +403,8 @@ class EmissionRasterizer:
                 self._get_point_weights()
             elif sourcetype == AREA:
                 self._get_area_weights()
+            if sourcetype == ROAD:
+                self._get_road_weights()
             elif sourcetype == GRID:
                 self._get_grid_weights(polygon=polygon)
 
@@ -401,6 +494,85 @@ class EmissionRasterizer:
         self._cache.write_weights(AREA)
         self._cache.write_emissions(AREA)
 
+    def _get_road_weights(self):
+        """Get cell weights for roads.
+        returns a dict with road_id as keys and
+        (index_array, weight_array) as values
+
+        complete records from query result are stored in dict
+        with road_id as key.
+        """
+
+        col_map = self._cache.col_maps[ROAD]
+        for rec in self.querysets[ROAD]:
+            source_id = rec[col_map.source_id]
+            if source_id not in self._cache.gridded_sources[ROAD]:
+                road_weights = {}
+                # extract nodes from road geometry in WKT format
+                wkt = rec[col_map.wkt]
+                nodes = get_nodes_from_wkt(wkt)
+
+                # if geometry is simplified, the length of the simplified
+                # geometry should be used when rasterizing
+                try:
+                    road_length = rec[col_map.simple_length]
+                except AttributeError:
+                    road_length = rec[col_map.length]
+
+                # sum weights for each segment to each cell index
+                # (many segments can intersect the same cell)
+
+                for i in range(1, len(nodes)):
+                    p1_x, p1_y = nodes[i - 1]
+                    p2_x, p2_y = nodes[i]
+
+                    # rasterize segment and add weights to road_weights dict
+                    # for each segment the weights are multiplied with
+                    # the segment fraction of the road
+                    # the resulting road weights will sum up to 1
+                    ddaf_line_subpixel(
+                        p1_x,
+                        p1_y,
+                        p2_x,
+                        p2_y,
+                        road_weights,
+                        road_length,
+                        self.extent,
+                        self.dx,
+                        self.dy,
+                    )
+
+                if len(road_weights) > 0:
+                    indices = list(zip(*road_weights.keys()))
+
+                    try:
+                        ncells = indices[0].size
+                    except AttributeError:
+                        ncells = len(indices[0])
+                    if self.levels is not None:
+                        # road sources are added to lowest level
+                        level = 0
+                        # add z dimension to index array
+                        index = (tuple([level] * ncells), indices[0], indices[1])
+                    else:
+                        index = (indices[0], indices[1])
+
+                    # store cell indices and a weight array for each road id
+                    weights = (
+                        index,
+                        np.fromiter(road_weights.values(), dtype=float),
+                    )
+                else:
+                    weights = None
+                self._cache.add_rec(rec, ROAD, write_weights=True, weights=weights)
+            else:
+                self._cache.add_rec(rec, ROAD, write_weights=False)
+
+        # write last cache page to disk
+        self._cache.write_weights(ROAD)
+        # write a separate file for records of each substance
+        self._cache.write_emissions(ROAD)
+
     def _get_grid_weights(self, polygon=None):
         """Store records of grid-sources in dict with source_id as key.
 
@@ -486,9 +658,9 @@ class EmissionRasterizer:
     ):
         """create netCDF variables."""
         if timeseries:
-            cell_methods = "1H-mean"
+            cell_methods = "1h-mean"
             time = True
-            self.time_step = "1H"
+            self.time_step = "1h"
         else:
             cell_methods = None
             time = False
@@ -537,10 +709,12 @@ class EmissionRasterizer:
         begin=None,
         end=None,
         sourcetypes=None,
-        *,
         exclude_points=False,
+        exclude_roads=False,
         point_ids=None,
         area_ids=None,
+        grid_ids=None,
+        road_ids=None,
         name=None,
         tags=None,
         polygon=None,
@@ -578,7 +752,6 @@ class EmissionRasterizer:
             aggregation: aggregation label of result variables
             instance: write emissions to specified variable instance
         """
-
         self.instance = instance
         self.aggregation = aggregation
         self.levels = None
@@ -596,6 +769,8 @@ class EmissionRasterizer:
         self.sourcetypes = copy(sourcetypes) or list(SOURCETYPES)
         if exclude_points and POINT in self.sourcetypes:
             self.sourcetypes.remove(POINT)
+        if exclude_roads and ROAD in self.sourcetypes:
+            self.sourcetypes.remove(ROAD)
 
         if not hasattr(substances, "__iter__"):
             self.substances = [substances]
@@ -766,11 +941,15 @@ class EmissionRasterizer:
         # get mapping for query result column index
         col_map = self._cache.col_maps[sourcetype]
 
+        # a template time-series that will be scaled with emission factors
+        emis_fac_freeflow = np.ones((timesteps,))
+
         emis_ts = pd.Series(
             index=pd.date_range(start=begin, end=end, freq="H"),
             data=np.zeros((timesteps,)),
         )
-
+        cstvs_cache = {}
+        emis_fac_cache = {}
         # iterate over pages
         for page_ind in range(self._cache.emis_page_count(sourcetype, substance.pk)):
             page_nr = page_ind + 1
@@ -787,11 +966,100 @@ class EmissionRasterizer:
                 emis = rec[col_map.emis]
                 source_id = rec[col_map.source_id]
 
-                # dataframe with intensity scalings for each hour
-                timevar_scalings = self.source_timevar_scalings[timevar_id or "default"]
+                # for road sources emissions are calculated using
+                # ef corresponding to traffic condition for each hour
+                if sourcetype == ROAD:
+                    cstv_id = rec[col_map.coldstart_timevar_id]
+                    coldstart_fraction = rec[col_map.coldstart_fraction]
+                    coldstart_ef = rec[col_map.coldstart_ef]
 
-                # calculate emission timeseries (kg/s)
-                emis_ts = timevar_scalings * emis
+                    # dataframe with coldstart time-variation for each hour
+                    # (normalize coldstart var combined with flow variation)
+                    if coldstart_fraction > 0 and coldstart_ef > 0:
+                        if (cstv_id, timevar_id) not in cstvs_cache:
+                            cstv_index = pd.date_range(
+                                start=begin - datetime.timedelta(hours=1),
+                                end=end - datetime.timedelta(hours=1),
+                                freq="h",
+                            )
+                            cstvs_cache[(cstv_id, timevar_id)] = timevar_to_series(
+                                cstv_index,
+                                self.coldstart_timevars[cstv_id or "default"],
+                                self.flow_timevars[timevar_id or "default"],
+                                timezone=self.timezone,
+                            )
+                        coldstart_timevar_scalings = cstvs_cache[(cstv_id, timevar_id)]
+
+                    # dataframe with intensity scalings for each hour
+                    flow_timevar_scalings = self.flow_timevar_scalings[
+                        timevar_id or "default"
+                    ]
+                    cong_prof_id = rec[col_map.congestion_profile_id or "default"]
+
+                    # dataframe with traffic conditions (values 1-4)
+                    traffic_conditions = self.traffic_conditions[
+                        cong_prof_id or "default"
+                    ]
+
+                    # calculate emission timeseries
+                    # exhaust emissions + coldstart emissions
+                    flow = rec[col_map.veh_m_per_sec]
+                    scaled_veh_flow = flow_timevar_scalings.to_numpy() * flow
+
+                    freeflow_ef = rec[col_map.freeflow_ef]
+                    heavy_ef = rec[col_map.heavy_ef]
+                    saturated_ef = rec[col_map.saturated_ef]
+                    stopngo_ef = rec[col_map.stopngo_ef]
+                    emis_fac_key = (
+                        cong_prof_id,
+                        freeflow_ef,
+                        heavy_ef,
+                        saturated_ef,
+                        stopngo_ef,
+                    )
+
+                    if emis_fac_key not in emis_fac_cache:
+                        # array for emission factors for current vehicle
+                        # one ef for each traffic condition
+
+                        # create a full time-series of free-flow ef
+                        emis_fac = emis_fac_freeflow * freeflow_ef
+
+                        # replace ef where we have non free-flow conditions
+                        emis_fac = np.where(traffic_conditions == 2, heavy_ef, emis_fac)
+                        emis_fac = np.where(
+                            traffic_conditions == 3, saturated_ef, emis_fac
+                        )
+                        emis_fac = np.where(
+                            traffic_conditions == 4, stopngo_ef, emis_fac
+                        )
+                        emis_fac_cache[emis_fac_key] = emis_fac
+                    else:
+                        emis_fac = emis_fac_cache[emis_fac_key]
+
+                    # calculate emission timeseries (kg/s)
+                    if coldstart_ef > 0 and coldstart_fraction > 0:
+                        coldstart_scaled_veh_flow = (
+                            coldstart_timevar_scalings.to_numpy()
+                            * coldstart_fraction
+                            * coldstart_ef
+                        )
+
+                        emis_ts = (
+                            scaled_veh_flow * emis_fac
+                            + flow * coldstart_scaled_veh_flow
+                        )
+                    else:
+                        emis_ts = scaled_veh_flow * emis_fac
+
+                else:
+                    # dataframe with intensity scalings for each hour
+                    timevar_scalings = self.source_timevar_scalings[
+                        timevar_id or "default"
+                    ]
+
+                    # calculate emission timeseries (kg/s)
+                    emis_ts = timevar_scalings * emis
 
                 # add emissions to chunk
                 emis_chunk[:, self._cache.feature_ids[sourcetype][source_id]] += emis_ts
@@ -901,6 +1169,9 @@ class EmissionRasterizer:
 
         # create an empty array
         chunk = np.zeros((nr_timesteps, self.ny, self.nx), dtype=np.float32)
+        emis_fac_freeflow = np.ones((nr_timesteps,))
+        cstvs_cache = {}
+        emis_fac_cache = {}
         for sourcetype in sourcetypes:
             if not self._cache.has_sourcetype(sourcetype):
                 continue
@@ -924,13 +1195,99 @@ class EmissionRasterizer:
                     emis = rec[col_map.emis]
                     source_id = rec[col_map.source_id]
 
-                    # dataframe with intensity scalings for each hour
-                    timevar_scalings = self.source_timevar_scalings[
-                        timevar_id or "default"
-                    ]
+                    # for road sources emissions are calculated using
+                    # ef corresponding to traffic condition for each hour
+                    if sourcetype == ROAD:
+                        cstv_id = rec[col_map.coldstart_timevar_id]
+                        coldstart_fraction = rec[col_map.coldstart_fraction]
+                        coldstart_ef = rec[col_map.coldstart_ef]
 
-                    # calculate emission timeseries scaled by timevar
-                    emis_ts = timevar_scalings.to_numpy() * emis
+                        # dataframe with coldstart time-variation for each hour
+                        # (normalize coldstart var combined with flow variation)
+                        if coldstart_fraction > 0 and coldstart_ef > 0:
+                            if (cstv_id, timevar_id) not in cstvs_cache:
+                                cstv_index = pd.date_range(
+                                    start=begin - datetime.timedelta(hours=1),
+                                    end=end - datetime.timedelta(hours=1),
+                                    freq="h",
+                                )
+                                cstvs_cache[(cstv_id, timevar_id)] = timevar_to_series(
+                                    cstv_index,
+                                    self.coldstart_timevars[cstv_id or "default"],
+                                    self.flow_timevars[timevar_id or "default"],
+                                    timezone=self.timezone,
+                                )
+                            coldstart_timevar_scalings = cstvs_cache[
+                                (cstv_id, timevar_id)
+                            ]
+
+                        # dataframe with intensity scalings for each hour
+                        flow_timevar_scalings = self.flow_timevar_scalings[
+                            timevar_id or "default"
+                        ]
+                        cong_prof_id = rec[col_map.congestion_profile_id or "default"]
+
+                        # dataframe with traffic conditions (values 1-4)
+                        traffic_conditions = self.traffic_conditions[
+                            cong_prof_id or "default"
+                        ]
+
+                        # calculate emission timeseries
+                        # exhaust emissions + coldstart emissions
+                        flow = rec[col_map.veh_m_per_sec]
+                        scaled_veh_flow = flow_timevar_scalings.to_numpy() * flow
+
+                        freeflow_ef = rec[col_map.freeflow_ef]
+                        heavy_ef = rec[col_map.heavy_ef]
+                        saturated_ef = rec[col_map.saturated_ef]
+                        stopngo_ef = rec[col_map.stopngo_ef]
+
+                        emis_fac_key = (
+                            cong_prof_id,
+                            freeflow_ef,
+                            heavy_ef,
+                            saturated_ef,
+                            stopngo_ef,
+                        )
+                        if emis_fac_key not in emis_fac_cache:
+                            # array for emission factors for current vehicle
+                            # one ef for each traffic condition
+                            emis_fac = emis_fac_freeflow * freeflow_ef
+                            emis_fac = np.where(
+                                traffic_conditions == 2, heavy_ef, emis_fac
+                            )
+                            emis_fac = np.where(
+                                traffic_conditions == 3, saturated_ef, emis_fac
+                            )
+                            emis_fac = np.where(
+                                traffic_conditions == 4, stopngo_ef, emis_fac
+                            )
+                            emis_fac_cache[emis_fac_key] = emis_fac
+                        else:
+                            emis_fac = emis_fac_cache[emis_fac_key]
+
+                        if coldstart_ef > 0 and coldstart_fraction > 0:
+                            coldstart_scaled_veh_flow = (
+                                coldstart_timevar_scalings.to_numpy()
+                                * coldstart_fraction
+                                * coldstart_ef
+                            )
+
+                            emis_ts = (
+                                scaled_veh_flow * emis_fac
+                                + flow * coldstart_scaled_veh_flow
+                            )
+                        else:
+                            emis_ts = scaled_veh_flow * emis_fac
+
+                    else:
+                        # dataframe with intensity scalings for each hour
+                        timevar_scalings = self.source_timevar_scalings[
+                            timevar_id or "default"
+                        ]
+
+                        # calculate emission timeseries scaled by timevar
+                        emis_ts = timevar_scalings.to_numpy() * emis
 
                     if sourcetype != GRID:
                         # get cell indices and weights for source
@@ -975,29 +1332,26 @@ class EmissionRasterizer:
         # ensure chunk size is not larger than grid
         chunk_nx = min(self.nx, spatial_chunksize or 5)
         chunk_ny = min(self.ny, spatial_chunksize or 5)
-        chunk_nz = 1  # self.nz if isinstance(self, Field3D) else 1
 
         if time_chunksize is None:
             # assumes single precision (4 bytes per value)
             # max estimate based on full grid rather than limiting to spatial chunks,
             # (more practical if full grid fits in memory...)
 
-            field_size_bytes = self.nx * self.ny * chunk_nz * 4
+            field_size_bytes = self.nx * self.ny * 4
             max_time_chunksize = int(chunk_cache / field_size_bytes)
 
             if self.time_step is not None:
                 time_chunksize = int(
-                    datetime.timedelta(hours=366 * 24) / self.delta_t()
+                    datetime.timedelta(hours=366 * 24)
+                    / time_step_as_delta(self.time_step)
                 )
             else:
                 time_chunksize = 366
 
             time_chunksize = min(time_chunksize, max_time_chunksize)
 
-        if chunk_nz > 1:
-            return (time_chunksize, chunk_ny, chunk_nx)
-
-        return (time_chunksize, chunk_nz, chunk_ny, chunk_nx)
+        return (time_chunksize, chunk_ny, chunk_nx)
 
     def create_gridmapping_variable(self, dset: nc.Dataset, crs: rio.CRS):
         name = f"EPSG_{crs.to_epsg()}"

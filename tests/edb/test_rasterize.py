@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 
 # from django.contrib.gis.gdal import GDALRaster
-from django.contrib.gis.geos import Point, Polygon
+from django.contrib.gis.geos import LineString, Point, Polygon
 
 from etk.edb.const import WGS84_SRID
-from etk.edb.models import AreaSource, PointSource, Substance
+from etk.edb.models import AreaSource, PointSource, RoadSource, Substance
 from etk.edb.rasterize import EmissionRasterizer, Output
 from etk.edb.units import emission_unit_to_si
 
@@ -518,3 +518,70 @@ class TestEmissionRasterizer:
     #     with nc.Dataset(tmpdir + "/SOx.nc", "r", format="NETCDF4") as dset:
     #         assert np.sum(dset["Emission of SOx"]) == pytest.approx(0, 1e-6)
     #         # should be 0 since ac 1.2
+
+    def test_road_source(self, testsettings, tmpdir, roadclasses, fleets):
+        NOx = Substance.objects.get(slug="NOx")
+        SOx = Substance.objects.get(slug="SOx")
+
+        extent = (0.0, 0.0, 100.0, 100.0)
+        srid = 3006
+        output = Output(
+            extent=extent, timezone=datetime.timezone.utc, path=tmpdir, srid=srid
+        )
+
+        # testing with one road segment just within the dataset extent
+        llcorner = Point(x=extent[0] + 1, y=extent[1] + 1, z=None, srid=3006)
+        llcorner.transform(WGS84_SRID)
+
+        urcorner = Point(x=extent[2] - 1, y=extent[3] - 1, z=None, srid=3006)
+        urcorner.transform(WGS84_SRID)
+
+        road1 = RoadSource.objects.create(
+            name="road1",
+            geom=LineString(llcorner.coords, urcorner.coords, srid=WGS84_SRID),
+            tags={"tag2": "B"},
+            aadt=1000,
+            speed=80,
+            width=20,
+            roadclass=roadclasses[0],
+            fleet=fleets[0],
+        )
+
+        rasterizer = EmissionRasterizer(output, nx=4, ny=4)
+        # testing to rasterize average emission intensity
+        rasterizer.process(NOx)
+        # need to find a way to compute the sum of all emissions in inventory!
+        emissions = RoadSource.objects.first().emission(substance=NOx.id)
+        emissions_sum = sum([list(value.values())[0] for value in emissions.values()])
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert np.sum(dset["emission_NOx"]) == pytest.approx(emissions_sum, 1e-4)
+
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert np.sum(dset["emission_NOx"]) == pytest.approx(1.6361665e-07, 1e-4)
+
+        # testing to rasterize all hours in time interval
+        begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
+        rasterizer.process(NOx, begin, end, unit="g/s")
+
+        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+            assert len(dset.variables["time"]) == 3
+            data1 = dset.variables["emission_NOx"][:]
+            assert data1.sum() > 0
+
+        avg_emis2 = sum(
+            [next(iter(v.values())) for v in road1.emission(substance=SOx).values()]
+        )
+        # avg_emis2 in gadget 1.6361665242450532e-07
+        begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
+        end = datetime.datetime(2012, 12, 31, 23, tzinfo=datetime.timezone.utc)
+
+        rasterizer.process(SOx, begin, end)
+        with nc.Dataset(tmpdir + "/SOx.nc", "r", format="NETCDF4") as dset:
+            data2 = dset.variables["emission_SOx"][:]
+            gridded_avg_emis = data2.sum() / data2.shape[0]
+
+        # summing large number of grid cells may cause some truncation
+        # we need to have a higher error tolerance (1e-2)
+        # rasterize returns emissions in kg/s by default
+        assert avg_emis2 == pytest.approx(gridded_avg_emis, 1e-2)

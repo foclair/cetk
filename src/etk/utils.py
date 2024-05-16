@@ -1,5 +1,6 @@
 """Utility functions."""
 
+import itertools
 import re
 import unicodedata
 
@@ -49,3 +50,13 @@ class GTiffProfile(rio.profiles.Profile):
         "nodata": NODATA,
         "dtype": "float32",
     }
+
+
+def inbatch(iterable, size):
+    """Return suitable sized batches (as lists) of an iterable."""
+    it = iter(iterable)
+    while True:
+        batch = list(itertools.islice(it, size))
+        if not batch:
+            return
+        yield batch
