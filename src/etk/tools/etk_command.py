@@ -261,6 +261,7 @@ def main():
         import   import data
         export   export data
         calc     calculate emissions
+        settings change database settings
 
         Current database is {db_path} (set by $ETK_DATABASE_PATH)
         """,
@@ -269,7 +270,7 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "import", "export", "calc"),
+        choices=("migrate", "create", "import", "export", "calc", "settings"),
     )
     verbosity = [arg for arg in sys.argv if arg == "-v"]
     sys_args = [arg for arg in sys.argv if arg != "-v"]
@@ -498,3 +499,18 @@ def main():
         else:
             sys.stderr.write("Did not export data, something went wrong.")
             sys.exit(1)
+
+    elif main_args.command == "settings":
+        sub_parser = argparse.ArgumentParser(
+            description="Change settings database",
+            usage="etk settings [options]",
+        )
+        sub_parser.add_argument("--srid", help="Integer defining a coordinate system")
+        args = sub_parser.parse_args(sub_args)
+        if args.srid is not None:
+            settings = Settings.get_current()
+            # TODO check if valid srid
+            settings.srid = args.srid
+            settings.save()
+            sys.stdout.write(f"Changed database srid to {args.srid}.\n")
+            sys.exit(0)
