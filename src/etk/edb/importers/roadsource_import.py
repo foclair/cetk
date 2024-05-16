@@ -218,19 +218,26 @@ def import_traffic(filename, sheets, validation=False):
     if "VehicleFuel" in sheets:
         vehiclesettings = vehicles_excel_to_dict(filename)
     elif "VehicleEmissionFactor" in sheets:
-        return_message.append(
-            import_error(
-                "Cannot import vehicle emfacs if VehicleFuel is not "
-                "set in the same file.",
-                validation=validation,
-            )
+        log.error(
+            "Cannot import or validate vehicle emfacs if VehicleFuel "
+            "is not set in the same file."
         )
+        raise ImportError
     if "VehicleEmissionFactor" in sheets:
-        # TODO set unit from spreadsheet?
+        df = worksheet_to_dataframe(workbook["VehicleEmissionFactor"].values)
+        unit = set(df["unit"])
+        if len(unit) > 1:
+            return_message.append(
+                import_error(
+                    "Several units found for import " f"{unit}, can only use one",
+                    validation=validation,
+                )
+            )
+        unit = str(list(unit)[0])
         updates = import_vehicles(
             filename,
             vehiclesettings,
-            unit="kg/m",
+            unit=unit,  # "kg/m"
             encoding="utf-8",
             overwrite=True,
             validation=validation,
@@ -280,9 +287,6 @@ def import_traffic(filename, sheets, validation=False):
         except ImportError as err:
             return {}, [f"{err}"]
     return return_dict, return_message  # update dict and messages
-
-
-# TODO continue replacing ImportError by import_error where possible for validation
 
 
 def import_vehicles(  # noqa: C901, PLR0912, PLR0915

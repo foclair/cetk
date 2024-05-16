@@ -468,7 +468,6 @@ def main():
                 begin=args.begin,
                 end=args.end,
             )  # TODO add arguments for codeset, substances, begin/end, timezone!
-            # could also add for polygon, but this filtering is not implemented yet!!
             sys.stdout.write("Successfully rasterized emissions\n")
             sys.exit(0)
 

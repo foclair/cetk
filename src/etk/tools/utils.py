@@ -136,6 +136,10 @@ def create_from_template(filename):
     shutil.copyfile(get_template_db(), filename)
 
 
+def set_settings_srid(srid, db_path=None):
+    return run("etk", "settings", "--srid", str(srid), db_path=db_path)
+
+
 def run(*args, db_path=None):
     env = (
         os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}

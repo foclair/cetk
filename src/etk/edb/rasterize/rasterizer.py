@@ -17,7 +17,6 @@ import rasterio as rio
 from django.contrib.gis.geos import GEOSGeometry, Polygon
 from rastafari import ddaf_line_subpixel, even_odd_polygon_fill, resample_band
 
-# TODO EmissionCache needs to be updated when road and grid sources introduced
 from etk import __version__
 from etk.edb.cache import EmissionCache, NotInCacheError
 from etk.edb.models import (
@@ -312,8 +311,7 @@ class EmissionRasterizer:
         cur=None,
     ):
         """Get querysets for emissions."""
-        # TODO cannot use calculate_source_emissions() because need to filter for ac!
-        # TODO is substances only used for traffic work, or also something else?
+
         sourcetypes = sourcetypes or SOURCETYPES
         # not used; srid = Settings.get_current().srid
 
