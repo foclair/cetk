@@ -7,6 +7,8 @@ import os
 import django
 from django.conf import settings
 
+from etk import logging
+
 DEFAULT_SETTINGS = {
     "DEBUG": False,
     "INSTALLED_APPS": ["django.contrib.gis", "etk.edb.apps.EdbConfig"],
@@ -15,6 +17,8 @@ DEFAULT_SETTINGS = {
     "USE_I18N": True,
     "USE_TZ": True,
 }
+
+log = logging.getLogger(__name__)
 
 
 def configure():
@@ -25,15 +29,59 @@ def configure():
         )
         default_db = os.path.abspath(os.path.join(config_home, "eclair.gpkg"))
         db_path = os.environ.get("ETK_DATABASE_PATH", default_db)
+        DEBUG = os.environ.get("ETK_DEBUG", False)
+        level = "DEBUG" if DEBUG else "INFO"
+        if level == "DEBUG":
+            etk_logger = {"handlers": ["console_debug"], "level": level}
+        else:
+            etk_logger = {"handlers": ["console"], "level": level}
+
+        if "FLATPAK_ID" in os.environ:
+            spatialite_path = os.environ.get(
+                "SPATIALITE_LIBRARY_PATH", "/app/lib/mod_spatialite.so"
+            )
+        elif os.name == "posix":
+            spatialite_path = os.environ.get(
+                "SPATIALITE_LIBRARY_PATH", "/usr/lib64/mod_spatialite.so"
+            )
+        elif os.name == "nt":
+            spatialite_path = os.environ.get(
+                "SPATIALITE_LIBRARY_PATH", "/usr/lib64/mod_spatialite.so"
+            )
+        else:
+            spatialite_path = os.environ.get(
+                "SPATIALITE_LIBRARY_PATH", "/usr/lib64/mod_spatialite.so"
+            )
+
         settings.configure(
             **DEFAULT_SETTINGS,
+            SPATIALITE_LIBRARY_PATH=spatialite_path,
             DATABASES={
                 "default": {
                     "ENGINE": "django.contrib.gis.db.backends.spatialite",
                     "NAME": db_path,
                     "TEST": {"NAME": os.path.join(config_home, "test.eclair.gpkg")},
                 },
+            },
+            LOGGING={
+                "version": 1,
+                "disable_existing_loggers": False,
+                "formatters": {
+                    "etk": {"format": "%(levelname)s: %(message)s"},  # noqa
+                    "etk_debug": {
+                        "format": "%(asctime)s %(levelname)s: %(name)s  %(message)s"
+                    },  # noqa
+                },
+                "handlers": {
+                    "console": {"class": "logging.StreamHandler", "formatter": "etk"},
+                    "console_debug": {
+                        "class": "logging.StreamHandler",
+                        "formatter": "etk_debug",
+                    },
+                },
+                "loggers": {"etk": etk_logger},
             }
         )
         django.setup()
+        log.debug("configured django")
     return settings

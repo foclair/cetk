@@ -8,6 +8,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError  # noqa
 
+from django.core import serializers
+
 from etk import __version__, logging
 from etk.edb.const import SHEET_NAMES
 
@@ -34,6 +36,17 @@ def check_and_get_path(filename):
         return p
     else:
         raise ArgumentTypeError(f"Input file {filename} does not exist")
+
+
+def run_get_settings(db_path=None, **kwargs):
+    """get settings from db."""
+    cmd_args = []
+    for k, v in kwargs.items():
+        cmd_args.append(f"--{k}")
+        cmd_args.append(str(v))
+    stdout, stderr = run("etk", "info", db_path=db_path, *cmd_args)
+    settings = next(serializers.deserialize("json", stdout)).object
+    return settings
 
 
 def run_update_emission_tables(db_path=None, **kwargs):
@@ -80,8 +93,7 @@ def run_rasterize_emissions(
     """rasterize emissions and store as NetCDF."""
     cmd_args = ["--rasterize", str(outputpath), "--cellsize", str(cellsize)]
     if extent is not None:
-        cmd_args += ["--extent"]
-        cmd_args += [f"{x}" for x in extent]
+        cmd_args += ["--extent"] + list(map(str, extent))
     if srid is not None:
         cmd_args += ["--srid", str(srid)]
     if begin is not None and end is not None:

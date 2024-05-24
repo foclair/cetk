@@ -7,6 +7,7 @@ import sys
 from math import ceil
 from pathlib import Path
 
+from django.core import serializers
 from django.db import transaction
 from openpyxl import load_workbook
 from pyproj import CRS
@@ -85,13 +86,31 @@ class Editor(object):
                 db_path = get_template_db()
             else:
                 db_path = get_db()
-
         log.debug(f"Running migrations for database {db_path}")
         try:
             std_out, std_err = run_migrate(db_path=db_path)
         except (CalledProcessError, SubprocessError) as err:
             log.error(f"Error while migrating {db_path}: {err}")
-        log.debug(f"Successfully migrated database {db_path}")
+        else:
+            log.debug(f"Successfully migrated database {db_path}")
+
+    def info(self, **kwargs):
+        from etk.edb.models import CodeSet, Settings
+
+        settings = Settings.get_current()
+        for k, v in kwargs.items():
+            if k == "srid" and v is not None:
+                settings.srid = int(v)
+            elif k in ("codeset1", "codeset2", "codeset3") and v is not None:
+                try:
+                    setattr(settings, k, CodeSet.objects.get(slug=v))
+                except CodeSet.DoesNotExist:
+                    log.error(f"No code-set defined with slug: '{v}'")
+            elif v is not None:
+                log.error(f"could not set unexpected property {k}")
+
+            settings.save()
+        print(serializers.serialize("json", [settings]))
 
     def import_workbook(self, filename, sheets=SHEET_NAMES, dry_run=False):
         return_msg = []
@@ -144,11 +163,22 @@ class Editor(object):
                         updates, msgs = import_traffic(
                             filename, sheets=import_sheets, validation=dry_run
                         )
-                        db_updates.update(updates)
-                        if len(msgs) != 0:
-                            return_msg += msgs
-                            if not dry_run:
-                                raise ImportError(return_msg)
+                    elif sheet == "PointSource":
+                        updates, msgs = import_sources(
+                            filename, validation=dry_run, sourcetype="point"
+                        )
+                    elif sheet == "AreaSource":
+                        updates, msgs = import_sources(
+                            filename, validation=dry_run, sourcetype="area"
+                        )
+                    elif sheet == "RoadSource":
+                        updates, msgs = import_sources(
+                            filename, validation=dry_run, sourcetype="road"
+                        )
+                    db_updates.update(updates)
+                    if len(msgs) != 0:
+                        return_msg += msgs
+                        raise ImportError(return_msg)
                 if dry_run:
                     raise DryrunAbort
             # grid sources imported outside atomic transaction
@@ -164,11 +194,16 @@ class Editor(object):
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename, validation=True)
                 return_msg += msgs
-            if len(return_msg) != 0:
+            if len(return_msg) > 10:
                 log.error(
-                    f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}"
+                    ">10 errors during validation, first 10:"
+                    f"{os.linesep}{os.linesep.join(return_msg[:10])}"
                 )
-                log.info("Finished dry-run")
+            elif len(return_msg) != 0:
+                log.error(
+                    "Errors during validation:"
+                    f"{os.linesep}{os.linesep.join(return_msg)}"
+                )
             else:
                 log.info("Successful dry-run, no errors, the file is ready to import.")
                 log.info(
@@ -176,7 +211,16 @@ class Editor(object):
                     + f" data to be imported {db_updates}"
                 )
         except ImportError:
-            log.error(f"Errors during import:{os.linesep}{os.linesep.join(return_msg)}")
+            if len(return_msg) > 10:
+                log.error(
+                    ">10 errors during validation, first 10:"
+                    f"{os.linesep}{os.linesep.join(return_msg[:10])}"
+                )
+            else:
+                log.error(
+                    "Errors during validation:"
+                    f"{os.linesep}{os.linesep.join(return_msg)}"
+                )
         else:
             log.info(
                 datetime.datetime.now().strftime("%H:%M:%S")
@@ -260,6 +304,7 @@ def main():
         Main commands are:
         create   create an sqlite inventory
         migrate  migrate an sqlite inventory
+        info     print settings
         import   import data
         export   export data
         calc     calculate emissions
@@ -272,7 +317,7 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "import", "export", "calc", "settings"),
+        choices=("migrate", "create", "info", "import", "export", "calc", "settings"),
     )
     verbosity = [arg for arg in sys.argv if arg == "-v"]
     sys_args = [arg for arg in sys.argv if arg != "-v"]
@@ -291,7 +336,8 @@ def main():
         args = sub_parser.parse_args(sub_args)
         create_from_template(args.filename)
         log.debug(
-            "Created new database '{args.filename}' from template '{get_template_db()}'"
+            f"Created new database '{args.filename}' "
+            f"from template '{get_template_db()}'"
         )
         sys.exit(0)
 
@@ -302,6 +348,23 @@ def main():
     ):
         sys.stderr.write("No database specified, set by $ETK_DATABASE_PATH\n")
         sys.exit(1)
+
+    if main_args.command == "info":
+        sub_parser = argparse.ArgumentParser(
+            description="Print or update settings.",
+            usage="usage: etk info [--srid EPSG] [--codeset1 SLUG] [--codeset2 SLUG] [--codeset3 SLUG]",  # noqa: E501
+        )
+        sub_parser.add_argument("--srid", type=int, help="Update srid in settings")
+        sub_parser.add_argument("--codeset1", help="Update Code-set1")
+        sub_parser.add_argument("--codeset2", help="Update Code-set2")
+        sub_parser.add_argument("--codeset3", help="Update Code-set3")
+        args = sub_parser.parse_args(sub_args)
+        editor.info(
+            srid=args.srid,
+            codeset1=args.codeset1,
+            codeset2=args.codeset2,
+            codeset3=args.codeset3,
+        )
 
     if main_args.command == "migrate":
         sub_parser = argparse.ArgumentParser(

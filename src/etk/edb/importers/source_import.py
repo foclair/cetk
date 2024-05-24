@@ -454,7 +454,6 @@ def create_or_update_sources(
             for key in row_dict.keys()
             if key.startswith("subst:") and pd.notna(row_dict[key])
         ]
-
         # create list of data dict for each substance emission
         emissions = {}
         for subst_key in subst_keys:
@@ -472,23 +471,23 @@ def create_or_update_sources(
                 )
 
             try:
-                if not pd.isna(row_dict["emission_unit"]):
+                if "unit" in row_dict and not pd.isnull(row_dict["unit"]):
                     emis["value"] = emission_unit_to_si(
                         float(row_dict[subst_key]), row_dict["emission_unit"]
                     )
                 else:
                     return_message.append(
                         import_error(
-                            f"No unit specified for {sourcetype} sources"
-                            + f" on row {row_nr}",
+                            f"No unit specified for {sourcetype}-source"
+                            f" emissions on row {row_nr}",
                             validation=validation,
                         )
                     )
             except ValueError:
                 return_message.append(
                     import_error(
-                        f"Invalid {sourcetype} emission value {row_dict[subst_key]}"
-                        + f" on row {row_nr} for {sourcetype} sources.",
+                        f"Invalid {sourcetype}-source emission value "
+                        f"{row_dict[subst_key]} on row {row_nr}",
                         validation=validation,
                     )
                 )
