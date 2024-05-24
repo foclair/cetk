@@ -264,7 +264,7 @@ class TestImportRoads:
         assert road1.roadclass.attributes == {"roadtype": "1", "speed": "90"}
 
         config2 = roadsource_excel_to_dict(get_data_file("roads.xlsx"))
-        import_roads(config2["filepath"], config2)
+        import_roads(get_data_file(config2["filepath"]), config2)
         assert RoadSource.objects.all().count() == 2 * 26
         # roadsources are not updated as other sources are
 

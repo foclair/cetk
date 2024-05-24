@@ -38,15 +38,21 @@ def check_and_get_path(filename):
         raise ArgumentTypeError(f"Input file {filename} does not exist")
 
 
-def run_get_settings(db_path=None, **kwargs):
+def run_get_settings(db_path=None):
+    """get settings from db."""
+    stdout, stderr = run("etk", "info", db_path=db_path)
+    settings = next(serializers.deserialize("json", stdout)).object
+    return settings
+
+
+def run_update_settings(db_path=None, **kwargs):
     """get settings from db."""
     cmd_args = []
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
-    stdout, stderr = run("etk", "info", db_path=db_path, *cmd_args)
-    settings = next(serializers.deserialize("json", stdout)).object
-    return settings
+    stdout, stderr = run("etk", "settings", db_path=db_path, *cmd_args)
+    return stdout, stderr
 
 
 def run_update_emission_tables(db_path=None, **kwargs):

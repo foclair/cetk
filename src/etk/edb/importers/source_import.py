@@ -471,7 +471,9 @@ def create_or_update_sources(
                 )
 
             try:
-                if "unit" in row_dict and not pd.isnull(row_dict["unit"]):
+                if "emission_unit" in row_dict and not pd.isnull(
+                    row_dict["emission_unit"]
+                ):
                     emis["value"] = emission_unit_to_si(
                         float(row_dict[subst_key]), row_dict["emission_unit"]
                     )
@@ -964,9 +966,9 @@ def import_sourceactivities(
             )
         create_pointsourceactivities = []
         update_pointsourceactivities = []
+        # NB: does not work if column header starts with space, but same for subst:
+        activity_keys = [k for k in df_pointsource.columns if k.startswith("act:")]
         for row_key, row in df_pointsource.iterrows():
-            # NB: does not work if column header starts with space, but same for subst:
-            activity_keys = [k for k in row.keys() if k.startswith("act:")]
             for activity_key in activity_keys:
                 if not pd.isnull(row[activity_key]):
                     rate = row[activity_key]
@@ -981,40 +983,38 @@ def import_sourceactivities(
                                 validation=validation,
                             )
                         )
-                        rate = activity_rate_unit_to_si(rate, activity.unit)
-                        # original unit stored in activity.unit, but
-                        # pointsourceactivity.rate stored as activity / s.
-                        if pd.isna(row.name[0]):
-                            facility_id = None
-                        else:
-                            facility_id = str(row.name[0])
+                    rate = activity_rate_unit_to_si(rate, activity.unit)
+                    # original unit stored in activity.unit, but
+                    # pointsourceactivity.rate stored as activity / s.
+                    if pd.isna(row.name[0]):
+                        facility_id = None
+                    else:
+                        facility_id = str(row.name[0])
+                    if caching_sources:
+                        # row index set as ["facility_id", "source_name"]
+                        # in create_or_update_source
+                        pointsource = pointsources[facility_id, str(row.name[1])]
+                    else:
+                        facility = (
+                            facilities[facility_id] if facility_id is not None else None
+                        )
+                        pointsource = PointSource.objects.get(
+                            name=str(row.name[1]), facility=facility
+                        )
+                    try:
                         if caching_sources:
-                            # row index set as ["facility_id", "source_name"]
-                            # in create_or_update_source
-                            pointsource = pointsources[facility_id, str(row.name[1])]
+                            psa = pointsourceactivities[activity, pointsource]
                         else:
-                            facility = (
-                                facilities[facility_id]
-                                if facility_id is not None
-                                else None
+                            psa = PointSourceActivity.objects.get(
+                                activity_id=activity.id, source_id=pointsource.id
                             )
-                            pointsource = PointSource.objects.get(
-                                name=str(row.name[1]), facility=facility
-                            )
-                        try:
-                            if caching_sources:
-                                psa = pointsourceactivities[activity, pointsource]
-                            else:
-                                psa = PointSourceActivity.objects.get(
-                                    activity_id=activity.id, source_id=pointsource.id
-                                )
-                            setattr(psa, "rate", rate)
-                            update_pointsourceactivities.append(psa)
-                        except (PointSourceActivity.DoesNotExist, KeyError):
-                            psa = PointSourceActivity(
-                                activity=activity, source=pointsource, rate=rate
-                            )
-                            create_pointsourceactivities.append(psa)
+                        setattr(psa, "rate", rate)
+                        update_pointsourceactivities.append(psa)
+                    except (PointSourceActivity.DoesNotExist, KeyError):
+                        psa = PointSourceActivity(
+                            activity=activity, source=pointsource, rate=rate
+                        )
+                        create_pointsourceactivities.append(psa)
 
         PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
         PointSourceActivity.objects.bulk_update(

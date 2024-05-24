@@ -112,7 +112,7 @@ class Settings(models.Model):
         # Retrieve the settings, if exist
         return Settings.objects.get_or_create(
             defaults={
-                "srid": WGS84_SRID,
+                "srid": 3006,
                 "timezone": "Europe/Stockholm",
                 "extent": GEOSGeometry(DEFAULT_EXTENT, WGS84_SRID),
                 "codeset1": CodeSet.objects.filter(id=1).first(),

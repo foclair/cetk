@@ -8,7 +8,7 @@ from etk.tools.utils import run_import
 
 
 @pytest.fixture
-def inventory_xlsx(settings):
+def inventory_xlsx(testsettings):
     return resources.files("tools.data") / "inventory.xlsx"
 
 
@@ -22,5 +22,6 @@ def test_db(tmpdir):
 
 @pytest.fixture
 def inventory(test_db, inventory_xlsx):
+    run_import(inventory_xlsx, db_path=test_db)
     run_import(inventory_xlsx, db_path=test_db)
     return test_db

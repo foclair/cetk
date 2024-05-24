@@ -95,22 +95,45 @@ class Editor(object):
             log.debug(f"Successfully migrated database {db_path}")
 
     def info(self, **kwargs):
+        settings = Settings.get_current()
+        print(serializers.serialize("json", [settings]))
+
+    def update_settings(self, srid=None, codeset1=None, codeset2=None, codeset3=None):
         from etk.edb.models import CodeSet, Settings
 
         settings = Settings.get_current()
-        for k, v in kwargs.items():
-            if k == "srid" and v is not None:
-                settings.srid = int(v)
-            elif k in ("codeset1", "codeset2", "codeset3") and v is not None:
-                try:
-                    setattr(settings, k, CodeSet.objects.get(slug=v))
-                except CodeSet.DoesNotExist:
-                    log.error(f"No code-set defined with slug: '{v}'")
-            elif v is not None:
-                log.error(f"could not set unexpected property {k}")
+        if srid == WGS84_SRID:
+            log.error(
+                "SRID in settings must be a "
+                "projected coordinate system in meters, not lat/lon.\n"
+            )
+            sys.exit(1)
 
-            settings.save()
-        print(serializers.serialize("json", [settings]))
+        elif srid is not None:
+            try:
+                crs = CRS.from_epsg(srid)  # noqa
+            except CRSError:
+                log.error(f"SRID={srid} does not define a valid CRS.\n")
+                sys.exit(1)
+            settings.srid = srid
+            log.info(f"Updated srid to {srid}.\n")
+        try:
+            if codeset1 is not None:
+                slug = codeset1
+                settings.codeset1 = CodeSet.objects.get(slug=slug)
+                log.info(f"Updated code-set1 to {slug}.\n")
+            if codeset2 is not None:
+                slug = codeset2
+                settings.codeset2 = CodeSet.objects.get(slug=slug)
+                log.info(f"Updated code-set2 to {slug}.\n")
+            if codeset3 is not None:
+                slug = codeset3
+                settings.codeset3 = CodeSet.objects.get(slug=slug)
+                log.info(f"Updated code-set3 to {slug}.\n")
+        except CodeSet.DoesNotExist:
+            log.error(f"No code-set defined with slug: '{slug}'")
+            sys.exit(1)
+        settings.save()
 
     def import_workbook(self, filename, sheets=SHEET_NAMES, dry_run=False):
         return_msg = []
@@ -127,7 +150,6 @@ class Editor(object):
                     if sheet not in workbook.sheetnames:
                         log.info(f"Workbook has no sheet named {sheet}, skipped import")
                 if any(name != "GridSource" for name in import_sheets):
-                    # import Timevar, Codeset, ActivityCode, EmissionFactor,
                     # PointSource and AreaSource
                     sourceact = [
                         "CodeSet",
@@ -163,21 +185,25 @@ class Editor(object):
                         updates, msgs = import_traffic(
                             filename, sheets=import_sheets, validation=dry_run
                         )
-                    elif sheet == "PointSource":
-                        updates, msgs = import_sources(
-                            filename, validation=dry_run, sourcetype="point"
-                        )
-                    elif sheet == "AreaSource":
-                        updates, msgs = import_sources(
-                            filename, validation=dry_run, sourcetype="area"
-                        )
+                        if len(msgs) != 0:
+                            return_msg += msgs
+                    # point and area-sources are imported in import_sourceactivities
+                    # elif sheet == "PointSource":
+                    #     updates, msgs = import_sources(
+                    #         filename, validation=dry_run, sourcetype="point"
+                    #     )
+                    # elif sheet == "AreaSource":
+                    #     updates, msgs = import_sources(
+                    #         filename, validation=dry_run, sourcetype="area"
+                    #     )
                     elif sheet == "RoadSource":
                         updates, msgs = import_sources(
                             filename, validation=dry_run, sourcetype="road"
                         )
+                        if len(msgs) != 0:
+                            return_msg += msgs
                     db_updates.update(updates)
                     if len(msgs) != 0:
-                        return_msg += msgs
                         raise ImportError(return_msg)
                 if dry_run:
                     raise DryrunAbort
@@ -352,19 +378,10 @@ def main():
     if main_args.command == "info":
         sub_parser = argparse.ArgumentParser(
             description="Print or update settings.",
-            usage="usage: etk info [--srid EPSG] [--codeset1 SLUG] [--codeset2 SLUG] [--codeset3 SLUG]",  # noqa: E501
+            usage="usage: etk info ",
         )
-        sub_parser.add_argument("--srid", type=int, help="Update srid in settings")
-        sub_parser.add_argument("--codeset1", help="Update Code-set1")
-        sub_parser.add_argument("--codeset2", help="Update Code-set2")
-        sub_parser.add_argument("--codeset3", help="Update Code-set3")
         args = sub_parser.parse_args(sub_args)
-        editor.info(
-            srid=args.srid,
-            codeset1=args.codeset1,
-            codeset2=args.codeset2,
-            codeset3=args.codeset3,
-        )
+        editor.info()
 
     if main_args.command == "migrate":
         sub_parser = argparse.ArgumentParser(
@@ -567,32 +584,17 @@ def main():
 
     elif main_args.command == "settings":
         sub_parser = argparse.ArgumentParser(
-            description="Change settings database",
-            usage="etk settings [options]",
+            description="Update settings",
+            usage="etk settings [--srid EPSG] [--codeset1 SLUG] [--codeset2 SLUG] [--codeset3 SLUG]",  # noqa: E501
         )
-        sub_parser.add_argument("--srid", help="Integer defining a coordinate system")
+        sub_parser.add_argument("--srid", type=int, help="Update srid in settings")
+        sub_parser.add_argument("--codeset1", help="Update code-set1")
+        sub_parser.add_argument("--codeset2", help="Update code-set2")
+        sub_parser.add_argument("--codeset3", help="Update code-set3")
         args = sub_parser.parse_args(sub_args)
-        if args.srid is not None:
-            try:
-                args.srid = int(args.srid)
-            except ValueError:
-                sys.stderr.write(
-                    f"Code '{args.srid}' does not define a valid CRS. "
-                    "It should be an integer of size 4-5.\n"
-                )
-                sys.exit(1)
-            if args.srid == WGS84_SRID:
-                sys.stdout.write(
-                    "WARNING: SRID in settings should preferably be a "
-                    "projected coordinate system in meters, not lat/lon.\n"
-                )
-            try:
-                crs = CRS.from_epsg(args.srid)  # noqa
-            except CRSError:
-                sys.stderr.write(f"Code {args.srid} does not define a valid CRS.\n")
-                sys.exit(1)
-            settings = Settings.get_current()
-            settings.srid = args.srid
-            settings.save()
-            sys.stdout.write(f"Changed database srid to {args.srid}.\n")
-            sys.exit(0)
+        editor.update_settings(
+            srid=args.srid,
+            codeset1=args.codeset1,
+            codeset2=args.codeset2,
+            codeset3=args.codeset3,
+        )

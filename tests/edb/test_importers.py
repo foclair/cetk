@@ -109,10 +109,10 @@ class TestImport:
         filepath = resources.files("edb.data") / "pointsourceactivities.xlsx"
         # test if create pointsourceactivities works
         import_sourceactivities(filepath)
-        assert PointSourceActivity.objects.all().count()
+        assert PointSourceActivity.objects.all().count() > 0
         # test if update also works
         import_sourceactivities(filepath)
-        assert PointSourceActivity.objects.all().count()
+        assert PointSourceActivity.objects.all().count() > 0
 
     def test_import_areasources(self, vertical_dist, areasource_xlsx):
 
@@ -122,7 +122,7 @@ class TestImport:
         cs1.save()
         # create areasources
         import_sources(areasource_xlsx, sourcetype="area")
-        assert AreaSource.objects.all().count()
+        assert AreaSource.objects.all().count() > 0
         source1 = AreaSource.objects.get(name="source1")
         assert source1.name == "source1"
         assert source1.timevar is None
@@ -130,7 +130,7 @@ class TestImport:
 
         # test if update also works
         import_sources(areasource_xlsx, sourcetype="area")
-        assert AreaSource.objects.all().count()
+        assert AreaSource.objects.all().count() > 0
 
     def test_import_areasourceactivities(self, vertical_dist):
         vdist = vertical_dist  # noqa
@@ -139,10 +139,10 @@ class TestImport:
         filepath = resources.files("edb.data") / "areasourceactivities.xlsx"
         # test if create pointsourceactivities works
         import_sourceactivities(filepath)
-        assert AreaSourceActivity.objects.all().count()
+        assert AreaSourceActivity.objects.all().count() > 0
         # test if update also works
         import_sourceactivities(filepath)
-        assert AreaSourceActivity.objects.all().count()
+        assert AreaSourceActivity.objects.all().count() > 0
 
     @pytest.mark.django_db(transaction=False)
     def test_import_gridsources(

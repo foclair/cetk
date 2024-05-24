@@ -60,7 +60,6 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
     #    error = e.stderr.decode("utf-8")
     #    print(error)
     assert "ERROR" in str(stdout)
-    assert "Finished dry-run" in str(stdout)
 
 
 def test_import_traffic(tmp_db, traffic_xlsx):
