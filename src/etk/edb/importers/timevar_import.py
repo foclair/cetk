@@ -17,6 +17,7 @@ def import_timevarsheet(workbook, validation=False, sheetname="Timevar"):
     if sheetname == "ColdstartTimevar":
         keyname = "coldstart"
     timevar_dict = {keyname: {}}
+
     # NB this only works if Excel file has exact same format
     nr_timevars = (len(df_timevar["ID"]) + 1) // 27
     for i in range(nr_timevars):

@@ -8,7 +8,6 @@ from math import ceil
 from pathlib import Path
 
 from django.core import serializers
-from django.db import transaction
 from openpyxl import load_workbook
 from pyproj import CRS
 from pyproj.exceptions import CRSError
@@ -41,6 +40,7 @@ from etk.edb.importers import (  # noqa
     import_timevarsheet,
     import_traffic,
 )
+from etk.edb.importers.utils import ValidationError  # noqa
 from etk.edb.models import Settings, Substance  # noqa
 from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
@@ -51,12 +51,6 @@ DEFAULT_EMISSION_UNIT = "kg/year"
 
 sheet_choices = ["All"]
 sheet_choices.extend(SHEET_NAMES)
-
-
-class DryrunAbort(Exception):
-    """Forcing abort of database changes when doing dryrun."""
-
-    pass
 
 
 def adjust_extent(extent, srid, cellsize):
@@ -145,98 +139,66 @@ class Editor(object):
             if s in frozenset(sheets) and s in frozenset(workbook.sheetnames)
         ]
         try:
-            with transaction.atomic():
-                for sheet in import_sheets:
-                    if sheet not in workbook.sheetnames:
-                        log.info(f"Workbook has no sheet named {sheet}, skipped import")
-                if any(name != "GridSource" for name in import_sheets):
-                    # PointSource and AreaSource
-                    sourceact = [
-                        "CodeSet",
-                        "ActivityCode",
-                        "EmissionFactor",
-                        "Timevar",
-                        "PointSource",
-                        "AreaSource",
-                    ]
-                    if any(name in sourceact for name in import_sheets):
-                        updates, msgs = import_sourceactivities(
-                            filename,
-                            import_sheets=import_sheets,
-                            validation=dry_run,
-                        )
-                        db_updates.update(updates)
-                        if len(msgs) != 0:
-                            return_msg += msgs
-                            if not dry_run:
-                                raise ImportError(return_msg)
-                    traffic = [
-                        "RoadSource",
-                        "VehicleFuel",
-                        "Fleet",
-                        "CongestionProfile",
-                        "FlowTimevar",
-                        "ColdstartTimevar",
-                        "RoadAttribute",
-                        "TrafficSituation",
-                        "VehicleEmissionFactor",
-                    ]
-                    if any(name in traffic for name in import_sheets):
-                        updates, msgs = import_traffic(
-                            filename, sheets=import_sheets, validation=dry_run
-                        )
-                        if len(msgs) != 0:
-                            return_msg += msgs
-                    # point and area-sources are imported in import_sourceactivities
-                    # elif sheet == "PointSource":
-                    #     updates, msgs = import_sources(
-                    #         filename, validation=dry_run, sourcetype="point"
-                    #     )
-                    # elif sheet == "AreaSource":
-                    #     updates, msgs = import_sources(
-                    #         filename, validation=dry_run, sourcetype="area"
-                    #     )
-                    elif sheet == "RoadSource":
-                        updates, msgs = import_sources(
-                            filename, validation=dry_run, sourcetype="road"
-                        )
-                        if len(msgs) != 0:
-                            return_msg += msgs
-                    db_updates.update(updates)
-                    if len(msgs) != 0:
-                        raise ImportError(return_msg)
-                if dry_run:
-                    raise DryrunAbort
-            # grid sources imported outside atomic transaction
-            # to avoid errors when writing rasters using rasterio
-            if "GridSource" in import_sheets:
-                updates, msgs = import_gridsources(filename, validation=dry_run)
+            missing_sheets = set(import_sheets).difference(workbook.sheetnames)
+            if len(missing_sheets) > 0:
+                log.info(f"Workbook has no sheets named: {missing_sheets}")
+
+            # PointSource and AreaSource
+            sourceact = [
+                "CodeSet",
+                "ActivityCode",
+                "EmissionFactor",
+                "Timevar",
+                "PointSource",
+                "AreaSource",
+            ]
+            if any(name in sourceact for name in import_sheets):
+                updates, msgs = import_sourceactivities(
+                    filename,
+                    import_sheets=import_sheets,
+                    validation=dry_run,
+                )
                 db_updates.update(updates)
-                if len(msgs) > 0:
-                    return_msg += msgs
-                    raise ImportError(return_msg)
-        except DryrunAbort:
-            # validate grid sources
-            if "GridSource" in import_sheets:
-                updates, msgs = import_gridsources(filename, validation=True)
                 return_msg += msgs
-            if len(return_msg) > 10:
-                log.error(
-                    ">10 errors during validation, first 10:"
-                    f"{os.linesep}{os.linesep.join(return_msg[:10])}"
+
+            traffic = [
+                "RoadSource",
+                "VehicleFuel",
+                "Fleet",
+                "CongestionProfile",
+                "FlowTimevar",
+                "ColdstartTimevar",
+                "RoadAttribute",
+                "TrafficSituation",
+                "VehicleEmissionFactor",
+            ]
+            if any(name in traffic for name in import_sheets):
+                updates, msgs = import_traffic(
+                    filename, sheets=import_sheets, validation=dry_run
                 )
-            elif len(return_msg) != 0:
-                log.error(
-                    "Errors during validation:"
-                    f"{os.linesep}{os.linesep.join(return_msg)}"
-                )
-            else:
-                log.info("Successful dry-run, no errors, the file is ready to import.")
-                log.info(
-                    datetime.datetime.now().strftime("%H:%M:%S")
-                    + f" data to be imported {db_updates}"
-                )
-        except ImportError:
+                return_msg += msgs
+            # point and area-sources are imported in import_sourceactivities
+            # elif sheet == "PointSource":
+            #     updates, msgs = import_sources(
+            #         filename, validation=dry_run, sourcetype="point"
+            #     )
+            # elif sheet == "AreaSource":
+            #     updates, msgs = import_sources(
+            #         filename, validation=dry_run, sourcetype="area"
+            #     )
+            # elif sheet == "RoadSource":
+            #    updates, msgs = import_sources(
+            #        filename, validation=dry_run, sourcetype="road"
+            #    )
+            #    return_msg += msgs
+            # db_updates.update(updates)
+            if "GridSource" in import_sheets:
+                updates, msgs = import_gridsources(filename)
+                db_updates.update(updates)
+                return_msg += msgs
+            if len(return_msg) > 0:
+                raise ValidationError(return_msg)
+        except ValidationError:
             if len(return_msg) > 10:
                 log.error(
                     ">10 errors during validation, first 10:"
@@ -248,10 +210,16 @@ class Editor(object):
                     f"{os.linesep}{os.linesep.join(return_msg)}"
                 )
         else:
-            log.info(
-                datetime.datetime.now().strftime("%H:%M:%S")
-                + f" imported data {db_updates}"
-            )
+            if not dry_run:
+                log.info(
+                    datetime.datetime.now().strftime("%H:%M:%S")
+                    + f" successfully imported {db_updates}"
+                )
+            else:
+                log.info(
+                    datetime.datetime.now().strftime("%H:%M:%S")
+                    + f" successfully validated {db_updates}"
+                )
         return db_updates, return_msg
 
     def update_emission_tables(
@@ -421,7 +389,7 @@ def main():
         args = sub_parser.parse_args(sub_args)
         if not Path(db_path).exists():
             sys.stderr.write(
-                "Database " + db_path + " does not exist, first run "
+                f"Database {db_path} does not exist, first run "
                 "'etk create' or 'etk migrate'\n"
             )
             sys.exit(1)

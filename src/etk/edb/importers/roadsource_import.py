@@ -420,7 +420,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                     f"Required column '{col}' not found in file '{vehicles_file}"
                 )
 
-        log.debug("checking that all substance exist in the database")
+        log.debug("checking that all substances exist in the database")
         substances = {}
         for subst in df.index.get_level_values(3).unique():
             try:

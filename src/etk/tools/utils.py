@@ -7,6 +7,7 @@ from argparse import ArgumentTypeError
 from collections.abc import Iterable
 from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError  # noqa
+from tempfile import gettempdir
 
 from django.core import serializers
 
@@ -14,6 +15,12 @@ from etk import __version__, logging
 from etk.edb.const import SHEET_NAMES
 
 log = logging.getLogger(__name__)
+
+
+class BackupError(Exception):
+    """Error during backup-process."""
+
+    pass
 
 
 def get_db():
@@ -36,6 +43,24 @@ def check_and_get_path(filename):
         return p
     else:
         raise ArgumentTypeError(f"Input file {filename} does not exist")
+
+
+def get_backup_path(db_path):
+    return Path(gettempdir()) / f"{db_path.name}.bkp"
+
+
+def backup_db():
+    db_path = get_db()
+    shutil.copyfile(db_path, get_backup_path(db_path))
+
+
+def restore_backup():
+    db_path = get_db()
+    backup_path = get_backup_path(db_path)
+    if not backup_path.exists():
+        raise BackupError(f"no backup for {db_path} found")
+    db_path.unlink()
+    shutil.copyfile(backup_path, db_path)
 
 
 def run_get_settings(db_path=None):
@@ -135,9 +160,17 @@ def run_import(filename, sheets=SHEET_NAMES, dry_run=False, db_path=None, **kwar
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
+
     if dry_run:
         cmd_args.append("--dryrun")
-    return run("etk", "import", *cmd_args)
+        backup_path = backup_db(db_path)
+        try:
+            stdout, stderr = run("etk", "import", *cmd_args, db_path=backup_path)
+        finally:
+            backup_path.unlink()
+    else:
+        stdout, stderr = run("etk", "import", *cmd_args, db_path=db_path)
+    return stdout, stderr
 
 
 def run_export(filename, db_path=None, **kwargs):

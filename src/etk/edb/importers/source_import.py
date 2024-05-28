@@ -1,13 +1,11 @@
 """Data importers for the edb application."""
 
-import logging
-
 import numpy as np
 import pandas as pd
 from django.contrib.gis.geos import GEOSGeometry, Point
-from django.db import IntegrityError
 from openpyxl import load_workbook
 
+from etk import logging
 from etk.edb.cache import cache_queryset
 from etk.edb.const import SHEET_NAMES, WGS84_SRID
 from etk.edb.models import (
@@ -16,7 +14,6 @@ from etk.edb.models import (
     AreaSourceActivity,
     AreaSourceSubstance,
     CodeSet,
-    EmissionFactor,
     Facility,
     PointSource,
     PointSourceActivity,
@@ -24,12 +21,9 @@ from etk.edb.models import (
     Substance,
 )
 from etk.edb.models.timevar_models import Timevar
-from etk.edb.units import (
-    activity_ef_unit_to_si,
-    activity_rate_unit_to_si,
-    emission_unit_to_si,
-)
+from etk.edb.units import activity_rate_unit_to_si, emission_unit_to_si
 
+from .activity_import import import_emissionfactorsheet
 from .codeset_import import import_activitycodesheet, import_codesetsheet
 from .timevar_import import import_timevarsheet
 from .utils import cache_codeset, import_error, worksheet_to_dataframe
@@ -772,170 +766,28 @@ def import_sourceactivities(
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
     if ("Timevar" in sheet_names) and ("Timevar" in import_sheets):
+        log.debug("importing timevars")
         updates, msgs = import_timevarsheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
 
     if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
+        log.debug("importing code-sets")
         updates, msgs = import_codesetsheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
 
     if ("ActivityCode" in sheet_names) and ("ActivityCode" in import_sheets):
+        log.debug("importing activity-codes")
         updates, msgs = import_activitycodesheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
 
     if ("EmissionFactor" in sheet_names) and ("EmissionFactor" in import_sheets):
-        activities = cache_queryset(
-            Activity.objects.prefetch_related("emissionfactors").all(), "name"
-        )
-        data = workbook["EmissionFactor"].values
-        df_activity = worksheet_to_dataframe(data)
-        activity_names = df_activity["activity_name"]
-        update_activities = {}
-        create_activities = {}
-        drop_emfacs = []
-        for row_nr, activity_name in enumerate(activity_names):
-            try:
-                activity = activities[activity_name]
-                if activity_name not in update_activities.keys():
-                    setattr(activity, "name", activity_name)
-                    setattr(activity, "unit", df_activity["activity_unit"][row_nr])
-                    update_activities[activity_name] = activity
-                    drop_emfacs += list(activities[activity_name].emissionfactors.all())
-                else:
-                    if (
-                        df_activity["activity_unit"][row_nr]
-                        != update_activities[activity_name].unit
-                    ):
-                        return_message.append(
-                            import_error(
-                                f"conflicting units for activity '{activity_name}'",
-                                validation=validation,
-                            )
-                        )
-            except KeyError:
-                if activity_name not in create_activities:
-                    activity = Activity(
-                        name=activity_name, unit=df_activity["activity_unit"][row_nr]
-                    )
-                    create_activities[activity_name] = activity
-                else:
-                    if (
-                        df_activity["activity_unit"][row_nr]
-                        != create_activities[activity_name].unit
-                    ):
-                        return_message.append(
-                            import_error(
-                                "multiple rows for the same activity "
-                                + str(activity_name),
-                                validation=validation,
-                            )
-                        )
-        Activity.objects.bulk_create(create_activities.values())
-        Activity.objects.bulk_update(
-            update_activities.values(),
-            [
-                "name",
-                "unit",
-            ],
-        )
-        # drop existing emfacs of activities that will be updated
-        EmissionFactor.objects.filter(pk__in=[inst.id for inst in drop_emfacs]).delete()
-        return_dict.update(
-            {
-                "activity": {
-                    "updated": len(update_activities),
-                    "created": len(create_activities),
-                }
-            }
-        )
-        data = workbook["EmissionFactor"].values
-        df_emfac = worksheet_to_dataframe(data)
-        substances = cache_queryset(Substance.objects.all(), "slug")
-        activities = cache_queryset(Activity.objects.all(), "name")
-        # unique together activity_name and substance
-        emissionfactors = cache_queryset(
-            EmissionFactor.objects.all(), ["activity", "substance"]
-        )
-        update_emfacs = []
-        create_emfacs = []
-        for row_nr in range(len(df_emfac)):
-            activity_name = df_emfac.iloc[row_nr]["activity_name"]
-            try:
-                activity = activities[activity_name]
-                subst = df_emfac.iloc[row_nr]["substance"]
-                try:
-                    substance = substances[subst]
-                    factor = df_emfac.iloc[row_nr]["factor"]
-                    factor_unit = df_emfac.iloc[row_nr]["emissionfactor_unit"]
-                    activity_quantity_unit, time_unit = activity.unit.split("/")
-                    mass_unit, factor_quantity_unit = factor_unit.split("/")
-                    if activity_quantity_unit != factor_quantity_unit:
-                        # emission factor and activity need to have the same unit
-                        # for quantity, eg GJ, m3 "pellets", number of produces bottles
-                        return_message.append(
-                            import_error(
-                                "Units for emission factor and activity rate for"
-                                f" '{activity_name}'"
-                                " are inconsistent, convert units before importing.",
-                                validation=validation,
-                            )
-                        )
-                    else:
-                        factor = activity_ef_unit_to_si(factor, factor_unit)
-                    try:
-                        emfac = emissionfactors[(activity, substance)]
-                        setattr(emfac, "activity", activity)
-                        setattr(emfac, "substance", substance)
-                        setattr(emfac, "factor", factor)
-                        update_emfacs.append(emfac)
-                    except KeyError:
-                        emfac = EmissionFactor(
-                            activity=activity, substance=substance, factor=factor
-                        )
-                        create_emfacs.append(emfac)
-                except KeyError:
-                    if subst == "PM2.5":
-                        substance = substances["PM25"]
-                    else:
-                        return_message.append(
-                            import_error(
-                                f"unknown substance '{subst}'"
-                                f" for emission factor on row '{row_nr}'",
-                                validation=validation,
-                            )
-                        )
-            except KeyError:
-                return_message.append(
-                    import_error(
-                        f"unknown activity '{activity_name}'"
-                        f" for emission factor on row '{row_nr}'",
-                        validation=validation,
-                    )
-                )
-
-        try:
-            EmissionFactor.objects.bulk_create(create_emfacs)
-        except IntegrityError:
-            return_message.append(
-                import_error(
-                    "Two emission factors for same activity and substance are given.",
-                    validation=validation,
-                )
-            )
-        EmissionFactor.objects.bulk_update(
-            update_emfacs, ["activity", "substance", "factor"]
-        )
-        return_dict.update(
-            {
-                "emission_factors": {
-                    "updated": len(update_emfacs),
-                    "created": len(create_emfacs),
-                }
-            }
-        )
+        log.debug("importing emission-factors")
+        updates, msgs = import_emissionfactorsheet(workbook, validation)
+        return_dict.update(updates)
+        return_message += msgs
 
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
         data = workbook["PointSource"].values
@@ -957,6 +809,7 @@ def import_sourceactivities(
         activities = cache_queryset(Activity.objects.all(), "name")
         facilities = cache_queryset(Facility.objects.all(), "official_id")
         if caching_sources:
+            log.debug("caching sources to speed up updates")
             pointsourceactivities = cache_queryset(
                 PointSourceActivity.objects.select_related("activity", "source").all(),
                 ["activity", "source"],
@@ -964,11 +817,29 @@ def import_sourceactivities(
             pointsources = cache_sources(
                 PointSource.objects.select_related("facility").all()
             )
+        log.debug("Reading sources")
         create_pointsourceactivities = []
         update_pointsourceactivities = []
         # NB: does not work if column header starts with space, but same for subst:
         activity_keys = [k for k in df_pointsource.columns if k.startswith("act:")]
+        row_nr = 1
         for row_key, row in df_pointsource.iterrows():
+            # original unit stored in activity.unit, but
+            # pointsourceactivity.rate stored as activity / s.
+            if pd.isna(row.name[0]):
+                facility_id = None
+            else:
+                facility_id = str(row.name[0])
+            if caching_sources:
+                # row index set as ["facility_id", "source_name"]
+                # in create_or_update_source
+                pointsource = pointsources[facility_id, str(row.name[1])]
+            else:
+                facility = facilities[facility_id] if facility_id is not None else None
+                pointsource = PointSource.objects.get(
+                    name=str(row.name[1]), facility=facility
+                )
+            log.debug(f"pointsource {row_nr}: {pointsource.name}")
             for activity_key in activity_keys:
                 if not pd.isnull(row[activity_key]):
                     rate = row[activity_key]
@@ -984,23 +855,6 @@ def import_sourceactivities(
                             )
                         )
                     rate = activity_rate_unit_to_si(rate, activity.unit)
-                    # original unit stored in activity.unit, but
-                    # pointsourceactivity.rate stored as activity / s.
-                    if pd.isna(row.name[0]):
-                        facility_id = None
-                    else:
-                        facility_id = str(row.name[0])
-                    if caching_sources:
-                        # row index set as ["facility_id", "source_name"]
-                        # in create_or_update_source
-                        pointsource = pointsources[facility_id, str(row.name[1])]
-                    else:
-                        facility = (
-                            facilities[facility_id] if facility_id is not None else None
-                        )
-                        pointsource = PointSource.objects.get(
-                            name=str(row.name[1]), facility=facility
-                        )
                     try:
                         if caching_sources:
                             psa = pointsourceactivities[activity, pointsource]
@@ -1015,7 +869,8 @@ def import_sourceactivities(
                             activity=activity, source=pointsource, rate=rate
                         )
                         create_pointsourceactivities.append(psa)
-
+            row_nr += 1
+        log.debug("Creating point-sources")
         PointSourceActivity.objects.bulk_create(create_pointsourceactivities)
         PointSourceActivity.objects.bulk_update(
             update_pointsourceactivities, ["activity", "source", "rate"]

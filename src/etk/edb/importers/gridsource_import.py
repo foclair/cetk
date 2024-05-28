@@ -82,6 +82,8 @@ def read_import_file(filepath, encoding=None):
         df = read_xlsx(filepath)
     else:
         raise ImportError("only xlsx and csv files are supported for import")
+    if "name" not in df.columns:
+        raise ImportError("Missing column 'name' for in GridSource sheet")
     df = df.set_index("name")
     return df
 
@@ -119,7 +121,7 @@ def validate_gridsources(df, timevars, code_sets, raster_names, datadir):
                     )
                 )
         for col in filter(lambda x: row_dict[x] is not None, act_cols):
-            act_name = col[4:]
+            act_name = col[4:].strip()
             messages += validate_raster(
                 row_dict, raster_names, datadir, rasters, row_nr, subst_slug
             )
@@ -151,7 +153,7 @@ def create_or_update_rasters(rasters, raster_names):
                 write_gridsource_raster(raster, raster_name)
 
 
-def import_gridsources(filepath, validation=False, encoding=None):
+def import_gridsources(filepath, encoding=None):
     """validate and/or import grid-sources from file."""
 
     substances = cache_queryset(Substance.objects.all(), "slug")
@@ -189,60 +191,60 @@ def import_gridsources(filepath, validation=False, encoding=None):
     create_or_update_rasters(rasters, raster_names)
     nr_created_sources = 0
     nr_updated_sources = 0
-    if not validation:
-        subst_cols = get_substance_emission_columns(df)
-        act_cols = get_activity_rate_columns(df)
-        for name, row in df.iterrows():
-            row_dict = nan2None(row.to_dict())
-            src, created = GridSource.objects.get_or_create(name=name)
-            if created:
-                nr_created_sources += 1
+
+    subst_cols = get_substance_emission_columns(df)
+    act_cols = get_activity_rate_columns(df)
+    for name, row in df.iterrows():
+        row_dict = nan2None(row.to_dict())
+        src, created = GridSource.objects.get_or_create(name=name)
+        if created:
+            nr_created_sources += 1
+        else:
+            nr_updated_sources += 1
+        # set tags
+        tag_keys = [key for key in row_dict.keys() if key.startswith("tag:")]
+        src.tags = {
+            key[4:]: row_dict[key] for key in tag_keys if row_dict[key] is not None
+        }
+        validate_activitycodes(row_dict, code_sets, row_nr, src)
+        validate_timevar(row_dict, timevars, row_nr, src)
+        src.save()
+
+        # remove any existing emissions
+        if not created:
+            src.substances.all().delete()
+            src.activities.all().delete()
+
+        for col in filter(lambda x: row_dict[x] is not None, subst_cols):
+            subst = col[6:]
+            # if sum is specified instead of an emission total,
+            # the emission value is calculated as the sum of the raster
+            rname, rpath = data_to_raster(
+                row_dict["rastername"], row_dict["path"], datadir, subst
+            )
+            emis = {"substance": substances[subst], "raster": rname}
+            emis_value = row_dict[col]
+            unit = row_dict["emission_unit"]
+            if emis_value == "sum":
+                emis["value"] = emission_unit_to_si(rasters[rname]["sum"], unit)
             else:
-                nr_updated_sources += 1
-            # set tags
-            tag_keys = [key for key in row_dict.keys() if key.startswith("tag:")]
-            src.tags = {
-                key[4:]: row_dict[key] for key in tag_keys if row_dict[key] is not None
-            }
-            validate_activitycodes(row_dict, code_sets, row_nr, src)
-            validate_timevar(row_dict, timevars, row_nr, src)
-            src.save()
+                emis["value"] = emission_unit_to_si(float(emis_value), unit)
+            src.substances.create(**emis)
 
-            # remove any existing emissions
-            if not created:
-                src.substances.all().delete()
-                src.activities.all().delete()
+        for col in filter(lambda x: row_dict[x] is not None, act_cols):
+            activity_name = col[4:]
+            rname, rpath = data_to_raster(
+                row_dict["rastername"], row_dict["path"], datadir, subst
+            )
+            emis = {"activity": activities[activity_name], "raster": rname}
+            rate = row_dict[col]
+            if rate == "sum":
+                emis["rate"] = rasters[rname]["sum"]
+            else:
+                emis["rate"] = rate
+            src.activities.create(**emis)
 
-            for col in filter(lambda x: row_dict[x] is not None, subst_cols):
-                subst = col[6:]
-                # if sum is specified instead of an emission total,
-                # the emission value is calculated as the sum of the raster
-                rname, rpath = data_to_raster(
-                    row_dict["rastername"], row_dict["path"], datadir, subst
-                )
-                emis = {"substance": substances[subst], "raster": rname}
-                emis_value = row_dict[col]
-                unit = row_dict["emission_unit"]
-                if emis_value == "sum":
-                    emis["value"] = emission_unit_to_si(rasters[rname]["sum"], unit)
-                else:
-                    emis["value"] = emission_unit_to_si(float(emis_value), unit)
-                src.substances.create(**emis)
-
-            for col in filter(lambda x: row_dict[x] is not None, act_cols):
-                activity_name = col[4:]
-                rname, rpath = data_to_raster(
-                    row_dict["rastername"], row_dict["path"], datadir, subst
-                )
-                emis = {"activity": activities[activity_name], "raster": rname}
-                rate = row_dict[col]
-                if rate == "sum":
-                    emis["rate"] = rasters[rname]["sum"]
-                else:
-                    emis["rate"] = rate
-                src.activities.create(**emis)
-
-            row_nr += 1
+        row_nr += 1
     db_updates = {
         "gridsources": {"updated": nr_updated_sources, "created": nr_created_sources}
     }

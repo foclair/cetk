@@ -41,8 +41,11 @@ def validate_columns(
         invalid_substances = expected_substances.difference(substances.keys())
         if len(invalid_substances) > 0:
             messages.append(f"GridSource: Invalid substances: {invalid_substances}")
+
     if activities is not None:
-        expected_activities = {col[4:] for col in df.columns if col.startswith("act:")}
+        expected_activities = {
+            col[4:].strip() for col in df.columns if col.startswith("act:")
+        }
         invalid_activities = expected_activities.difference(activities.keys())
         if len(invalid_activities) > 0:
             messages.append(f"GridSource: Invalid activities: {invalid_activities}")

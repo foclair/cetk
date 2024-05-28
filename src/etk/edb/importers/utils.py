@@ -7,8 +7,14 @@ from etk.edb.cache import cache_queryset
 from etk.edb.models import Settings
 
 
-class ImportError(Exception):
-    """Error while importing emission data."""
+class ValidationError(Exception):
+    """Error while validating emission data."""
+
+    pass
+
+
+class EmptySheet(Exception):
+    """Error trying to read data from an empty sheet."""
 
     pass
 
@@ -23,7 +29,7 @@ def nan2None(d):
 def import_error(message, return_message="", validation=False):
     """import error management"""
     if not validation:
-        raise ImportError(message)
+        raise ValidationError(message)
     else:
         return_message += message + "\n"
     return return_message
@@ -65,7 +71,10 @@ def cache_codesets():
 
 
 def worksheet_to_dataframe(data):
-    cols = next(data)
+    try:
+        cols = next(data)
+    except StopIteration:
+        raise EmptySheet("Sheet is empty")
     data = list(data)
     data = (islice(r, 0, None) for r in data)
     df = pd.DataFrame(data, columns=cols)
