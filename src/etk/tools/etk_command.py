@@ -197,8 +197,9 @@ class Editor(object):
                 db_updates.update(updates)
                 return_msg += msgs
             if len(return_msg) > 0:
-                raise ValidationError(return_msg)
-        except ValidationError:
+                raise ValidationError()
+        except ValidationError as err:
+            return_msg.append(str(err))
             if len(return_msg) > 10:
                 log.error(
                     ">10 errors during validation, first 10:"
@@ -211,15 +212,9 @@ class Editor(object):
                 )
         else:
             if not dry_run:
-                log.info(
-                    datetime.datetime.now().strftime("%H:%M:%S")
-                    + f" successfully imported {db_updates}"
-                )
+                log.info(f"successfully imported {db_updates}")
             else:
-                log.info(
-                    datetime.datetime.now().strftime("%H:%M:%S")
-                    + f" successfully validated {db_updates}"
-                )
+                log.info(f"successfully validated {db_updates}")
         return db_updates, return_msg
 
     def update_emission_tables(

@@ -29,9 +29,9 @@ def nan2None(d):
 def import_error(message, return_message="", validation=False):
     """import error management"""
     if not validation:
-        raise ValidationError(message)
+        raise ValidationError(f"VALIDATION: {message}")
     else:
-        return_message += message + "\n"
+        return_message += f"VALIDATION: {message}\n"
     return return_message
 
 

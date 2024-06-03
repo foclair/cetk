@@ -766,30 +766,31 @@ def import_sourceactivities(
     return_dict = {}
     sheet_names = [sheet.title for sheet in workbook.worksheets]
     if ("Timevar" in sheet_names) and ("Timevar" in import_sheets):
-        log.debug("importing timevars")
+        log.debug("validating/importing timevars")
         updates, msgs = import_timevarsheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
 
     if ("CodeSet" in sheet_names) and ("CodeSet" in import_sheets):
-        log.debug("importing code-sets")
+        log.debug("validating/importing code-sets")
         updates, msgs = import_codesetsheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
 
     if ("ActivityCode" in sheet_names) and ("ActivityCode" in import_sheets):
-        log.debug("importing activity-codes")
+        log.debug("validating/importing activity-codes")
         updates, msgs = import_activitycodesheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
 
     if ("EmissionFactor" in sheet_names) and ("EmissionFactor" in import_sheets):
-        log.debug("importing emission-factors")
+        log.debug("validating/importing emission-factors")
         updates, msgs = import_emissionfactorsheet(workbook, validation)
         return_dict.update(updates)
         return_message += msgs
 
     if ("PointSource" in sheet_names) and ("PointSource" in import_sheets):
+        log.debug("validating/importing sheet PointSource")
         data = workbook["PointSource"].values
         df_pointsource = worksheet_to_dataframe(data)
         df_pointsource = set_datatypes(df_pointsource, "point")

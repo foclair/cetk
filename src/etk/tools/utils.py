@@ -46,21 +46,14 @@ def check_and_get_path(filename):
 
 
 def get_backup_path(db_path):
-    return Path(gettempdir()) / f"{db_path.name}.bkp"
+    return
 
 
 def backup_db():
     db_path = get_db()
-    shutil.copyfile(db_path, get_backup_path(db_path))
-
-
-def restore_backup():
-    db_path = get_db()
-    backup_path = get_backup_path(db_path)
-    if not backup_path.exists():
-        raise BackupError(f"no backup for {db_path} found")
-    db_path.unlink()
-    shutil.copyfile(backup_path, db_path)
+    backup_path = Path(gettempdir()) / f"{db_path.name}.bkp"
+    shutil.copyfile(db_path, backup_path)
+    return backup_path
 
 
 def run_get_settings(db_path=None):
@@ -163,14 +156,12 @@ def run_import(filename, sheets=SHEET_NAMES, dry_run=False, db_path=None, **kwar
 
     if dry_run:
         cmd_args.append("--dryrun")
-        backup_path = backup_db(db_path)
-        try:
-            stdout, stderr = run("etk", "import", *cmd_args, db_path=backup_path)
-        finally:
-            backup_path.unlink()
+        backup_path = backup_db()
+        proc = run_non_blocking("etk", "import", *cmd_args, db_path=backup_path)
     else:
-        stdout, stderr = run("etk", "import", *cmd_args, db_path=db_path)
-    return stdout, stderr
+        proc = run_non_blocking("etk", "import", *cmd_args, db_path=db_path)
+        backup_path = None
+    return backup_path, proc
 
 
 def run_export(filename, db_path=None, **kwargs):
@@ -191,7 +182,7 @@ def set_settings_srid(srid, db_path=None):
     return run("etk", "settings", "--srid", str(srid), db_path=db_path)
 
 
-def run(*args, db_path=None):
+def run(*args, db_path=None, log_level=logging.INFO):
     env = (
         os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
     )
@@ -200,6 +191,20 @@ def run(*args, db_path=None):
     )
     log.debug(f"command {'_'.join(args)} finished with status code {proc.returncode}")
     return proc.stdout, proc.stderr
+
+
+def run_non_blocking(*args, db_path=None, log_level=logging.INFO):
+    env = (
+        os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
+    )
+    return subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=1,
+        universal_newlines=True,
+        env=env,
+    )
 
 
 class VerboseAction(argparse.Action):

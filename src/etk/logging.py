@@ -51,7 +51,7 @@ def create_file_handler(filename, loglevel=logging.DEBUG):
     return filehandler
 
 
-def configure(terminal_level=logging.INFO, file_level=logging.DEBUG, filename=None):
+def configure(terminal_level=logging.WARNING, file_level=logging.DEBUG, filename=None):
     """Configure logging.
 
     *terminal_level* sets the minimum log level to send to stderr.

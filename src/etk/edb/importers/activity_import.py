@@ -30,17 +30,16 @@ def import_emissionfactorsheet(workbook, validation):
                 setattr(activity, "unit", df_activity["activity_unit"][row_nr])
                 update_activities[activity_name] = activity
                 drop_emfacs += list(activities[activity_name].emissionfactors.all())
-            else:
-                if (
-                    df_activity["activity_unit"][row_nr]
-                    != update_activities[activity_name].unit
-                ):
-                    return_message.append(
-                        import_error(
-                            f"conflicting units for activity '{activity_name}'",
-                            validation=validation,
-                        )
+            elif (
+                df_activity["activity_unit"][row_nr]
+                != update_activities[activity_name].unit
+            ):
+                return_message.append(
+                    import_error(
+                        f"conflicting units for activity '{activity_name}'",
+                        validation=validation,
                     )
+                )
         except KeyError:
             if activity_name not in create_activities:
                 activity = Activity(
@@ -140,7 +139,6 @@ def import_emissionfactorsheet(workbook, validation):
                     validation=validation,
                 )
             )
-
     try:
         EmissionFactor.objects.bulk_create(create_emfacs)
     except IntegrityError:

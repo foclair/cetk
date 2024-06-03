@@ -377,11 +377,11 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     except ValueError:
         log.error(f"invalid emission-factor unit {unit} specified in config-file")
         raise
-    log.info(f"emission factor units is: {unit}")
+    log.debug(f"emission factor units is: {unit}")
 
     messages = {}
     with Path(vehicles_file).open(encoding=encoding) as veh_file:
-        log.info("reading emission-factor table")
+        log.debug("reading emission-factor table")
         dtype_dict = {
             "vehicle": str,
             "fuel": str,
@@ -717,7 +717,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
             efs_to_update,
             ("freeflow", "heavy", "saturated", "stopngo", "coldstart"),
         )
-        log.info(f"updated {len(efs_to_update)} emission-factors")
+        log.debug(f"updated {len(efs_to_update)} emission-factors")
         return_dict = {"vehicle_emission_factors": {"updated": len(efs_to_update)}}
     else:
         return_dict = {"vehicle_emission_factors": {"updated": 0}}
@@ -727,7 +727,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     if len(efs_to_create) > 0:
         try:
             VehicleEF.objects.bulk_create(efs_to_create)
-            log.info(f"wrote {len(efs_to_create)} emission-factors")
+            log.debug(f"wrote {len(efs_to_create)} emission-factors")
             return_dict["vehicle_emission_factors"]["created"] = len(efs_to_create)
         except IntegrityError:
             for ef in efs_to_create:
@@ -760,7 +760,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
     except KeyError:
         ImportError("keyword 'attributes' not found in config")
 
-    log.info("create road attributes")
+    log.debug("create road attributes")
 
     # created objects are stored in a nested dict
     defined_attributes = OrderedDict()
@@ -824,7 +824,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
         for rc in RoadClass.objects.prefetch_related(PrefetchRoadClassAttributes())
     }
 
-    log.info("reading roadclass table")
+    log.debug("reading roadclass table")
     with Path(roadclass_file).open(encoding=encoding) as roadclass_stream:
         roadclass_attributes = [a.slug for a in defined_attributes]
         if Path(roadclass_file).suffix == ".csv":
@@ -1569,7 +1569,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
             progress = count / nroads * 100
             if int(progress) > old_progress:
                 if not validation:
-                    log.info(f"done {int(progress)}%")
+                    log.debug(f"done {int(progress)}%")
                 old_progress = int(progress)
 
             if exclude is not None and filter_out(feature, exclude):
@@ -1587,7 +1587,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
         roads = []
         if progress_callback:
             progress_callback(count)
-    log.info(f"created {ncreated} roads")
+    log.debug(f"created {ncreated} roads")
     return_dict = {"roads": {"created": ncreated, "updated": 0}}
     if len(messages) > 0:
         log.warning("Summary: ")
