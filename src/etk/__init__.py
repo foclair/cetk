@@ -46,7 +46,7 @@ def configure():
             )
         elif os.name == "nt":
             spatialite_path = os.environ.get(
-                "SPATIALITE_LIBRARY_PATH", "/usr/lib64/mod_spatialite.so"
+                "SPATIALITE_LIBRARY_PATH", r"C:\OSGeo4W\bin\mod_spatialite.dll"
             )
         else:
             spatialite_path = os.environ.get(
