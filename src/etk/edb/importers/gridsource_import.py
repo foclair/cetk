@@ -61,7 +61,7 @@ def read_csv(filepath, encoding=None):
 
 def read_xlsx(filepath):
     try:
-        workbook = load_workbook(filename=filepath, data_only=True)
+        workbook = load_workbook(filename=filepath, data_only=True, read_only=True)
     except Exception as exc:
         raise ImportError(f"could not read workbook: {exc}")
     if "GridSource" not in workbook:
@@ -71,6 +71,7 @@ def read_xlsx(filepath):
     data = worksheet.values
     df = worksheet_to_dataframe(data)
     df = df.astype(dtype="string")
+    workbook.close()
     return df
 
 

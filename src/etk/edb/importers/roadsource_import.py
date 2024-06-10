@@ -286,6 +286,7 @@ def import_traffic(filename, sheets, validation=False):
             return_message += msg
         except ImportError as err:
             return {}, [f"{err}"]
+    workbook.close()
     return return_dict, return_message  # update dict and messages
 
 

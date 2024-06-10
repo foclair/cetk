@@ -132,7 +132,7 @@ class Editor(object):
     def import_workbook(self, filename, sheets=SHEET_NAMES, dry_run=False):
         return_msg = []
         db_updates = {}
-        workbook = load_workbook(filename=filename, data_only=True)
+        workbook = load_workbook(filename=filename, data_only=True, read_only=True)
         import_sheets = [
             s
             for s in SHEET_NAMES
@@ -215,6 +215,7 @@ class Editor(object):
                 log.info(f"successfully imported {db_updates}")
             else:
                 log.info(f"successfully validated {db_updates}")
+        workbook.close()
         return db_updates, return_msg
 
     def update_emission_tables(

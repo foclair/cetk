@@ -7,7 +7,7 @@ from argparse import ArgumentTypeError
 from collections.abc import Iterable
 from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError  # noqa
-from tempfile import gettempdir
+from tempfile import NamedTemporaryFile, gettempdir
 
 from django.core import serializers
 
@@ -193,18 +193,54 @@ def run(*args, db_path=None, log_level=logging.INFO):
     return proc.stdout, proc.stderr
 
 
+def get_next_counter(prefix):
+    # Scan the /tmp directory for files with the specified prefix
+    tmp_files = [f for f in os.listdir("/tmp") if f.startswith(prefix)]
+
+    # If no files found, return 1 as the starting counter
+    if not tmp_files:
+        return 1
+
+    # Extract the counters from the file names and find the maximum
+    counters = [int(f.split("_")[-1]) for f in tmp_files]
+    return max(counters) + 1
+
+
 def run_non_blocking(*args, db_path=None, log_level=logging.INFO):
+    prefix = args[0] + "_" + args[1] + "_"
+    counter = get_next_counter(prefix)
+    # breakpoint()
+    # Generate unique temporary file names with the prefix
+    stdout_file = NamedTemporaryFile(
+        prefix=prefix + "_stdout_", suffix=f"_{counter}", delete=False
+    )
+    stderr_file = NamedTemporaryFile(
+        prefix=prefix + "_stderr_", suffix=f"_{counter}", delete=False
+    )
+
+    # Get file paths
+    stdout_path = stdout_file.name
+    stderr_path = stderr_file.name
+
     env = (
         os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
     )
-    return subprocess.Popen(
+
+    # Start the subprocess with stdout and stderr redirected to the files
+    process = subprocess.Popen(
         args,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=stdout_file,
+        stderr=stderr_file,
         bufsize=1,
         universal_newlines=True,
         env=env,
     )
+
+    # Close the file objects
+    stdout_file.close()
+    stderr_file.close()
+
+    return process, stdout_path, stderr_path
 
 
 class VerboseAction(argparse.Action):
