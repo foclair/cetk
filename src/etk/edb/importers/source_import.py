@@ -170,7 +170,6 @@ def import_sources(
 
     return create_or_update_sources(
         df,
-        return_message="",
         validation=validation,
         srid=None,
         sourcetype=sourcetype,
@@ -197,7 +196,6 @@ def set_datatypes(df, sourcetype):
 # @profile
 def create_or_update_sources(
     df,
-    return_message="",
     validation=False,
     srid=None,
     sourcetype="point",
@@ -796,15 +794,15 @@ def import_sourceactivities(
         df_pointsource = set_datatypes(df_pointsource, "point")
         # import pointsources and pointsourcesubstances
         caching_sources = len(df_pointsource) > PointSource.objects.count()
-        ps, return_message = create_or_update_sources(
+        ps, msgs = create_or_update_sources(
             df_pointsource,
             srid=srid,
-            return_message=return_message,
             validation=validation,
             sourcetype="point",
             cache=caching_sources,
         )
         return_dict.update(ps)
+        return_message += msgs
 
         # import pointsourceactivities
         activities = cache_queryset(Activity.objects.all(), "name")
@@ -888,14 +886,14 @@ def import_sourceactivities(
         data = workbook["AreaSource"].values
         df_areasource = worksheet_to_dataframe(data)
         df_areasource = set_datatypes(df_areasource, "area")
-        ps, return_message = create_or_update_sources(
+        ps, msgs = create_or_update_sources(
             df_areasource,
             srid=srid,
-            return_message=return_message,
             validation=validation,
             sourcetype="area",
         )
         return_dict.update(ps)
+        return_message.append(msgs)
         # for now always caching areasources, change if case with many areasources
         # becomes relevant.
         areasourceactivities = cache_queryset(

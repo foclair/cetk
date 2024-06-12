@@ -152,6 +152,7 @@ class Editor(object):
                 "PointSource",
                 "AreaSource",
             ]
+
             if any(name in sourceact for name in import_sheets):
                 updates, msgs = import_sourceactivities(
                     filename,
@@ -196,18 +197,24 @@ class Editor(object):
                 updates, msgs = import_gridsources(filename)
                 db_updates.update(updates)
                 return_msg += msgs
+            # skip empty messages
+            return_msg = [entry.strip() for entry in return_msg if entry]
             if len(return_msg) > 0:
                 raise ValidationError()
         except ValidationError as err:
             return_msg.append(str(err))
+            if not dry_run:
+                run_type = "import"
+            else:
+                run_type = "validation"
             if len(return_msg) > 10:
                 log.error(
-                    ">10 errors during validation, first 10:"
+                    f">10 errors during {run_type}, first 10:"
                     f"{os.linesep}{os.linesep.join(return_msg[:10])}"
                 )
             else:
                 log.error(
-                    "Errors during validation:"
+                    f"Errors during {run_type}:"
                     f"{os.linesep}{os.linesep.join(return_msg)}"
                 )
         else:
