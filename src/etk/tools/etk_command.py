@@ -218,10 +218,15 @@ class Editor(object):
                     f"{os.linesep}{os.linesep.join(return_msg)}"
                 )
         else:
+            log.info(f"getting here {datetime.datetime.now()}")
             if not dry_run:
-                log.info(f"successfully imported {db_updates}")
+                log.info(
+                    f"{datetime.datetime.now()} successfully imported {db_updates}"
+                )
             else:
-                log.info(f"successfully validated {db_updates}")
+                log.info(
+                    f"{datetime.datetime.now()} successfully validated {db_updates}"
+                )
         workbook.close()
         return db_updates, return_msg
 
