@@ -778,6 +778,7 @@ class EmissionRasterizer:
             self.substances = substances
 
         self.log.debug("reading records from database")
+
         # create querysets for all sources
         self._get_querysets(
             sourcetypes=sourcetypes,
@@ -785,6 +786,8 @@ class EmissionRasterizer:
             tags=tags,
             point_ids=point_ids,
             area_ids=area_ids,
+            road_ids=road_ids,
+            grid_ids=grid_ids,
             polygon=polygon,
             ac1=ac1,
             ac2=ac2,

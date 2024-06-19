@@ -255,6 +255,10 @@ class Editor(object):
         outputpath,
         cellsize,
         sourcetypes=None,
+        point_ids=None,
+        area_ids=None,
+        grid_ids=None,
+        road_ids=None,
         unit=DEFAULT_EMISSION_UNIT,
         codeset=None,
         substances=None,
@@ -273,7 +277,17 @@ class Editor(object):
                 extent=extent, timezone=timezone, path=outputpath, srid=srid
             )
             rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
-            rasterizer.process(substances, begin=begin, end=end, unit=unit)
+            rasterizer.process(
+                substances,
+                begin=begin,
+                end=end,
+                unit=unit,
+                sourcetypes=sourcetypes,
+                point_ids=point_ids,
+                area_ids=area_ids,
+                grid_ids=grid_ids,
+                road_ids=road_ids,
+            )
         except Exception as err:
             log.error(f"could not rasterize emissions: {str(err)}")
             sys.exit(1)
@@ -456,6 +470,29 @@ def main():
             + " Time 00:00 assumed",
             metavar="YYMMDDHH",
         )
+        rasterize_grp.add_argument(
+            "--point-ids",
+            nargs="+",
+            help="List of pointsource id's to include in rasterizer. "
+            + "All sources will be rasterized for other sourcetypes if not limited "
+            + "using argument sourcetypes or filtering specified for ids for "
+            + " other sourcetypes too.",
+        )
+        rasterize_grp.add_argument(
+            "--area-ids",
+            nargs="+",
+            help="List of areasource id's to include in rasterizer",
+        )
+        rasterize_grp.add_argument(
+            "--road-ids",
+            nargs="+",
+            help="List of roadsource id's to include in rasterizer",
+        )
+        rasterize_grp.add_argument(
+            "--grid-ids",
+            nargs="+",
+            help="List of gridsource id's to include in rasterizer",
+        )
         # TODO add argument begin/end for rasterize
         # TODO add argument to aggregate emissions within polygon
 
@@ -507,6 +544,10 @@ def main():
                 args.cellsize,
                 substances=substances,
                 sourcetypes=args.sourcetypes,
+                point_ids=args.point_ids,
+                area_ids=args.area_ids,
+                grid_ids=args.grid_ids,
+                road_ids=args.road_ids,
                 unit=args.unit,
                 extent=args.extent,
                 srid=args.srid,

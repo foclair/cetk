@@ -17,7 +17,7 @@ def create_ids_where_clause(ids):
     args:
         ids: iterable of source id's
     """
-    source_ids = ",".join(map(int, ids))
+    source_ids = ",".join(ids)
     return f"sources.id IN ({source_ids})"
 
 
