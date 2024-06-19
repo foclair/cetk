@@ -178,21 +178,7 @@ class Editor(object):
                     filename, sheets=import_sheets, validation=dry_run
                 )
                 return_msg += msgs
-            # point and area-sources are imported in import_sourceactivities
-            # elif sheet == "PointSource":
-            #     updates, msgs = import_sources(
-            #         filename, validation=dry_run, sourcetype="point"
-            #     )
-            # elif sheet == "AreaSource":
-            #     updates, msgs = import_sources(
-            #         filename, validation=dry_run, sourcetype="area"
-            #     )
-            # elif sheet == "RoadSource":
-            #    updates, msgs = import_sources(
-            #        filename, validation=dry_run, sourcetype="road"
-            #    )
-            #    return_msg += msgs
-            # db_updates.update(updates)
+                db_updates.update(updates)
             if "GridSource" in import_sheets:
                 updates, msgs = import_gridsources(filename)
                 db_updates.update(updates)

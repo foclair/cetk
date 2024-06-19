@@ -80,17 +80,7 @@ def get_gridsource_raster(name, clip_by=None):
     with rio.open(path_from_connection(), table=raster_table(name)) as dset:
         _, srid = dset.profile["crs"].to_authority()
         nodata = dset.profile.get("nodata_value", NODATA)
-        metadata = {
-            "srid": srid,
-            "nodata": nodata,
-            "extent": (
-                dset.bounds.left,
-                dset.bounds.bottom,
-                dset.bounds.right,
-                dset.bounds.top,
-            ),
-            "transform": dset.transform,
-        }
+        metadata = {"srid": srid, "nodata": nodata}
         if clip_by is not None:
             geoms = [shapely.from_wkt(clip_by.transform(srid, clone=True).wkt)]
             try:
@@ -100,7 +90,20 @@ def get_gridsource_raster(name, clip_by=None):
             except ValueError:
                 raise OutsideExtentError("polygon is completely outside extent")
             metadata["transform"] = transform
+            rows, cols = data.shape
+            x_bl, y_bl = transform * (0, rows)
+            x_tr, y_tr = transform * (cols, 0)
+            metadata["extent"] = (x_bl, y_bl, x_tr, y_tr)
         else:
+            metadata["extent"] = (
+                (
+                    dset.bounds.left,
+                    dset.bounds.bottom,
+                    dset.bounds.right,
+                    dset.bounds.top,
+                ),
+            )
+            metadata["transform"] = dset.transform
             data = dset.read()
     return data, metadata
 

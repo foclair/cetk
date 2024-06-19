@@ -83,7 +83,7 @@ def run_update_emission_tables(db_path=None, **kwargs):
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
-    return run("etk", "calc", db_path=db_path, *cmd_args)
+    return run_non_blocking("etk", "calc", db_path=db_path, *cmd_args)
 
 
 def run_aggregate_emissions(
