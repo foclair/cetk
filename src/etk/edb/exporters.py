@@ -2,7 +2,7 @@ import ast
 
 from openpyxl import Workbook
 
-from etk.edb.const import WGS84_SRID
+from etk.edb.const import DEFAULT_EMISSION_UNIT, WGS84_SRID
 from etk.edb.importers.source_import import (
     OPTIONAL_COLUMNS_POINT,
     REQUIRED_COLUMNS_AREA,
@@ -24,7 +24,7 @@ from etk.edb.models.timevar_models import Timevar
 from etk.edb.units import activity_rate_unit_from_si, emis_conversion_factor_from_si
 
 
-def export_sources(export_filepath, srid=WGS84_SRID, unit="ton/year"):
+def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT):
     # Create a new Excel workbook and remove standard first Sheet
     workbook = Workbook()
     del workbook["Sheet"]

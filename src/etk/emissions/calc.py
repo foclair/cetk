@@ -3,6 +3,7 @@
 import pandas as pd
 from django.db import connection
 
+from etk.edb.const import DEFAULT_EMISSION_UNIT
 from etk.edb.models import CodeSet, Settings, Substance
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.queries import (
@@ -27,7 +28,7 @@ def calculate_source_emissions(
     ids=None,
     tags=None,
     polygon=None,
-    unit="kg/year",
+    unit=DEFAULT_EMISSION_UNIT,
 ):
     settings = Settings.get_current()
     srid = srid or settings.srid
@@ -52,7 +53,7 @@ def calculate_source_emissions_df(
     ids=None,
     tags=None,
     polygon=None,
-    unit="kg/year",
+    unit=DEFAULT_EMISSION_UNIT,
 ):
     cur = calculate_source_emissions(
         sourcetype=sourcetype,
@@ -89,7 +90,7 @@ def aggregate_emissions(
     tags=None,
     point_ids=None,
     area_ids=None,
-    unit="ton/year",
+    unit=DEFAULT_EMISSION_UNIT,
     name=None,
 ):
 

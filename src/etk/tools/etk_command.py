@@ -29,7 +29,12 @@ log = logging.getLogger("etk")
 
 settings = etk.configure()
 
-from etk.edb.const import DEFAULT_SRID, SHEET_NAMES, WGS84_SRID  # noqa
+from etk.edb.const import (  # noqa
+    DEFAULT_EMISSION_UNIT,
+    DEFAULT_SRID,
+    SHEET_NAMES,
+    WGS84_SRID,
+)
 from etk.edb.exporters import export_sources  # noqa
 from etk.edb.importers import (  # noqa
     import_activitycodesheet,
@@ -47,7 +52,6 @@ from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
 from etk.emissions.views import create_emission_table  # noqa
 
 SOURCETYPES = ("point", "area", "grid", "road")
-DEFAULT_EMISSION_UNIT = "kg/year"
 
 sheet_choices = ["All"]
 sheet_choices.extend(SHEET_NAMES)

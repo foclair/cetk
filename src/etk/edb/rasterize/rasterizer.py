@@ -383,8 +383,6 @@ class EmissionRasterizer:
                 raise ValueError(
                     f"Rasterize cannot handle sourcetype {sourcetype} yet."
                 )
-            # TODO check, should add unit="kg/s"? default unit for
-            # calculate_source_emissions is kg/year!
             self.querysets[sourcetype] = calculate_source_emissions(
                 sourcetype,
                 substances=substances,

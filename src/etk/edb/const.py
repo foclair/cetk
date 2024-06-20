@@ -3,6 +3,7 @@ DEFAULT_SRID = 3857
 CHAR_FIELD_LENGTH = 100
 CODE_FIELD_LENGTH = 50
 NODATA = -9999.0
+DEFAULT_EMISSION_UNIT = "kg/year"
 
 # sheet names which are valid for data import
 SHEET_NAMES = [

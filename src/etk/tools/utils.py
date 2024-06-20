@@ -117,6 +117,10 @@ def run_rasterize_emissions(
     unit=None,
     sourcetypes=None,
     substances=None,
+    point_ids=None,
+    area_ids=None,
+    road_ids=None,
+    grid_ids=None,
 ):
     """rasterize emissions and store as NetCDF."""
     cmd_args = ["--rasterize", str(outputpath), "--cellsize", str(cellsize)]
@@ -141,7 +145,30 @@ def run_rasterize_emissions(
         if isinstance(substances, str):
             substances = [substances]
         cmd_args += ["--substances"] + substances
-
+    if point_ids is not None:
+        cmd_args += ["--point-ids"]
+        if not isinstance(point_ids, Iterable):
+            cmd_args += [str(point_ids)]
+        else:
+            cmd_args += list(point_ids)
+    if area_ids is not None:
+        cmd_args += ["--area-ids"]
+        if not isinstance(area_ids, Iterable):
+            cmd_args += [str(area_ids)]
+        else:
+            cmd_args += list(area_ids)
+    if road_ids is not None:
+        cmd_args += ["--road-ids"]
+        if not isinstance(road_ids, Iterable):
+            cmd_args += [str(road_ids)]
+        else:
+            cmd_args += list(road_ids)
+    if grid_ids is not None:
+        cmd_args += ["--grid-ids"]
+        if not isinstance(grid_ids, Iterable):
+            cmd_args += [str(grid_ids)]
+        else:
+            cmd_args += list(grid_ids)
     return run_non_blocking("etk", "calc", db_path=db_path, *cmd_args)
 
 
