@@ -1,9 +1,13 @@
 import ast
 import os
 
+import geopandas as gpd
 import numpy as np
+import pandas as pd
 import rasterio as rio
+from django.db import connection
 from openpyxl import Workbook
+from shapely import wkt
 
 from etk.edb.const import DEFAULT_EMISSION_UNIT, WGS84_SRID
 from etk.edb.importers.source_import import (
@@ -17,12 +21,18 @@ from etk.edb.models import (
     AreaSource,
     AreaSourceSubstance,
     CodeSet,
+    ColdstartTimevar,
+    CongestionProfile,
     EmissionFactor,
     Facility,
+    FlowTimevar,
     GridSource,
     GridSourceSubstance,
     PointSource,
     PointSourceSubstance,
+    RoadAttribute,
+    RoadClass,
+    RoadSource,
     Substance,
 )
 from etk.edb.models.timevar_models import Timevar
@@ -35,6 +45,60 @@ REQUIRED_COLUMNS_GRID = {
     "timevar": np.str_,
     "path": np.str_,
 }
+
+days_header = [
+    "ID",
+    "typeday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+]
+months_header = [
+    " ",
+    "month",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+]
+time_intervals = [
+    "00-01",
+    "01-02",
+    "02-03",
+    "03-04",
+    "04-05",
+    "05-06",
+    "06-07",
+    "07-08",
+    "08-09",
+    "09-10",
+    "10-11",
+    "11-12",
+    "12-13",
+    "13-14",
+    "14-15",
+    "15-16",
+    "16-17",
+    "17-18",
+    "18-19",
+    "19-20",
+    "20-21",
+    "21-22",
+    "22-23",
+    "23-24",
+]
 
 
 def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT):
@@ -98,92 +162,121 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
         else:
             worksheet.append([ac.code_set.slug, ac.code, ac.label, ""])
 
-    if len(Timevar.objects.all()) > 0:
+    if Timevar.objects.count() > 0:
         worksheet = workbook.create_sheet(title="Timevar")
-        days_header = [
-            "ID",
-            "typeday",
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-        ]
-        months_header = [
-            " ",
-            "month",
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December",
-        ]
-        time_intervals = [
-            "00-01",
-            "01-02",
-            "02-03",
-            "03-04",
-            "04-05",
-            "05-06",
-            "06-07",
-            "07-08",
-            "08-09",
-            "09-10",
-            "10-11",
-            "11-12",
-            "12-13",
-            "13-14",
-            "14-15",
-            "15-16",
-            "16-17",
-            "17-18",
-            "18-19",
-            "19-20",
-            "20-21",
-            "21-22",
-            "22-23",
-            "23-24",
-        ]
-        for tvar in Timevar.objects.all():
-            worksheet.append(days_header)
+        create_timevar_sheet(worksheet, Timevar)
+
+    if FlowTimevar.objects.count() > 0:
+        worksheet = workbook.create_sheet(title="FlowTimevar")
+        create_timevar_sheet(worksheet, FlowTimevar)
+
+    if ColdstartTimevar.objects.count() > 0:
+        worksheet = workbook.create_sheet(title="ColdstartTimevar")
+        create_timevar_sheet(worksheet, ColdstartTimevar)
+
+    if CongestionProfile.objects.count() > 0:
+        worksheet = workbook.create_sheet(title="CongestionProfile")
+        create_timevar_sheet(worksheet, CongestionProfile)
+
+    if RoadSource.objects.count() > 0:
+        create_roadsource_sheet(workbook)
+
+    # RoadAttributes could be defined before importing any roads
+    if RoadAttribute.objects.count() > 0:
+        print("continue here")
+    # TODO
+    # export tags, not supported yet.
+    # RoadSource,VehicleFuel,Fleet,RoadAttribute
+    # TrafficSituation,VehicleEmissionFactor
+
+    # Save the workbook to the specified export path
+    workbook.save(export_filepath)
+
+
+def create_roadsource_sheet(workbook):
+    worksheet = workbook.create_sheet(title="RoadSource")
+    header = [
+        "filepath",
+        "name",
+        "nlanes",
+        "width",
+        "median_strip_width",
+        "aadt",
+        "heavy_vehicle_share",
+        "fleet",
+        "congestion_profile",
+        "speed",
+        "slope",
+    ]
+    # add attributes, always at least 1 to define which emission factors to use
+    road_attributes = ""
+    for attribute in RoadAttribute.objects.all():
+        header.append("attr:" + attribute.slug)
+        road_attributes += f", rc.{attribute.slug} AS {attribute.slug} "
+    worksheet.append(header)
+    # slight adaptions to header to form actual content
+    db_name = os.path.basename(get_db()).split(".")[0]
+    roadpath = os.path.join(os.path.dirname(get_db()), db_name + "-roadsource.gpkg")
+    header[0] = roadpath
+    header = [attr.replace("attr:", "") for attr in header]
+    worksheet.append(header)
+
+    sql = (
+        "SELECT rs.name, rs.nolanes, rs.width, rs.median_strip_width, rs.aadt, "
+        "rs.heavy_vehicle_share, f.name AS fleet, cp.name AS congestion_profile, "
+        "rs.speed, rs.slope, rs.roadclass_id, ST_AsText(geom) AS geometry "
+        "FROM edb_roadsource AS rs "
+        "LEFT JOIN edb_fleet AS F ON rs.fleet_id = f.id "
+        "LEFT JOIN edb_congestionprofile AS cp ON rs.congestion_profile_id = cp.id "
+        " LIMIT 3"
+    )
+    cur = connection.cursor()
+    cur.execute(sql)
+
+    df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
+    roadclass_mapping = {}
+    for rc in RoadClass.objects.all():
+        roadclass_mapping[rc.id] = rc.attributes
+    for col in roadclass_mapping[1].keys():
+        df[col] = df["roadclass_id"].map(
+            lambda x: roadclass_mapping[x][col] if x in roadclass_mapping else None
+        )
+    df = df.drop(columns=["roadclass_id"])
+    df["geometry"] = df["geometry"].apply(wkt.loads)
+    gdf = gpd.GeoDataFrame(df, geometry="geometry")
+    crs = "EPSG:4326"
+    gdf.crs = crs
+    gdf.to_file(roadpath, driver="GPKG")
+
+
+def create_timevar_sheet(worksheet, tvar_type):
+    for tvar in tvar_type.objects.all():
+        worksheet.append(days_header)
+        if tvar_type is CongestionProfile:
+            typeday_list = ast.literal_eval(tvar.traffic_condition)
+        else:
             typeday_list = ast.literal_eval(tvar.typeday)
-            for i in range(len(typeday_list)):
-                if i == 0:
-                    row_data = [tvar.name] + [time_intervals[i]] + typeday_list[i]
-                else:
-                    row_data = [""] + [time_intervals[i]] + typeday_list[i]
-                worksheet.append(row_data)
+        for i in range(len(typeday_list)):
+            if i == 0:
+                row_data = [tvar.name] + [time_intervals[i]] + typeday_list[i]
+            else:
+                row_data = [""] + [time_intervals[i]] + typeday_list[i]
+            worksheet.append(row_data)
+        if tvar_type is not CongestionProfile:
             month_list = ast.literal_eval(tvar.month)
             worksheet.append(months_header)
             worksheet.append(["", ""] + month_list)
-    # TODO
-    # RoadSource,VehicleFuel,Fleet,CongestionProfile,FlowTimevar,ColdstartTimevar,RoadAttribute
-    # TrafficSituation,VehicleEmissionFactor
-    # GridSource
-    # Save the workbook to the specified export path
-    workbook.save(export_filepath)
 
 
 def create_source_sheet(
     worksheet, model_type, REQUIRED_COLUMNS, SourceSubstanceModel, unit
 ):
+    """create source sheet for Point, Area or GridSource"""
     emis_conversion_factor = emis_conversion_factor_from_si(unit)
-    # works for pointsource and areasource
-    # Define the header row
     header = list(REQUIRED_COLUMNS.keys())
     codeset_slugs = [code.slug for code in CodeSet.objects.all()]
     codeset_ids = [CodeSet.objects.get(slug=slug).id for slug in codeset_slugs]
     codeset_columns = [f"activitycode_{slug}" for slug in codeset_slugs]
-    # unique list of substance slugs for sources
     substance_slugs = list(
         set([ss.substance.slug for ss in SourceSubstanceModel.objects.all()])
     )
@@ -195,15 +288,13 @@ def create_source_sheet(
         activity_columns = [f"act:{name}" for name in activity_names]
         header = header + activity_columns
 
-    # Write the header to the worksheet
     worksheet.append(header)
-    # Iterate through features and add data to the worksheet
     for source in model_type.objects.all():
         if source.timevar_id is not None:
             timevar_name = Timevar.objects.get(id=source.timevar_id).name
         else:
             timevar_name = ""
-        #
+
         activitycodes = {}
         for i in codeset_ids:
             activitycode = getattr(source, f"activitycode{i}")
@@ -231,7 +322,6 @@ def create_source_sheet(
             else:
                 rastername = ""
             if rastername != "":
-                # TODO export raster here, but only write file if does not exist yet?
                 rasterpath = os.path.join(
                     os.path.dirname(get_db()), rastername + ".tif"
                 )
@@ -300,9 +390,6 @@ def create_source_sheet(
                 for name in activity_names
             ]
             row_data = row_data + act_row
-        # TODO {subst} for raster name!!
-        # should activity_rate_unit_from_si be done for gridsource? seems wrong now
-        # check for pointsource and areasource too
         worksheet.append(row_data)
 
 

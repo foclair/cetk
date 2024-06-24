@@ -399,7 +399,7 @@ def create_or_update_sources(
                             )
             except AttributeError:
                 # no such codeset exists
-                if len(activitycode_columns) > len(CodeSet.objects.all()):
+                if len(activitycode_columns) > CodeSet.objects.count():
                     # need to check if activitycode is specified for unimported codeset
                     codeset_slug = [
                         column.split("_", 1)[-1] for column in activitycode_columns
