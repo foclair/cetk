@@ -2,6 +2,7 @@ import ast
 import os
 
 import numpy as np
+import rasterio as rio
 from openpyxl import Workbook
 
 from etk.edb.const import DEFAULT_EMISSION_UNIT, WGS84_SRID
@@ -40,21 +41,24 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
     # Create a new Excel workbook and remove standard first Sheet
     workbook = Workbook()
     del workbook["Sheet"]
-    point_columns = REQUIRED_COLUMNS_POINT | OPTIONAL_COLUMNS_POINT
-    worksheet = workbook.create_sheet(title="PointSource")
-    create_source_sheet(
-        worksheet, PointSource, point_columns, PointSourceSubstance, unit
-    )
+    if PointSource.objects.count() > 0:
+        point_columns = REQUIRED_COLUMNS_POINT | OPTIONAL_COLUMNS_POINT
+        worksheet = workbook.create_sheet(title="PointSource")
+        create_source_sheet(
+            worksheet, PointSource, point_columns, PointSourceSubstance, unit
+        )
 
-    worksheet = workbook.create_sheet(title="AreaSource")
-    create_source_sheet(
-        worksheet, AreaSource, REQUIRED_COLUMNS_AREA, AreaSourceSubstance, unit
-    )
+    if AreaSource.objects.count() > 0:
+        worksheet = workbook.create_sheet(title="AreaSource")
+        create_source_sheet(
+            worksheet, AreaSource, REQUIRED_COLUMNS_AREA, AreaSourceSubstance, unit
+        )
 
-    worksheet = workbook.create_sheet(title="GridSource")
-    create_source_sheet(
-        worksheet, GridSource, REQUIRED_COLUMNS_GRID, GridSourceSubstance, unit
-    )
+    if GridSource.objects.count() > 0:
+        worksheet = workbook.create_sheet(title="GridSource")
+        create_source_sheet(
+            worksheet, GridSource, REQUIRED_COLUMNS_GRID, GridSourceSubstance, unit
+        )
 
     worksheet = workbook.create_sheet(title="EmissionFactor")
     header = [
@@ -223,6 +227,7 @@ def create_source_sheet(
                         )
             elif source.activities.count > 0:
                 rastername = source.activities.first().raster
+                rasternames = [rastername]
             else:
                 rastername = ""
             if rastername != "":
@@ -230,6 +235,15 @@ def create_source_sheet(
                 rasterpath = os.path.join(
                     os.path.dirname(get_db()), rastername + ".tif"
                 )
+                for name in rasternames:
+                    # storing each raster, not generic name
+                    tif_path = os.path.join(os.path.dirname(get_db()), name + ".tif")
+                    with rio.open(f"GPKG:{get_db()}:raster_{name}") as src:
+                        meta = src.meta
+                        meta.update(driver="GTiff")
+                        with rio.open(tif_path, "w", **meta) as dst:
+                            # always only 1 band
+                            dst.write(src.read(1), 1)
             else:
                 rasterpath = ""
             row_data = [source.name, rastername, timevar_name, rasterpath]
