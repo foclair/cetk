@@ -16,7 +16,7 @@ from etk.edb.models import (
     list_gridsource_rasters,
     write_gridsource_raster,
 )
-from etk.edb.units import emission_unit_to_si
+from etk.edb.units import activity_rate_unit_to_si, emission_unit_to_si
 
 from .utils import (
     cache_codesets,
@@ -240,9 +240,13 @@ def import_gridsources(filepath, encoding=None):
             emis = {"activity": activities[activity_name], "raster": rname}
             rate = row_dict[col]
             if rate == "sum":
-                emis["rate"] = rasters[rname]["sum"]
+                emis["rate"] = activity_rate_unit_to_si(
+                    rasters[rname]["sum"], emis["activity"].unit
+                )
             else:
-                emis["rate"] = rate
+                emis["rate"] = activity_rate_unit_to_si(
+                    float(rate), emis["activity"].unit
+                )
             src.activities.create(**emis)
 
         row_nr += 1
