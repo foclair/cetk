@@ -3,7 +3,18 @@
 from django.db import IntegrityError
 
 from etk.edb.cache import cache_queryset
-from etk.edb.models import Activity, EmissionFactor, Substance
+from etk.edb.models import (
+    Activity,
+    AreaSource,
+    AreaSourceActivity,
+    EmissionFactor,
+    Facility,
+    GridSource,
+    GridSourceActivity,
+    PointSource,
+    PointSourceActivity,
+    Substance,
+)
 from etk.edb.units import activity_ef_unit_to_si
 
 from .utils import import_error, worksheet_to_dataframe
@@ -26,8 +37,114 @@ def import_emissionfactorsheet(workbook, validation):
         try:
             activity = activities[activity_name]
             if activity_name not in update_activities.keys():
-                setattr(activity, "name", activity_name)
-                setattr(activity, "unit", df_activity["activity_unit"][row_nr])
+                if df_activity["activity_unit"][row_nr] != activity.unit:
+                    # check if all sources with this activity are updated.
+                    error_message = (
+                        "Changing activity rate unit for activity "
+                        f"{activity_name} without updating all sources"
+                        " in inventory with this activity. Define as new"
+                        " activity by giving new name, or update all"
+                        " sources with this activity simultaneously."
+                    )
+                    pointsource_ids = [
+                        psa.source_id
+                        for psa in PointSourceActivity.objects.filter(
+                            activity_id=activity.id
+                        )
+                    ]
+                    if len(pointsource_ids) > 0:
+                        pointsources = [
+                            PointSource.objects.get(id=i) for i in pointsource_ids
+                        ]
+                        facility_names = [
+                            Facility.objects.get(id=source.facility_id).name
+                            for source in pointsources
+                        ]
+                        source_names = [source.name for source in pointsources]
+                        if "PointSource" in workbook.sheetnames:
+                            new_pointsources = worksheet_to_dataframe(
+                                workbook["PointSource"].values
+                            )
+                            for facility, source in zip(facility_names, source_names):
+                                row_exists = (
+                                    (new_pointsources["source_name"] == source)
+                                    & (new_pointsources["facility_name"] == facility)
+                                ).any()
+                                if not row_exists:
+                                    return_message.append(
+                                        import_error(
+                                            error_message, validation=validation
+                                        )
+                                    )
+                        else:
+                            return_message.append(
+                                import_error(error_message, validation=validation)
+                            )
+                    areasource_ids = [
+                        psa.source_id
+                        for psa in AreaSourceActivity.objects.filter(
+                            activity_id=activity.id
+                        )
+                    ]
+                    if len(areasource_ids) > 0:
+                        areasources = [
+                            AreaSource.objects.get(id=i) for i in areasource_ids
+                        ]
+                        facility_names = [
+                            Facility.objects.get(id=source.facility_id).name
+                            for source in areasources
+                        ]
+                        source_names = [source.name for source in areasources]
+                        if "AreaSource" in workbook.sheetnames:
+                            new_areasources = worksheet_to_dataframe(
+                                workbook["AreaSource"].values
+                            )
+                            for facility, source in zip(facility_names, source_names):
+                                row_exists = (
+                                    (new_areasources["source_name"] == source)
+                                    & (new_areasources["facility_name"] == facility)
+                                ).any()
+                                if not row_exists:
+                                    return_message.append(
+                                        import_error(
+                                            error_message, validation=validation
+                                        )
+                                    )
+                        else:
+                            return_message.append(
+                                import_error(error_message, validation=validation)
+                            )
+                    gridsource_ids = [
+                        psa.source_id
+                        for psa in GridSourceActivity.objects.filter(
+                            activity_id=activity.id
+                        )
+                    ]
+                    if len(gridsource_ids) > 0:
+                        gridsources = [
+                            GridSource.objects.get(id=i) for i in gridsource_ids
+                        ]
+                        source_names = [source.name for source in gridsources]
+                        if "GridSource" in workbook.sheetnames:
+                            update_sources = [
+                                name
+                                in worksheet_to_dataframe(
+                                    workbook["GridSource"].values
+                                )["name"]
+                                for name in gridsources
+                            ]
+                            if not all(update_sources):
+                                return_message.append(
+                                    import_error(
+                                        error_message,
+                                        validation=validation,
+                                    )
+                                )
+                        else:
+                            return_message.append(
+                                import_error(error_message, validation=validation)
+                            )
+                    setattr(activity, "unit", df_activity["activity_unit"][row_nr])
                 update_activities[activity_name] = activity
                 drop_emfacs += list(activities[activity_name].emissionfactors.all())
             elif (
