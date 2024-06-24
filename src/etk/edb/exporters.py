@@ -1,5 +1,7 @@
 import ast
+import os
 
+import numpy as np
 from openpyxl import Workbook
 
 from etk.edb.const import DEFAULT_EMISSION_UNIT, WGS84_SRID
@@ -16,12 +18,22 @@ from etk.edb.models import (
     CodeSet,
     EmissionFactor,
     Facility,
+    GridSource,
+    GridSourceSubstance,
     PointSource,
     PointSourceSubstance,
     Substance,
 )
 from etk.edb.models.timevar_models import Timevar
 from etk.edb.units import activity_rate_unit_from_si, emis_conversion_factor_from_si
+from etk.tools.utils import get_db
+
+REQUIRED_COLUMNS_GRID = {
+    "name": np.str_,
+    "rastername": np.str_,
+    "timevar": np.str_,
+    "path": np.str_,
+}
 
 
 def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT):
@@ -37,6 +49,11 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
     worksheet = workbook.create_sheet(title="AreaSource")
     create_source_sheet(
         worksheet, AreaSource, REQUIRED_COLUMNS_AREA, AreaSourceSubstance, unit
+    )
+
+    worksheet = workbook.create_sheet(title="GridSource")
+    create_source_sheet(
+        worksheet, GridSource, REQUIRED_COLUMNS_GRID, GridSourceSubstance, unit
     )
 
     worksheet = workbook.create_sheet(title="EmissionFactor")
@@ -144,7 +161,10 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
             month_list = ast.literal_eval(tvar.month)
             worksheet.append(months_header)
             worksheet.append(["", ""] + month_list)
-
+    # TODO
+    # RoadSource,VehicleFuel,Fleet,CongestionProfile,FlowTimevar,ColdstartTimevar,RoadAttribute
+    # TrafficSituation,VehicleEmissionFactor
+    # GridSource
     # Save the workbook to the specified export path
     workbook.save(export_filepath)
 
@@ -184,34 +204,62 @@ def create_source_sheet(
         for i in codeset_ids:
             activitycode = getattr(source, f"activitycode{i}")
             activitycodes[i] = activitycode.code if activitycode is not None else ""
+        source_substances = [ss.substance.slug for ss in source.substances.all()]
+        if model_type == GridSource:
+            if len(source_substances) > 0:
+                rasternames = set(
+                    [substance.raster for substance in source.substances.all()]
+                )
+                if len(rasternames) == 1:
+                    rastername = source.substances.first().raster
+                else:
+                    generic_name = drop_substance(rasternames, substance_slugs)
+                    if len(set(generic_name)) == 1:
+                        rastername = generic_name[0]
+                    else:
+                        raise ValueError(
+                            "Could not find a generic raster name "
+                            + f"for GridSource {source.name}"
+                        )
+            elif source.activities.count > 0:
+                rastername = source.activities.first().raster
+            else:
+                rastername = ""
+            if rastername != "":
+                # TODO export raster here, but only write file if does not exist yet?
+                rasterpath = os.path.join(
+                    os.path.dirname(get_db()), rastername + ".tif"
+                )
+            else:
+                rasterpath = ""
+            row_data = [source.name, rastername, timevar_name, rasterpath]
+        else:
+            row_data = [
+                str(source.facility),
+                Facility.objects.get(id=source.facility_id).name,
+                source.name,
+                source.geom.coords[1] if model_type == PointSource else source.geom.wkt,
+            ]
+            if model_type == PointSource:
+                row_data.append(source.geom.coords[0])
+            row_data.append(timevar_name)
 
-        row_data = [
-            str(source.facility),
-            Facility.objects.get(id=source.facility_id).name,
-            source.name,
-            source.geom.coords[1] if model_type == PointSource else source.geom.wkt,
-        ]
-        if model_type == PointSource:
-            row_data.append(source.geom.coords[0])
-        row_data.append(timevar_name)
-
-        if hasattr(source, "chimney_height"):
-            row_data.extend(
-                [
-                    source.chimney_height,
-                    source.chimney_outer_diameter,
-                    source.chimney_inner_diameter,
-                    source.chimney_gas_speed,
-                    source.chimney_gas_temperature,
-                    source.house_width,
-                    source.house_height,
-                ]
-            )
+            if hasattr(source, "chimney_height"):
+                row_data.extend(
+                    [
+                        source.chimney_height,
+                        source.chimney_outer_diameter,
+                        source.chimney_inner_diameter,
+                        source.chimney_gas_speed,
+                        source.chimney_gas_temperature,
+                        source.house_width,
+                        source.house_height,
+                    ]
+                )
 
         for i in codeset_ids:
             row_data.append(activitycodes[i])
 
-        source_substances = [ss.substance.slug for ss in source.substances.all()]
         emis_row = [
             source.substances.get(substance=Substance.objects.get(slug=slug).id).value
             if slug in source_substances
@@ -238,5 +286,18 @@ def create_source_sheet(
                 for name in activity_names
             ]
             row_data = row_data + act_row
-
+        # TODO {subst} for raster name!!
+        # should activity_rate_unit_from_si be done for gridsource? seems wrong now
+        # check for pointsource and areasource too
         worksheet.append(row_data)
+
+
+def drop_substance(rasternames, substance_slugs):
+    generic = []
+    for rastername in rasternames:
+        for substance in substance_slugs:
+            if substance in rastername:
+                different_part = rastername.replace(substance, "{subst}")
+                generic.append(different_part)
+                break
+    return generic

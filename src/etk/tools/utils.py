@@ -243,13 +243,13 @@ def run_non_blocking(*args, db_path=None, log_level=logging.INFO):
     )
 
     prefix = args[0] + "_" + args[1] + "_"
-    output_path = os.path.dirname(
-        os.environ.get("ETK_DATABASE_PATH") if db_path is None else db_path
-    )
-    counter = get_next_counter(prefix, output_path)
+    # output_path = os.path.dirname(
+    #     os.environ.get("ETK_DATABASE_PATH") if db_path is None else db_path
+    # )
+    counter = get_next_counter(prefix, gettempdir())
     # Generate file paths for stdout and stderr
-    stdout_path = os.path.join(output_path, f"{prefix}_{counter}_stdout.log")
-    stderr_path = os.path.join(output_path, f"{prefix}_{counter}_stderr.log")
+    stdout_path = os.path.join(gettempdir(), f"{prefix}_{counter}_stdout.log")
+    stderr_path = os.path.join(gettempdir(), f"{prefix}_{counter}_stderr.log")
     # Open the files for writing
     stdout_file = open(stdout_path, "w")
     stderr_file = open(stderr_path, "w")

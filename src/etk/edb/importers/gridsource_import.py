@@ -37,7 +37,7 @@ from .validation import (
     with_rownr_and_substance,
 )
 
-REQUIRED_COLUMNS = ["name", "rastername", "timevar", "path", "emission_unit"]
+REQUIRED_COLUMNS_GRID = ["name", "rastername", "timevar", "path", "emission_unit"]
 
 
 log = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ def read_csv(filepath, encoding=None):
             comment="#",
             dtype=np._str,
         )
-        for col in REQUIRED_COLUMNS:
+        for col in REQUIRED_COLUMNS_GRID:
             if col not in df.columns:
                 raise ImportError(f"Missing required column '{col}'")
     return df
@@ -172,7 +172,7 @@ def import_gridsources(filepath, encoding=None):
     messages = []
     messages += validate_columns(
         df,
-        REQUIRED_COLUMNS,
+        REQUIRED_COLUMNS_GRID,
         substances=substances,
         activities=activities,
         code_sets=code_sets,
