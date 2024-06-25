@@ -25,6 +25,8 @@ from etk.edb.models import (
     CongestionProfile,
     EmissionFactor,
     Facility,
+    Fleet,
+    FleetMemberFuel,
     FlowTimevar,
     GridSource,
     GridSourceSubstance,
@@ -34,6 +36,8 @@ from etk.edb.models import (
     RoadClass,
     RoadSource,
     Substance,
+    VehicleFuel,
+    VehicleFuelComb,
 )
 from etk.edb.models.timevar_models import Timevar
 from etk.edb.units import activity_rate_unit_from_si, emis_conversion_factor_from_si
@@ -124,43 +128,46 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
             worksheet, GridSource, REQUIRED_COLUMNS_GRID, GridSourceSubstance, unit
         )
 
-    worksheet = workbook.create_sheet(title="EmissionFactor")
-    header = [
-        "activity_name",
-        "substance",
-        "factor",
-        "emissionfactor_unit",
-        "activity_unit",
-    ]
-    worksheet.append(header)
-    for emfac in EmissionFactor.objects.all():
-        # all factors stored in SI, original factor unit at import not stored in db.
-        factor_unit = "kg/" + emfac.activity.unit.split("/")[0]
-        row_data = [
-            emfac.activity.name,
-            emfac.substance.slug,
-            emfac.factor,
-            factor_unit,
-            emfac.activity.unit,
+    if EmissionFactor.objects.count() > 0:
+        worksheet = workbook.create_sheet(title="EmissionFactor")
+        header = [
+            "activity_name",
+            "substance",
+            "factor",
+            "emissionfactor_unit",
+            "activity_unit",
         ]
-        worksheet.append(row_data)
+        worksheet.append(header)
+        for emfac in EmissionFactor.objects.all():
+            # all factors stored in SI, original factor unit at import not stored in db.
+            factor_unit = "kg/" + emfac.activity.unit.split("/")[0]
+            row_data = [
+                emfac.activity.name,
+                emfac.substance.slug,
+                emfac.factor,
+                factor_unit,
+                emfac.activity.unit,
+            ]
+            worksheet.append(row_data)
 
-    worksheet = workbook.create_sheet(title="CodeSet")
-    header = ["name", "slug", "description"]
-    worksheet.append(header)
-    for cs in CodeSet.objects.all():
-        worksheet.append([cs.name, cs.slug, cs.description])
+    if CodeSet.objects.count() > 0:
+        worksheet = workbook.create_sheet(title="CodeSet")
+        header = ["name", "slug", "description"]
+        worksheet.append(header)
+        for cs in CodeSet.objects.all():
+            worksheet.append([cs.name, cs.slug, cs.description])
 
-    worksheet = workbook.create_sheet(title="ActivityCode")
-    header = ["codeset_slug", "activitycode", "label", "vertical_distribution_slug"]
-    worksheet.append(header)
-    for ac in ActivityCode.objects.all():
-        if ac.vertical_dist is not None:
-            worksheet.append(
-                [ac.code_set.slug, ac.code, ac.label, ac.vertical_dist.slug]
-            )
-        else:
-            worksheet.append([ac.code_set.slug, ac.code, ac.label, ""])
+    if ActivityCode.objects.count() > 0:
+        worksheet = workbook.create_sheet(title="ActivityCode")
+        header = ["codeset_slug", "activitycode", "label", "vertical_distribution_slug"]
+        worksheet.append(header)
+        for ac in ActivityCode.objects.all():
+            if ac.vertical_dist is not None:
+                worksheet.append(
+                    [ac.code_set.slug, ac.code, ac.label, ac.vertical_dist.slug]
+                )
+            else:
+                worksheet.append([ac.code_set.slug, ac.code, ac.label, ""])
 
     if Timevar.objects.count() > 0:
         worksheet = workbook.create_sheet(title="Timevar")
@@ -183,14 +190,83 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
 
     # RoadAttributes could be defined before importing any roads
     if RoadAttribute.objects.count() > 0:
-        print("continue here")
+        worksheet = workbook.create_sheet(title="RoadAttribute")
+        header = ["name", "slug"]
+        worksheet.append(header)
+        for ra in RoadAttribute.objects.all():
+            worksheet.append([ra.name, ra.slug])
+
+    if VehicleFuelComb.objects.count() > 0:
+        create_vehiclefuel_sheet(workbook)
+
+    if Fleet.objects.count() > 0:
+        create_fleet_sheet(workbook)
     # TODO
     # export tags, not supported yet.
-    # RoadSource,VehicleFuel,Fleet,RoadAttribute
+    # Fleet
     # TrafficSituation,VehicleEmissionFactor
 
     # Save the workbook to the specified export path
     workbook.save(export_filepath)
+
+
+def create_fleet_sheet(workbook):
+    worksheet = workbook.create_sheet(title="Fleet")
+    header = [
+        "name",
+        "default_heavy_vehicle_share",
+        "vehicle",
+        "vehicle_fraction",
+        "coldstart_fraction",
+        "flow_timevar",
+        "coldstart_timevar",
+    ]
+    fuel_ids = []
+    for fuel in VehicleFuel.objects.all():
+        fuel_ids.append(fuel.id)
+        header.append(f"fuel:{fuel.name}")
+    worksheet.append(header)
+    for fleet in Fleet.objects.all():
+        for fleetmember in fleet.vehicles.all():
+            veh = fleetmember.vehicle
+            row = [
+                fleet.name,
+                fleet.default_heavy_vehicle_share,
+                veh.name,
+                fleetmember.fraction,
+                fleetmember.coldstart_fraction,
+            ]
+            if fleetmember.timevar is None:
+                row.append("")
+            else:
+                row.append(fleetmember.timevar.name)
+            if fleetmember.coldstart_timevar is None:
+                row.append("")
+            else:
+                row.append(fleetmember.coldstart_timevar.name)
+            for fuel_id in fuel_ids:
+                try:
+                    row.append(fleetmember.fuels.get(fuel_id=fuel_id).fraction)
+                except FleetMemberFuel.DoesNotExist:
+                    row.append("")
+            worksheet.append(row)
+
+
+def create_vehiclefuel_sheet(workbook):
+    worksheet = workbook.create_sheet(title="VehicleFuel")
+    header = ["name", "isheavy", "info", "fuel"]
+    codeset_slugs = [code.slug for code in CodeSet.objects.all()]
+    codeset_ids = [CodeSet.objects.get(slug=slug).id for slug in codeset_slugs]
+    codeset_columns = [f"activitycode_{slug}" for slug in codeset_slugs]
+    header = header + codeset_columns
+    worksheet.append(header)
+    for vf in VehicleFuelComb.objects.all():
+        row = [vf.vehicle.name, str(vf.vehicle.isheavy), vf.vehicle.info, vf.fuel.name]
+        for i in codeset_ids:
+            row.append(
+                ActivityCode.objects.get(id=getattr(vf, f"activitycode{i}_id")).code
+            )
+        worksheet.append(row)
 
 
 def create_roadsource_sheet(workbook):
