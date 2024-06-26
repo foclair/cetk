@@ -37,6 +37,7 @@ from etk.edb.models import (
     RoadSource,
     Substance,
     TrafficSituation,
+    VehicleEF,
     VehicleFuel,
     VehicleFuelComb,
 )
@@ -205,12 +206,43 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
 
     if TrafficSituation.objects.count() > 0:
         create_traffic_sheet(workbook)
-    # TODO
-    # export tags, not supported yet.
-    # TrafficSituation,VehicleEmissionFactor
 
-    # Save the workbook to the specified export path
+    if VehicleEF.objects.count() > 0:
+        create_vehicle_ef_sheet(workbook)
+
     workbook.save(export_filepath)
+
+
+def create_vehicle_ef_sheet(workbook):
+    worksheet = workbook.create_sheet(title="VehicleEmissionFactor")
+    header = [
+        "traffic_situation",
+        "vehicle",
+        "fuel",
+        "substance",
+        "freeflow",
+        "heavy",
+        "saturated",
+        "stopngo",
+        "coldstart",
+        "unit",
+    ]
+    worksheet.append(header)
+    for vef in VehicleEF.objects.all():
+        # TODO could convert to more human readable values with for example unit mg/km.
+        row = [
+            vef.traffic_situation.ts_id,
+            vef.vehicle.name,
+            vef.fuel.name,
+            vef.substance.slug,
+            vef.freeflow,
+            vef.heavy,
+            vef.saturated,
+            vef.stopngo,
+            vef.coldstart,
+            "kg/m",
+        ]
+        worksheet.append(row)
 
 
 def create_traffic_sheet(workbook):
@@ -220,11 +252,14 @@ def create_traffic_sheet(workbook):
     for attribute in RoadAttribute.objects.all():
         header.append("attr:" + attribute.slug)
         attributes.append(attribute.slug)
+    attributes = np.array(attributes)
     worksheet.append(header)
     for i, rc in enumerate(RoadClass.objects.all()):
-        row = [rc.traffic_situation.ts_id]
+        row = [""] * len(header)
+        row[0] = rc.traffic_situation.ts_id
         for av in rc.attribute_values.all():
-            print(av)
+            ind = np.where(attributes == av.attribute.slug)[0][0]
+            row[ind + 1] = av.value
         worksheet.append(row)
 
 
@@ -281,9 +316,12 @@ def create_vehiclefuel_sheet(workbook):
     for vf in VehicleFuelComb.objects.all():
         row = [vf.vehicle.name, str(vf.vehicle.isheavy), vf.vehicle.info, vf.fuel.name]
         for i in codeset_ids:
-            row.append(
-                ActivityCode.objects.get(id=getattr(vf, f"activitycode{i}_id")).code
-            )
+            try:
+                row.append(
+                    ActivityCode.objects.get(id=getattr(vf, f"activitycode{i}_id")).code
+                )
+            except ActivityCode.DoesNotExist:
+                row.append("")
         worksheet.append(row)
 
 
