@@ -96,7 +96,7 @@ def vehicles_excel_to_dict(file_path):
     dtype_dict = {"name": str, "isheavy": bool, "info": str, "fuel": str}
     for cs in CodeSet.objects.all():
         dtype_dict["activitycode_" + cs.slug] = str
-    df = pd.read_excel(file_path, sheet_name="VehicleFuel", dtype=dtype_dict)
+    df = pd.read_excel(file_path, sheet_name="VehicleFuel", dtype=dtype_dict).fillna("")
 
     # Extract the code sets from the DataFrame
     activity_columns = [col for col in df.columns if col.startswith("activitycode_")]
@@ -360,7 +360,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                         validation=validation,
                     )
                 )
-            if ac not in codes:
+            if ac not in codes and ac != "":
                 return_message.append(
                     import_error(
                         f"invalid value '{ac}' for activity code "
@@ -509,7 +509,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                 for i in range(3):
                     code_nr = i + 1
                     ac_codes[i] = code_data.get(f"activitycode{code_nr}", None)
-                    if ac_codes[i] is not None:
+                    if ac_codes[i] is not None and ac_codes[i] != "":
                         try:
                             ac_codes[i] = valid_codes[
                                 CodeSet.objects.get(id=code_nr).slug
