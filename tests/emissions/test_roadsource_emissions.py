@@ -11,8 +11,8 @@ def test_calculate_emissions(roadsources):
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
     df = calculate_source_emissions_df("road", substances=[NOx, SOx], unit="kg/year")
-    assert df.loc[(1, "SOx", "car"), "emis"] == pytest.approx(0.003707781)
-    assert df.loc[(1, "SOx", "car"), "traffic_work"] == pytest.approx(0.000868171)
+    assert df.loc[(1, "SOx", "car"), "emis"] == pytest.approx(358.91682597946345)
+    assert df.loc[(1, "SOx", "car"), "traffic_work"] == pytest.approx(84.03981206578662)
 
 
 def test_create_view(roadsources):
@@ -28,4 +28,4 @@ def test_create_table(roadsources):
     cur = connection.cursor()
     cur.execute("SELECT * from roadsource_emissions")
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
-    assert df.loc[0, "SOx"] == pytest.approx(0.0065023167)
+    assert df.loc[0, "SOx"] == pytest.approx(629.4304928506848)

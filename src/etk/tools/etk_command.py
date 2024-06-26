@@ -188,7 +188,7 @@ class Editor(object):
                 db_updates.update(updates)
                 return_msg += msgs
             # skip empty messages
-            return_msg = [entry.strip() for entry in return_msg if entry]
+            # return_msg = [entry.strip() for entry in return_msg if entry]
             if len(return_msg) > 0:
                 raise ValidationError()
         except ValidationError as err:
@@ -200,13 +200,10 @@ class Editor(object):
             if len(return_msg) > 10:
                 log.error(
                     f">10 errors during {run_type}, first 10:"
-                    f"{os.linesep}{os.linesep.join(return_msg[:10])}"
+                    f"{os.linesep}{return_msg[:10]}"
                 )
             else:
-                log.error(
-                    f"Errors during {run_type}:"
-                    f"{os.linesep}{os.linesep.join(return_msg)}"
-                )
+                log.error(f"Errors during {run_type}:" f"{os.linesep}{return_msg}")
         else:
             log.info(f"getting here {datetime.datetime.now()}")
             if not dry_run:

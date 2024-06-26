@@ -36,6 +36,7 @@ from etk.edb.models import (
     RoadClass,
     RoadSource,
     Substance,
+    TrafficSituation,
     VehicleFuel,
     VehicleFuelComb,
 )
@@ -201,13 +202,30 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
 
     if Fleet.objects.count() > 0:
         create_fleet_sheet(workbook)
+
+    if TrafficSituation.objects.count() > 0:
+        create_traffic_sheet(workbook)
     # TODO
     # export tags, not supported yet.
-    # Fleet
     # TrafficSituation,VehicleEmissionFactor
 
     # Save the workbook to the specified export path
     workbook.save(export_filepath)
+
+
+def create_traffic_sheet(workbook):
+    worksheet = workbook.create_sheet(title="TrafficSituation")
+    header = ["traffic_situation"]
+    attributes = []
+    for attribute in RoadAttribute.objects.all():
+        header.append("attr:" + attribute.slug)
+        attributes.append(attribute.slug)
+    worksheet.append(header)
+    for i, rc in enumerate(RoadClass.objects.all()):
+        row = [rc.traffic_situation.ts_id]
+        for av in rc.attribute_values.all():
+            print(av)
+        worksheet.append(row)
 
 
 def create_fleet_sheet(workbook):
