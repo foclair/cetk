@@ -142,6 +142,7 @@ class Editor(object):
             for s in SHEET_NAMES
             if s in frozenset(sheets) and s in frozenset(workbook.sheetnames)
         ]
+
         try:
             missing_sheets = set(import_sheets).difference(workbook.sheetnames)
             if len(missing_sheets) > 0:

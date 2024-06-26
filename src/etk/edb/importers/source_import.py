@@ -846,12 +846,10 @@ def import_sourceactivities(
                     try:
                         activity = activities[activity_name]
                     except KeyError:
-                        return_message.append(
-                            import_error(
-                                f"unknown activity '{activity_name}'"
-                                + f" for pointsource '{row['source_name']}'",
-                                validation=validation,
-                            )
+                        return_message += import_error(
+                            f"unknown activity '{activity_name}'"
+                            + f" for pointsource '{row['source_name']}'",
+                            validation=validation,
                         )
                     rate = activity_rate_unit_to_si(rate, activity.unit)
                     try:
@@ -893,7 +891,7 @@ def import_sourceactivities(
             sourcetype="area",
         )
         return_dict.update(ps)
-        return_message.append(msgs)
+        return_message += msgs
         # for now always caching areasources, change if case with many areasources
         # becomes relevant.
         areasourceactivities = cache_queryset(
@@ -917,13 +915,12 @@ def import_sourceactivities(
                     try:
                         activity = activities[activity_key[4:]]
                     except KeyError:
-                        return_message.append(
-                            import_error(
-                                f"unknown activity '{activity_name}'"
-                                f" for areasource '{row['source_name']}'",
-                                validation=validation,
-                            )
+                        return_message += import_error(
+                            f"unknown activity '{activity_name}'"
+                            f" for areasource '{row['source_name']}'",
+                            validation=validation,
                         )
+
                     rate = activity_rate_unit_to_si(rate, activity.unit)
                     # original unit stored in activity.unit, but
                     # areasourceactivity.rate stored as activity / s.

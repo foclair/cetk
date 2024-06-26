@@ -2,7 +2,6 @@
 
 import glob
 import os
-import time
 from importlib import resources
 from tempfile import gettempdir
 
@@ -37,11 +36,7 @@ def tmp_db(tmpdir):
 def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx):
     run_migrate(db_path=tmp_db)
     backup_path, proc = run_import(pointsourceactivities_xlsx, db_path=tmp_db)
-    for i in range(5):
-        if not proc.poll():
-            time.sleep(1)
-        else:
-            break
+    proc.wait()
     # Read the latest stderr file
     stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
     stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
@@ -64,11 +59,7 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
     assert changes == expected_dict
 
     backup_path, proc = run_import(validation_xlsx, db_path=tmp_db, dry_run=True)
-    for i in range(5):
-        if not proc.poll():
-            time.sleep(1)
-        else:
-            break
+    proc.wait()
     # Read the latest stderr file
     stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
     stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
@@ -82,18 +73,14 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
 def test_import_traffic(tmp_db, traffic_xlsx):
     run_migrate(db_path=tmp_db)
     backup_path, proc = run_import(traffic_xlsx, db_path=tmp_db)
-
+    proc.wait()
     expected_dict = {
         "codeset": {"updated": 0, "created": 3},
         "activitycode": {"updated": 0, "created": 9},
         "roads": {"created": 26, "updated": 0},
         "vehicle_emission_factors": {"updated": 0, "created": 6},
     }
-    for i in range(10):
-        if not proc.poll():
-            time.sleep(1)
-        else:
-            break
+
     # Read the latest stderr file
     stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
     stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
