@@ -455,10 +455,13 @@ def create_source_sheet(
                 if len(rasternames) == 1:
                     rastername = source.substances.first().raster
                 else:
-                    generic_name = drop_substance(rasternames, substance_slugs)
-                    if len(set(generic_name)) == 1:
-                        rastername = generic_name[0]
-                    else:
+                    try:
+                        rastername = (
+                            os.path.commonprefix(list(rasternames))
+                            + "{subst}"
+                            + common_suffix(list(rasternames))
+                        )
+                    except Exception:
                         raise ValueError(
                             "Could not find a generic raster name "
                             + f"for GridSource {source.name}"
@@ -540,12 +543,7 @@ def create_source_sheet(
         worksheet.append(row_data)
 
 
-def drop_substance(rasternames, substance_slugs):
-    generic = []
-    for rastername in rasternames:
-        for substance in substance_slugs:
-            if substance in rastername:
-                different_part = rastername.replace(substance, "{subst}")
-                generic.append(different_part)
-                break
-    return generic
+def common_suffix(strings):
+    reversed_strings = [s[::-1] for s in strings]
+    common_suffix_reversed = os.path.commonprefix(reversed_strings)
+    return common_suffix_reversed[::-1]
