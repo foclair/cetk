@@ -4,6 +4,7 @@ import os
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import pyogrio
 import rasterio as rio
 from django.db import connection
 from openpyxl import Workbook
@@ -117,21 +118,21 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
         create_source_sheet(
             worksheet, PointSource, point_columns, PointSourceSubstance, unit
         )
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if AreaSource.objects.count() > 0:
         worksheet = workbook.create_sheet(title="AreaSource")
         create_source_sheet(
             worksheet, AreaSource, REQUIRED_COLUMNS_AREA, AreaSourceSubstance, unit
         )
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if GridSource.objects.count() > 0:
         worksheet = workbook.create_sheet(title="GridSource")
         create_source_sheet(
             worksheet, GridSource, REQUIRED_COLUMNS_GRID, GridSourceSubstance, unit
         )
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if EmissionFactor.objects.count() > 0:
         worksheet = workbook.create_sheet(title="EmissionFactor")
@@ -154,7 +155,7 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
                 emfac.activity.unit,
             ]
             worksheet.append(row_data)
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if CodeSet.objects.count() > 0:
         worksheet = workbook.create_sheet(title="CodeSet")
@@ -162,7 +163,7 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
         worksheet.append(header)
         for cs in CodeSet.objects.all():
             worksheet.append([cs.name, cs.slug, cs.description])
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if ActivityCode.objects.count() > 0:
         worksheet = workbook.create_sheet(title="ActivityCode")
@@ -175,30 +176,31 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
                 )
             else:
                 worksheet.append([ac.code_set.slug, ac.code, ac.label, ""])
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if Timevar.objects.count() > 0:
         worksheet = workbook.create_sheet(title="Timevar")
         create_timevar_sheet(worksheet, Timevar)
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if FlowTimevar.objects.count() > 0:
         worksheet = workbook.create_sheet(title="FlowTimevar")
         create_timevar_sheet(worksheet, FlowTimevar)
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if ColdstartTimevar.objects.count() > 0:
         worksheet = workbook.create_sheet(title="ColdstartTimevar")
         create_timevar_sheet(worksheet, ColdstartTimevar)
-    workbook.save(export_filepath)
-
+        workbook.save(export_filepath)
+    print("getting here")
     if CongestionProfile.objects.count() > 0:
         worksheet = workbook.create_sheet(title="CongestionProfile")
         create_timevar_sheet(worksheet, CongestionProfile)
-    workbook.save(export_filepath)
-
+        workbook.save(export_filepath)
+    print("getting here")
     if RoadSource.objects.count() > 0:
         create_roadsource_sheet(workbook)
+        workbook.save(export_filepath)
 
     # RoadAttributes could be defined before importing any roads
     if RoadAttribute.objects.count() > 0:
@@ -207,23 +209,23 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
         worksheet.append(header)
         for ra in RoadAttribute.objects.all():
             worksheet.append([ra.name, ra.slug])
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if VehicleFuelComb.objects.count() > 0:
         create_vehiclefuel_sheet(workbook)
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if Fleet.objects.count() > 0:
         create_fleet_sheet(workbook)
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if TrafficSituation.objects.count() > 0:
         create_traffic_sheet(workbook)
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
     if VehicleEF.objects.count() > 0:
         create_vehicle_ef_sheet(workbook)
-    workbook.save(export_filepath)
+        workbook.save(export_filepath)
 
 
 def create_vehicle_ef_sheet(workbook):
@@ -373,7 +375,6 @@ def create_roadsource_sheet(workbook):
         "FROM edb_roadsource AS rs "
         "LEFT JOIN edb_fleet AS F ON rs.fleet_id = f.id "
         "LEFT JOIN edb_congestionprofile AS cp ON rs.congestion_profile_id = cp.id "
-        " LIMIT 3"
     )
     cur = connection.cursor()
     cur.execute(sql)
@@ -391,7 +392,8 @@ def create_roadsource_sheet(workbook):
     gdf = gpd.GeoDataFrame(df, geometry="geometry")
     crs = "EPSG:4326"
     gdf.crs = crs
-    gdf.to_file(roadpath, driver="GPKG")
+    # does not work from QGIS gdf.to_file(roadpath, driver="GPKG")
+    pyogrio.write_dataframe(gdf, roadpath, layer="roads")
 
 
 def create_timevar_sheet(worksheet, tvar_type):
