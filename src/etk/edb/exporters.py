@@ -192,12 +192,12 @@ def export_sources(export_filepath, srid=WGS84_SRID, unit=DEFAULT_EMISSION_UNIT)
         worksheet = workbook.create_sheet(title="ColdstartTimevar")
         create_timevar_sheet(worksheet, ColdstartTimevar)
         workbook.save(export_filepath)
-    print("getting here")
+
     if CongestionProfile.objects.count() > 0:
         worksheet = workbook.create_sheet(title="CongestionProfile")
         create_timevar_sheet(worksheet, CongestionProfile)
         workbook.save(export_filepath)
-    print("getting here")
+
     if RoadSource.objects.count() > 0:
         create_roadsource_sheet(workbook)
         workbook.save(export_filepath)
@@ -466,7 +466,7 @@ def create_source_sheet(
                             "Could not find a generic raster name "
                             + f"for GridSource {source.name}"
                         )
-            elif source.activities.count > 0:
+            elif source.activities.count() > 0:
                 rastername = source.activities.first().raster
                 rasternames = [rastername]
             else:
