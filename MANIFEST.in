@@ -7,6 +7,6 @@ include           manage.py
 include           .pre-commit-config.yaml
 include           pyproject.toml
 include           requirements.*
-include           src/etk/emissions/*.sql
+recursive-include *.sql
 recursive-include tests *.py
 global-exclude    *~
