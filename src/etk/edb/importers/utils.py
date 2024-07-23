@@ -1,6 +1,3 @@
-from itertools import islice
-
-import numpy as np
 import pandas as pd
 
 from etk.edb.cache import cache_queryset
@@ -71,26 +68,17 @@ def cache_codesets():
 
 
 def worksheet_to_dataframe(data):
-    try:
-        cols = next(data)
-    except StopIteration:
-        raise EmptySheet("Sheet is empty")
     data = list(data)
-    data = (islice(r, 0, None) for r in data)
-    df = pd.DataFrame(data, columns=cols)
-    # remove empty rows
-    empty_count = 0
-    for ind in range(-1, -1 * (len(df) + 1), -1):
-        if all([pd.isnull(val) for val in df.iloc[ind]]):
-            empty_count += 1
-        else:
-            break
-    # remove the last 'empty_count' lines
-    df = df.head(df.shape[0] - empty_count)
-    # remove empty columns without label
-    if None in df.columns:
-        if np.all([pd.isnull(val) for val in df[None].values]):
-            df = df.drop(columns=[None])
+    if not data:
+        raise EmptySheet("Sheet is empty")
+    df = pd.DataFrame(data)
+    # Set the first row as the header
+    df.columns = df.iloc[0]
+    df = df[1:].reset_index(drop=True)
+    # Remove completely empty rows
+    df = df.dropna(how="all")
+    # Remove completely empty columns without a header
+    df = df.loc[:, ~(df.isna().all() & df.columns.isna())]
     return df
 
 
