@@ -239,7 +239,7 @@ def get_next_counter(prefix, output_path):
 
 def run_non_blocking(*args, db_path=None, log_level=logging.INFO):
     env = (
-        os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
+        os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": str(db_path)}
     )
 
     prefix = args[0] + "_" + args[1] + "_"
