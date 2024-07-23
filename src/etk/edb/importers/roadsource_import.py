@@ -5,6 +5,7 @@ from collections import OrderedDict
 from operator import itemgetter
 from pathlib import Path
 
+import geopandas as gpd
 import numpy as np  # noqa
 import pandas as pd
 from django.contrib.gis.gdal import (  # noqa
@@ -13,6 +14,7 @@ from django.contrib.gis.gdal import (  # noqa
     DataSource,
     SpatialReference,
 )
+from django.contrib.gis.gdal.geometries import LineString as GDALLineString
 from django.contrib.gis.geos import Point, Polygon  # noqa
 from django.core.exceptions import ObjectDoesNotExist, ValidationError  # noqa
 from django.core.management.base import CommandError  # noqa
@@ -1225,10 +1227,12 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
 ):
     """Import a road network."""
     return_message = []
-    datasource = DataSource(roadfile)
+    datasource = gpd.read_file(roadfile)
 
-    layer = datasource[0]
-    src_proj = SpatialReference(config["srid"]) if "srid" in config else layer.srs
+    if "srid" in config:
+        src_proj = SpatialReference(config["srid"])
+    else:
+        src_proj = SpatialReference(datasource.crs.to_epsg())
     target_proj = SpatialReference(WGS84_SRID)
     trans = CoordTransform(src_proj, target_proj)
 
@@ -1368,14 +1372,17 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
     messages = {}
 
     def make_road(feature):  # noqa: C901, PLR0912, PLR0915
-        source_geom = feature.geom
-        if len(source_geom) < 2:
+        source_geom = feature.geometry
+
+        if np.shape(source_geom.xy)[1] < 2:
             msg = "invalid geometry (< 2 nodes), instance not imported"
             handle_msg(messages, msg)
             raise ValidationError(msg)
-        source_geom.coord_dim = 2
-        source_geom.transform(trans)
-        geom = source_geom.geos
+
+        gdalgeom = GDALLineString(source_geom.wkt)
+        gdalgeom.coord_dim = 2
+        gdalgeom.transform(trans)
+        geom = gdalgeom.geos
         road_data = {"geom": geom}
 
         for target_name, source_name in attr_dict.items():
@@ -1560,10 +1567,10 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
 
     roads = []
     count = 0
-    nroads = len(layer)
+    nroads = len(datasource)
     old_progress = -1
     ncreated = 0
-    for features in inbatch(layer, chunksize):
+    for features in inbatch(datasource.iterrows(), chunksize):
         for feature in features:
             count += 1
 
@@ -1573,13 +1580,13 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                     log.debug(f"done {int(progress)}%")
                 old_progress = int(progress)
 
-            if exclude is not None and filter_out(feature, exclude):
+            if exclude is not None and filter_out(feature[1], exclude):
                 continue
-            if only is not None and not filter_out(feature, only):
+            if only is not None and not filter_out(feature[1], only):
                 continue
 
             try:
-                road = make_road(feature)
+                road = make_road(feature[1])
             except ValidationError:
                 continue
             roads.append(road)
