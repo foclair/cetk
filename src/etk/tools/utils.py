@@ -215,7 +215,7 @@ def set_settings_srid(srid, db_path=None):
 
 def run(*args, db_path=None, log_level=logging.INFO):
     env = (
-        os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
+        os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": str(db_path)}
     )
     proc = subprocess.run(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=env
