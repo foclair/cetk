@@ -1406,7 +1406,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                             validation=validation,
                         )
                     )
-                if val is None:
+                if pd.isnull(val):
                     val = default_value
             else:
                 msg = f"no source field specified for target field {target_name}"
