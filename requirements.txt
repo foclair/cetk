@@ -17,11 +17,14 @@ asgiref==3.6.0 \
 attrs==23.2.0 \
     --hash=sha256:935dc3b529c262f6cf76e50877d35a4bd3c1de194fd41f47a2b7ae8f19971f30 \
     --hash=sha256:99b87a485a5820b23b879f04c2305b44b951b502fd64be915879d77a7e8fc6f1
-    # via rasterio
+    # via
+    #   fiona
+    #   rasterio
 certifi==2022.12.7 \
     --hash=sha256:35824b4c3a97115964b408844d64aa14db1cc518f6562e8d7261699d1350a9e3 \
     --hash=sha256:4ad3232f5e926d6718ec31cfc1fcadfde020920e278684144551c91769c7bc18
     # via
+    #   fiona
     #   netcdf4
     #   pyogrio
     #   pyproj
@@ -55,15 +58,20 @@ click==8.1.7 \
     # via
     #   click-plugins
     #   cligj
+    #   fiona
     #   rasterio
 click-plugins==1.1.1 \
     --hash=sha256:46ab999744a9d831159c3411bb0c79346d94a444df9a3a3742e9ed63645f264b \
     --hash=sha256:5d262006d3222f5057fd81e1623d4443e41dcda5dc815c06b442aa3c02889fc8
-    # via rasterio
+    # via
+    #   fiona
+    #   rasterio
 cligj==0.7.2 \
     --hash=sha256:a4bc13d623356b373c2c27c53dbd9c68cae5d526270bfa71f6c6fa69669c6b27 \
     --hash=sha256:c1ca117dbce1fe20a5809dc96f01e1c2840f6dcc939b3ddbb1111bf330ba82df
-    # via rasterio
+    # via
+    #   fiona
+    #   rasterio
 django==4.2.2 \
     --hash=sha256:2a6b6fbff5b59dd07bef10bcb019bee2ea97a30b2a656d51346596724324badf \
     --hash=sha256:672b3fa81e1f853bb58be1b51754108ab4ffa12a77c06db86aa8df9ed0c46fe5
@@ -72,6 +80,40 @@ et-xmlfile==1.1.0 \
     --hash=sha256:8eb9e2bc2f8c97e37a2dc85a09ecdcdec9d8a396530a6d5a33b30b9a92da0c5c \
     --hash=sha256:a2ba85d1d6a74ef63837eed693bcb89c3f752169b0e3e7ae5b16ca5e1b3deada
     # via openpyxl
+fiona==1.9.6 \
+    --hash=sha256:0eaffbf3bfae9960484c0c08ea461b0c40e111497f04e9475ebf15ac7a22d9dc \
+    --hash=sha256:11af1afc1255642a7787fe112c29d01f968f1053e4d4700fc6f3bb879c1622e0 \
+    --hash=sha256:1dcd6eca7524535baf2a39d7981b4a46d33ae28c313934a7c3eae62eecf9dfa5 \
+    --hash=sha256:39819fb8f5ec6d9971cb01b912b4431615a3d3f50c83798565d8ce41917930db \
+    --hash=sha256:42d8a0e5570948d3821c493b6141866d9a4d7a64edad2be4ecbb89f81904baac \
+    --hash=sha256:48b6218224e96de5e36b5eb259f37160092260e5de0dcd82ca200b1887aa9884 \
+    --hash=sha256:50037c3b7a5f6f434b562b5b1a5b664f1caa7a4383b00af23cdb59bfc6ba852c \
+    --hash=sha256:52e8fec650b72fc5253d8f86b63859acc687182281c29bfacd3930496cf982d1 \
+    --hash=sha256:53bedd2989e255df1bf3378ae9c06d6d241ec273c280c544bb44ffffebb97fb0 \
+    --hash=sha256:63e528b5ea3d8b1038d788e7c65117835c787ba7fdc94b1b42f09c2cbc0aaff2 \
+    --hash=sha256:77653a08564a44e634c44cd74a068d2f55d1d4029edd16d1c8aadcc4d8cc1d2c \
+    --hash=sha256:791b3494f8b218c06ea56f892bd6ba893dfa23525347761d066fb7738acda3b1 \
+    --hash=sha256:89095c2d542325ee45894b8837e8048cdbb2f22274934e1be3b673ca628010d7 \
+    --hash=sha256:918bd27d8625416672e834593970f96dff63215108f81efb876fe5c0bc58a3b4 \
+    --hash=sha256:98cea6f435843b2119731c6b0470e5b7386aa16b6aa7edabbf1ed93aefe029c3 \
+    --hash=sha256:9b53034efdf93ada9295b081e6a8280af7c75496a20df82d4c2ca46d65b85905 \
+    --hash=sha256:bf51846ad602757bf27876f458c5c9f14b09421fac612f64273cc4e3fcabc441 \
+    --hash=sha256:c1dd5fbc29b7303bb87eb683455e8451e1a53bb8faf20ef97fdcd843c9e4a7f6 \
+    --hash=sha256:c9b92aa1badb2773e7cac19bef3064d73e9d80c67c42f0928db2520a04be6f2f \
+    --hash=sha256:e313210b30d09ed8f829bf625599e248dadd78622728030221f6526580ff26c5 \
+    --hash=sha256:e5404ed08c711489abcb3a50a184816825b8af06eb73ad2a99e18b8e7b47c96a \
+    --hash=sha256:e7617563b36d2be99f048f0d0054b4d765f4aae454398f88f19de9c2c324b7f8 \
+    --hash=sha256:f1b49d51a744874608b689f029766aa1e078dd72e94b44cf8eeef6d7bd2e9051 \
+    --hash=sha256:f4230eccbd896a79d1ebfa551d84bf90f512f7bcbe1ca61e3f82231321f1a532
+    # via etk (setup.cfg)
+geopandas==1.0.1 \
+    --hash=sha256:01e147d9420cc374d26f51fc23716ac307f32b49406e4bd8462c07e82ed1d3d6 \
+    --hash=sha256:b8bf70a5534588205b7a56646e2082fb1de9a03599651b3d80c99ea4c2ca08ab
+    # via etk (setup.cfg)
+importlib-metadata==8.1.0 \
+    --hash=sha256:3cd29f739ed65973840b068e3132135ce954c254d48b5b640484467ef7ab3c8c \
+    --hash=sha256:fcdcb1d5ead7bdf3dd32657bb94ebe9d2aabfe89a19782ddc32da5041d6ebfb4
+    # via fiona
 netcdf4==1.6.5 \
     --hash=sha256:0187646e3348e7a8cd654617dda65517df138042c94c2fcc6682ff7c8c6654dc \
     --hash=sha256:081e9043ac6160989f60570928eabe803c88ce7df1d3f79f2345dc48f68ef752 \
@@ -133,6 +175,7 @@ numpy==1.24.2 \
     # via
     #   cftime
     #   etk (setup.cfg)
+    #   geopandas
     #   netcdf4
     #   pandas
     #   pyogrio
@@ -147,7 +190,9 @@ openpyxl==3.1.2 \
 packaging==24.1 \
     --hash=sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002 \
     --hash=sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124
-    # via pyogrio
+    # via
+    #   geopandas
+    #   pyogrio
 pandas==2.0.0 \
     --hash=sha256:0778ab54c8f399d83d98ffb674d11ec716449956bc6f6821891ab835848687f2 \
     --hash=sha256:24472cfc7ced511ac90608728b88312be56edc8f19b9ed885a7d2e47ffaf69c0 \
@@ -174,7 +219,9 @@ pandas==2.0.0 \
     --hash=sha256:d08e41d96bc4de6f500afe80936c68fce6099d5a434e2af7c7fd8e7c72a3265d \
     --hash=sha256:d93b7fcfd9f3328072b250d6d001dcfeec5d3bb66c1b9c8941e109a46c0c01a8 \
     --hash=sha256:fcd471c9d9f60926ab2f15c6c29164112f458acb42280365fbefa542d0c2fc74
-    # via etk (setup.cfg)
+    # via
+    #   etk (setup.cfg)
+    #   geopandas
 pyogrio==0.9.0 \
     --hash=sha256:019731a856a9abfe909e86f50eb13f8362f6742337caf757c54b7c8acfe75b89 \
     --hash=sha256:083351b258b3e08b6c6085dac560bd321b68de5cb4a66229095da68d5f3d696b \
@@ -202,7 +249,9 @@ pyogrio==0.9.0 \
     --hash=sha256:f5d80eb846be4fc4e642cbedc1ed0c143e8d241653382ecc76a7620bbd2a5c3a \
     --hash=sha256:f8bf193269ea9d347ac3ddada960a59f1ab2e4a5c009be95dc70e6505346b2fc \
     --hash=sha256:fb04bd80964428491951766452f0071b0bc37c7d38c45ef02502dbd83e5d74a0
-    # via etk (setup.cfg)
+    # via
+    #   etk (setup.cfg)
+    #   geopandas
 pyparsing==3.1.2 \
     --hash=sha256:a1bac0ce561155ecc3ed78ca94d3c9378656ad4c94c1270de543f621420f94ad \
     --hash=sha256:f9db75911801ed778fe61bb643079ff86601aca99fcae6345aa67292038fb742
@@ -243,7 +292,9 @@ pyproj==3.5.0 \
     --hash=sha256:eccb417b91d0be27805dfc97550bfb8b7db94e9fe1db5ebedb98f5b88d601323 \
     --hash=sha256:f7c2f4d9681e810cf40239caaca00079930a6d9ee6591139b88d592d36051d82 \
     --hash=sha256:fde5ece4d2436b5a57c8f5f97b49b5de06a856d03959f836c957d3e609f2de7e
-    # via rastafari
+    # via
+    #   geopandas
+    #   rastafari
 python-dateutil==2.8.2 \
     --hash=sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86 \
     --hash=sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9
@@ -406,11 +457,15 @@ shapely==2.0.4 \
     --hash=sha256:de0205cb21ad5ddaef607cda9a3191eadd1e7a62a756ea3a356369675230ac35 \
     --hash=sha256:ec555c9d0db12d7fd777ba3f8b75044c73e576c720a851667432fabb7057da6c \
     --hash=sha256:fb5cdcbbe3080181498931b52a91a21a781a35dcb859da741c0345c6402bf00c
-    # via etk (setup.cfg)
+    # via
+    #   etk (setup.cfg)
+    #   geopandas
 six==1.16.0 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254
-    # via python-dateutil
+    # via
+    #   fiona
+    #   python-dateutil
 snuggs==1.4.7 \
     --hash=sha256:501cf113fe3892e14e2fee76da5cd0606b7e149c411c271898e6259ebde2617b \
     --hash=sha256:988dde5d4db88e9d71c99457404773dabcc7a1c45971bfbe81900999942d9f07
@@ -423,6 +478,10 @@ tzdata==2023.3 \
     --hash=sha256:11ef1e08e54acb0d4f95bdb1be05da659673de4acbd21bf9c69e94cc5e907a3a \
     --hash=sha256:7e65763eef3120314099b6939b5546db7adce1e7d6f2e179e3df563c70511eda
     # via pandas
+zipp==3.19.2 \
+    --hash=sha256:bf1dcf6450f873a13e952a29504887c89e6de7506209e5b1bcc3460135d4de19 \
+    --hash=sha256:f091755f667055f2d02b32c53771a7a6c8b47e1fdbc4b72a8b9072b3eef8015c
+    # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==69.1.1 \

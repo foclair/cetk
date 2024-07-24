@@ -5,6 +5,8 @@ from collections import OrderedDict
 from operator import itemgetter
 from pathlib import Path
 
+# need to import fiona before geopandas due to gpd bug causing circular imports.
+import fiona  # noqa
 import geopandas as gpd
 import numpy as np  # noqa
 import pandas as pd

@@ -1,6 +1,8 @@
 import ast
 import os
 
+# need to import fiona before geopandas due to gpd bug causing circular imports.
+import fiona  # noqa
 import geopandas as gpd
 import numpy as np
 import pandas as pd
