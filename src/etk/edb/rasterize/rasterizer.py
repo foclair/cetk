@@ -249,9 +249,9 @@ class EmissionRasterizer:
             end: end time in UTC
 
         """
-        time_index = pd.date_range(begin, end, freq="H")
+        time_index = pd.date_range(begin, end, freq="h")
         one_hour = datetime.timedelta(hours=1)
-        shifted_index = pd.date_range(begin - one_hour, end - one_hour, freq="H")
+        shifted_index = pd.date_range(begin - one_hour, end - one_hour, freq="h")
 
         self.flow_timevar_scalings = pd.DataFrame(
             {
@@ -953,7 +953,7 @@ class EmissionRasterizer:
         emis_fac_freeflow = np.ones((timesteps,))
 
         emis_ts = pd.Series(
-            index=pd.date_range(start=begin, end=end, freq="H"),
+            index=pd.date_range(start=begin, end=end, freq="h"),
             data=np.zeros((timesteps,)),
         )
         cstvs_cache = {}
