@@ -539,7 +539,7 @@ def areasources(activities, code_sets):
 
 
 @pytest.fixture()
-def gridsource_raster(tmpdir, db):
+def gridsource_raster(tmpdir, transactional_db):
     nrows = 2
     ncols = 2
     x1, y1, x2, y2 = (0, 0, 1000, 1000)
