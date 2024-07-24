@@ -32,10 +32,13 @@ def get_db():
 def get_template_db():
     DATABASE_DIR = Path(
         os.path.join(
-            os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "eclair"
+            os.environ.get(
+                "XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config")
+            ),
+            "eclair",
         )
     )
-    return DATABASE_DIR / "eclair.gpkg"
+    return os.path.join(DATABASE_DIR, "eclair.gpkg")
 
 
 def check_and_get_path(filename):
@@ -53,7 +56,7 @@ def get_backup_path(db_path):
 def backup_db():
     db_path = get_db()
     if db_path:
-        backup_path = Path(gettempdir()) / f"{db_path.name}.bkp"
+        backup_path = Path(os.path.join(gettempdir(), f"{db_path.name}.bkp"))
     else:
         raise ValueError("No database specified, set by $ETK_DATABASE_PATH\n")
     shutil.copyfile(db_path, backup_path)

@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 import rasterio as rio
@@ -27,7 +29,7 @@ def rasterfile(tmpdir):
     data = np.linspace(0, 100, num=nrows * ncols, dtype=np.float32).reshape(
         (nrows, ncols)
     )
-    outfile = str(tmpdir / "gridsource_raster.tiff")
+    outfile = str(os.path.join(tmpdir, "gridsource_raster.tiff"))
     with rio.open(
         outfile,
         "w",

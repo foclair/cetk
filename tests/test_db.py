@@ -9,7 +9,7 @@ from etk.tools import Editor
 
 def test_init_db(tmpdir):
     """test to initialize an offline database."""
-    filepath = tmpdir / "test.sqlite"
+    filepath = os.path.join(tmpdir, "test.sqlite")
     os.environ["ETK_DATABASE_PATH"] = str(filepath)
     editor = Editor()
     editor.migrate()
@@ -22,7 +22,7 @@ def test_edit_test_db(db):
 
 
 def test_etk_cli(tmpdir):
-    filepath = tmpdir / "test.sqlite"
+    filepath = os.path.join(tmpdir, "test.sqlite")
     os.environ["ETK_DATABASE_PATH"] = str(filepath)
     try:
         subprocess.run(

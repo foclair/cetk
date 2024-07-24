@@ -1,5 +1,6 @@
 """Global pytest configuration."""
 
+import os
 import sys
 
 import numpy as np
@@ -547,7 +548,7 @@ def gridsource_raster(tmpdir, transactional_db):
     data = np.array([[0.1, 0.2], [0.3, 0.4]], dtype=np.float32)
 
     transform = rio.transform.from_bounds(x1, y1, x2, y2, width=ncols, height=nrows)
-    rasterfile = str(tmpdir / "gridsource_raster.tiff")
+    rasterfile = str(os.path.join(tmpdir, "gridsource_raster.tiff"))
     with rio.open(
         rasterfile,
         "w",
