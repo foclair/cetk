@@ -9,7 +9,7 @@ if [ ! $(flatpak run --command=python $FLATPAK -m pip --version | cut -d " " -f1
 else
    echo "found pip"
 fi
-
+flatpak run --command=python $FLATPAK -m pip install -r ./requirements.txt
 flatpak run --command=python $FLATPAK -m pip install -r ./requirements-dev.txt
 flatpak run --command=python $FLATPAK -m pip install -e .
 flatpak override --env=PATH="/app/bin:/usr/bin:/var/data/python/bin" $FLATPAK --user

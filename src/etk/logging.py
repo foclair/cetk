@@ -41,17 +41,17 @@ def create_etk_handler(loglevel=logging.INFO):
     return handler
 
 
-def create_file_handler(filename, loglevel=logging.DEBUG):
+def create_file_handler(filename, loglevel=logging.INFO):
     """Configure a log handler for *filename*."""
     filehandler = logging.FileHandler(filename, mode="w", encoding="utf-8")
-    filehandler.setLevel(logging.DEBUG)
+    filehandler.setLevel(loglevel)
     fmt = "%(asctime)s %(levelname)s %(name)s.%(funcName)s: %(message)s"
     fileformatter = logging.Formatter(fmt)
     filehandler.setFormatter(fileformatter)
     return filehandler
 
 
-def configure(terminal_level=logging.INFO, file_level=logging.DEBUG, filename=None):
+def configure(terminal_level=logging.WARNING, file_level=logging.INFO, filename=None):
     """Configure logging.
 
     *terminal_level* sets the minimum log level to send to stderr.
@@ -61,7 +61,7 @@ def configure(terminal_level=logging.INFO, file_level=logging.DEBUG, filename=No
 
     """
     baselogger = logging.getLogger("etk")
-    baselogger.setLevel(logging.DEBUG)
+    baselogger.setLevel(logging.INFO)
     if terminal_level:
         baselogger.addHandler(create_terminal_handler(terminal_level))
     if filename and file_level:

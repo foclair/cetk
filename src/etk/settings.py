@@ -4,8 +4,15 @@ import os
 
 DEBUG = os.environ.get("ETK_DEBUG", False)
 
-# SPATIALITE_LIBRARY_PATH="/usr/libspatialite50/lib/libspatialite.so.8"
-SPATIALITE_LIBRARY_PATH = "/usr/lib64/mod_spatialite.so"
+if "FLATPAK_ID" in os.environ:
+    SPATIALITE_LIBRARY_PATH = "/app/lib/mod_spatialite.so"
+elif os.name == "posix":
+    SPATIALITE_LIBRARY_PATH = "/usr/lib64/mod_spatialite.so"
+elif os.name == "nt":
+    SPATIALITE_LIBRARY_PATH = r"C:\OSGeo4W\bin\mod_spatialite.dll"
+else:
+    SPATIALITE_LIBRARY_PATH = "/usr/lib64/mod_spatialite.so"
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.gis",

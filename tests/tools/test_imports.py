@@ -1,8 +1,9 @@
 """Tests for emission model importers."""
 
+import glob
 import os
-import re
 from importlib import resources
+from tempfile import gettempdir
 
 import pytest
 
@@ -34,13 +35,17 @@ def tmp_db(tmpdir):
 
 def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx):
     run_migrate(db_path=tmp_db)
-
-    # Regular expression pattern to extract the dictionary part
-    pattern = r"imported data (.+)\\n"
-
-    (stderr, stdout) = run_import(pointsourceactivities_xlsx, db_path=tmp_db)
+    backup_path, proc = run_import(pointsourceactivities_xlsx, db_path=tmp_db)
+    proc.wait()
+    # Read the latest stderr file
+    stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
+    stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
+    if stderr_files:
+        latest_stderr_file = stderr_files[-1]
+        with open(latest_stderr_file, "r") as f:
+            stderr_content = f.read()
     # Find the dictionary part using regular expression
-    match = re.search(pattern, str(stdout))
+    changes = eval(stderr_content.split("\n")[-2].split("imported")[1].strip())
     expected_dict = {
         "codeset": {"updated": 0, "created": 2},
         "activitycode": {"updated": 0, "created": 3},
@@ -51,29 +56,37 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
         "pointsource": {"updated": 0, "created": 4},
         "pointsourceactivity": {"created": 3, "updated": 0},
     }
-    assert eval(match.group(1)) == expected_dict
+    assert changes == expected_dict
 
-    # from etk.tools.utils import CalledProcessError
-    # try:
-    (stderr, stdout) = run_import(validation_xlsx, db_path=tmp_db, dry_run=True)
-    # except CalledProcessError as e:
-    #    error = e.stderr.decode("utf-8")
-    #    print(error)
-    assert "ERROR" in str(stdout)
+    backup_path, proc = run_import(validation_xlsx, db_path=tmp_db, dry_run=True)
+    proc.wait()
+    # Read the latest stderr file
+    stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
+    stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
+    if stderr_files:
+        latest_stderr_file = stderr_files[-1]
+        with open(latest_stderr_file, "r") as f:
+            stderr_content = f.read()
+    assert "ERROR" in stderr_content
 
 
 def test_import_traffic(tmp_db, traffic_xlsx):
     run_migrate(db_path=tmp_db)
-
-    # Regular expression pattern to extract the dictionary part
-    pattern = r"imported data (.+)\\n"
-
-    (stderr, stdout) = run_import(traffic_xlsx, db_path=tmp_db)
-    match = re.search(pattern, str(stdout))
+    backup_path, proc = run_import(traffic_xlsx, db_path=tmp_db)
+    proc.wait()
     expected_dict = {
         "codeset": {"updated": 0, "created": 3},
         "activitycode": {"updated": 0, "created": 9},
         "roads": {"created": 26, "updated": 0},
         "vehicle_emission_factors": {"updated": 0, "created": 6},
     }
-    assert eval(match.group(1)) == expected_dict
+
+    # Read the latest stderr file
+    stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
+    stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
+    if stderr_files:
+        latest_stderr_file = stderr_files[-1]
+        with open(latest_stderr_file, "r") as f:
+            stderr_content = f.read()
+    changes = eval(stderr_content.split("\n")[-2].split("imported")[1].strip())
+    assert changes == expected_dict

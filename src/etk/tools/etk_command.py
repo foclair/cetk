@@ -8,7 +8,6 @@ from math import ceil
 from pathlib import Path
 
 from django.core import serializers
-from django.db import transaction
 from openpyxl import load_workbook
 from pyproj import CRS
 from pyproj.exceptions import CRSError
@@ -30,7 +29,12 @@ log = logging.getLogger("etk")
 
 settings = etk.configure()
 
-from etk.edb.const import DEFAULT_SRID, SHEET_NAMES, WGS84_SRID  # noqa
+from etk.edb.const import (  # noqa
+    DEFAULT_EMISSION_UNIT,
+    DEFAULT_SRID,
+    SHEET_NAMES,
+    WGS84_SRID,
+)
 from etk.edb.exporters import export_sources  # noqa
 from etk.edb.importers import (  # noqa
     import_activitycodesheet,
@@ -41,22 +45,16 @@ from etk.edb.importers import (  # noqa
     import_timevarsheet,
     import_traffic,
 )
+from etk.edb.importers.utils import ValidationError  # noqa
 from etk.edb.models import Settings, Substance  # noqa
 from etk.edb.rasterize.rasterizer import EmissionRasterizer, Output  # noqa
 from etk.emissions.calc import aggregate_emissions, get_used_substances  # noqa
 from etk.emissions.views import create_emission_table  # noqa
 
 SOURCETYPES = ("point", "area", "grid", "road")
-DEFAULT_EMISSION_UNIT = "kg/year"
 
 sheet_choices = ["All"]
 sheet_choices.extend(SHEET_NAMES)
-
-
-class DryrunAbort(Exception):
-    """Forcing abort of database changes when doing dryrun."""
-
-    pass
 
 
 def adjust_extent(extent, srid, cellsize):
@@ -138,120 +136,86 @@ class Editor(object):
     def import_workbook(self, filename, sheets=SHEET_NAMES, dry_run=False):
         return_msg = []
         db_updates = {}
-        workbook = load_workbook(filename=filename, data_only=True)
+        workbook = load_workbook(filename=filename, data_only=True, read_only=True)
         import_sheets = [
             s
             for s in SHEET_NAMES
             if s in frozenset(sheets) and s in frozenset(workbook.sheetnames)
         ]
+
         try:
-            with transaction.atomic():
-                for sheet in import_sheets:
-                    if sheet not in workbook.sheetnames:
-                        log.info(f"Workbook has no sheet named {sheet}, skipped import")
-                if any(name != "GridSource" for name in import_sheets):
-                    # PointSource and AreaSource
-                    sourceact = [
-                        "CodeSet",
-                        "ActivityCode",
-                        "EmissionFactor",
-                        "Timevar",
-                        "PointSource",
-                        "AreaSource",
-                    ]
-                    if any(name in sourceact for name in import_sheets):
-                        updates, msgs = import_sourceactivities(
-                            filename,
-                            import_sheets=import_sheets,
-                            validation=dry_run,
-                        )
-                        db_updates.update(updates)
-                        if len(msgs) != 0:
-                            return_msg += msgs
-                            if not dry_run:
-                                raise ImportError(return_msg)
-                    traffic = [
-                        "RoadSource",
-                        "VehicleFuel",
-                        "Fleet",
-                        "CongestionProfile",
-                        "FlowTimevar",
-                        "ColdstartTimevar",
-                        "RoadAttribute",
-                        "TrafficSituation",
-                        "VehicleEmissionFactor",
-                    ]
-                    if any(name in traffic for name in import_sheets):
-                        updates, msgs = import_traffic(
-                            filename, sheets=import_sheets, validation=dry_run
-                        )
-                        if len(msgs) != 0:
-                            return_msg += msgs
-                    # point and area-sources are imported in import_sourceactivities
-                    # elif sheet == "PointSource":
-                    #     updates, msgs = import_sources(
-                    #         filename, validation=dry_run, sourcetype="point"
-                    #     )
-                    # elif sheet == "AreaSource":
-                    #     updates, msgs = import_sources(
-                    #         filename, validation=dry_run, sourcetype="area"
-                    #     )
-                    elif sheet == "RoadSource":
-                        updates, msgs = import_sources(
-                            filename, validation=dry_run, sourcetype="road"
-                        )
-                        if len(msgs) != 0:
-                            return_msg += msgs
-                    db_updates.update(updates)
-                    if len(msgs) != 0:
-                        raise ImportError(return_msg)
-                if dry_run:
-                    raise DryrunAbort
-            # grid sources imported outside atomic transaction
-            # to avoid errors when writing rasters using rasterio
-            if "GridSource" in import_sheets:
-                updates, msgs = import_gridsources(filename, validation=dry_run)
+            missing_sheets = set(import_sheets).difference(workbook.sheetnames)
+            if len(missing_sheets) > 0:
+                log.info(f"Workbook has no sheets named: {missing_sheets}")
+
+            # PointSource and AreaSource
+            sourceact = [
+                "CodeSet",
+                "ActivityCode",
+                "EmissionFactor",
+                "Timevar",
+                "PointSource",
+                "AreaSource",
+            ]
+
+            if any(name in sourceact for name in import_sheets):
+                updates, msgs = import_sourceactivities(
+                    filename,
+                    import_sheets=import_sheets,
+                    validation=dry_run,
+                )
                 db_updates.update(updates)
-                if len(msgs) > 0:
-                    return_msg += msgs
-                    raise ImportError(return_msg)
-        except DryrunAbort:
-            # validate grid sources
-            if "GridSource" in import_sheets:
-                updates, msgs = import_gridsources(filename, validation=True)
                 return_msg += msgs
+
+            traffic = [
+                "RoadSource",
+                "VehicleFuel",
+                "Fleet",
+                "CongestionProfile",
+                "FlowTimevar",
+                "ColdstartTimevar",
+                "RoadAttribute",
+                "TrafficSituation",
+                "VehicleEmissionFactor",
+            ]
+            if any(name in traffic for name in import_sheets):
+                updates, msgs = import_traffic(
+                    filename, sheets=import_sheets, validation=dry_run
+                )
+                return_msg += msgs
+                db_updates.update(updates)
+            if "GridSource" in import_sheets:
+                updates, msgs = import_gridsources(filename)
+                db_updates.update(updates)
+                return_msg += msgs
+            # skip empty messages
+            # return_msg = [entry.strip() for entry in return_msg if entry]
+            if len(return_msg) > 0:
+                raise ValidationError()
+        except ValidationError as err:
+            return_msg.append(str(err))
+            if not dry_run:
+                run_type = "import"
+            else:
+                run_type = "validation"
             if len(return_msg) > 10:
                 log.error(
-                    ">10 errors during validation, first 10:"
-                    f"{os.linesep}{os.linesep.join(return_msg[:10])}"
-                )
-            elif len(return_msg) != 0:
-                log.error(
-                    "Errors during validation:"
-                    f"{os.linesep}{os.linesep.join(return_msg)}"
+                    f">10 errors during {run_type}, first 10:"
+                    f"{os.linesep}{return_msg[:10]}"
                 )
             else:
-                log.info("Successful dry-run, no errors, the file is ready to import.")
-                log.info(
-                    datetime.datetime.now().strftime("%H:%M:%S")
-                    + f" data to be imported {db_updates}"
-                )
-        except ImportError:
-            if len(return_msg) > 10:
-                log.error(
-                    ">10 errors during validation, first 10:"
-                    f"{os.linesep}{os.linesep.join(return_msg[:10])}"
-                )
-            else:
-                log.error(
-                    "Errors during validation:"
-                    f"{os.linesep}{os.linesep.join(return_msg)}"
-                )
+                log.error(f"Errors during {run_type}:" f"{os.linesep}{return_msg}")
         else:
-            log.info(
-                datetime.datetime.now().strftime("%H:%M:%S")
-                + f" imported data {db_updates}"
-            )
+            log.info(f"getting here {datetime.datetime.now()}")
+            if not dry_run:
+                log.info(
+                    f"{datetime.datetime.now()} successfully imported {db_updates}"
+                )
+            else:
+                log.info(
+                    f"{datetime.datetime.now()} successfully validated {db_updates}"
+                )
+        workbook.close()
         return db_updates, return_msg
 
     def update_emission_tables(
@@ -293,6 +257,10 @@ class Editor(object):
         outputpath,
         cellsize,
         sourcetypes=None,
+        point_ids=None,
+        area_ids=None,
+        grid_ids=None,
+        road_ids=None,
         unit=DEFAULT_EMISSION_UNIT,
         codeset=None,
         substances=None,
@@ -311,7 +279,17 @@ class Editor(object):
                 extent=extent, timezone=timezone, path=outputpath, srid=srid
             )
             rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
-            rasterizer.process(substances, begin=begin, end=end, unit=unit)
+            rasterizer.process(
+                substances,
+                begin=begin,
+                end=end,
+                unit=unit,
+                sourcetypes=sourcetypes,
+                point_ids=point_ids,
+                area_ids=area_ids,
+                grid_ids=grid_ids,
+                road_ids=road_ids,
+            )
         except Exception as err:
             log.error(f"could not rasterize emissions: {str(err)}")
             sys.exit(1)
@@ -421,7 +399,7 @@ def main():
         args = sub_parser.parse_args(sub_args)
         if not Path(db_path).exists():
             sys.stderr.write(
-                "Database " + db_path + " does not exist, first run "
+                f"Database {db_path} does not exist, first run "
                 "'etk create' or 'etk migrate'\n"
             )
             sys.exit(1)
@@ -494,6 +472,29 @@ def main():
             + " Time 00:00 assumed",
             metavar="YYMMDDHH",
         )
+        rasterize_grp.add_argument(
+            "--point-ids",
+            nargs="+",
+            help="List of pointsource id's to include in rasterizer. "
+            + "All sources will be rasterized for other sourcetypes if not limited "
+            + "using argument sourcetypes or filtering specified for ids for "
+            + " other sourcetypes too.",
+        )
+        rasterize_grp.add_argument(
+            "--area-ids",
+            nargs="+",
+            help="List of areasource id's to include in rasterizer",
+        )
+        rasterize_grp.add_argument(
+            "--road-ids",
+            nargs="+",
+            help="List of roadsource id's to include in rasterizer",
+        )
+        rasterize_grp.add_argument(
+            "--grid-ids",
+            nargs="+",
+            help="List of gridsource id's to include in rasterizer",
+        )
         # TODO add argument begin/end for rasterize
         # TODO add argument to aggregate emissions within polygon
 
@@ -545,6 +546,10 @@ def main():
                 args.cellsize,
                 substances=substances,
                 sourcetypes=args.sourcetypes,
+                point_ids=args.point_ids,
+                area_ids=args.area_ids,
+                grid_ids=args.grid_ids,
+                road_ids=args.road_ids,
                 unit=args.unit,
                 extent=args.extent,
                 srid=args.srid,

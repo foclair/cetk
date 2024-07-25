@@ -5,6 +5,9 @@ from collections import OrderedDict
 from operator import itemgetter
 from pathlib import Path
 
+# need to import fiona before geopandas due to gpd bug causing circular imports.
+import fiona  # noqa
+import geopandas as gpd
 import numpy as np  # noqa
 import pandas as pd
 from django.contrib.gis.gdal import (  # noqa
@@ -13,6 +16,7 @@ from django.contrib.gis.gdal import (  # noqa
     DataSource,
     SpatialReference,
 )
+from django.contrib.gis.gdal.geometries import LineString as GDALLineString
 from django.contrib.gis.geos import Point, Polygon  # noqa
 from django.core.exceptions import ObjectDoesNotExist, ValidationError  # noqa
 from django.core.management.base import CommandError  # noqa
@@ -96,7 +100,7 @@ def vehicles_excel_to_dict(file_path):
     dtype_dict = {"name": str, "isheavy": bool, "info": str, "fuel": str}
     for cs in CodeSet.objects.all():
         dtype_dict["activitycode_" + cs.slug] = str
-    df = pd.read_excel(file_path, sheet_name="VehicleFuel", dtype=dtype_dict)
+    df = pd.read_excel(file_path, sheet_name="VehicleFuel", dtype=dtype_dict).fillna("")
 
     # Extract the code sets from the DataFrame
     activity_columns = [col for col in df.columns if col.startswith("activitycode_")]
@@ -286,6 +290,7 @@ def import_traffic(filename, sheets, validation=False):
             return_message += msg
         except ImportError as err:
             return {}, [f"{err}"]
+    workbook.close()
     return return_dict, return_message  # update dict and messages
 
 
@@ -359,7 +364,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                         validation=validation,
                     )
                 )
-            if ac not in codes:
+            if ac not in codes and ac != "":
                 return_message.append(
                     import_error(
                         f"invalid value '{ac}' for activity code "
@@ -377,11 +382,11 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     except ValueError:
         log.error(f"invalid emission-factor unit {unit} specified in config-file")
         raise
-    log.info(f"emission factor units is: {unit}")
+    log.debug(f"emission factor units is: {unit}")
 
     messages = {}
     with Path(vehicles_file).open(encoding=encoding) as veh_file:
-        log.info("reading emission-factor table")
+        log.debug("reading emission-factor table")
         dtype_dict = {
             "vehicle": str,
             "fuel": str,
@@ -420,7 +425,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                     f"Required column '{col}' not found in file '{vehicles_file}"
                 )
 
-        log.debug("checking that all substance exist in the database")
+        log.debug("checking that all substances exist in the database")
         substances = {}
         for subst in df.index.get_level_values(3).unique():
             try:
@@ -508,7 +513,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                 for i in range(3):
                     code_nr = i + 1
                     ac_codes[i] = code_data.get(f"activitycode{code_nr}", None)
-                    if ac_codes[i] is not None:
+                    if ac_codes[i] is not None and ac_codes[i] != "":
                         try:
                             ac_codes[i] = valid_codes[
                                 CodeSet.objects.get(id=code_nr).slug
@@ -717,7 +722,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
             efs_to_update,
             ("freeflow", "heavy", "saturated", "stopngo", "coldstart"),
         )
-        log.info(f"updated {len(efs_to_update)} emission-factors")
+        log.debug(f"updated {len(efs_to_update)} emission-factors")
         return_dict = {"vehicle_emission_factors": {"updated": len(efs_to_update)}}
     else:
         return_dict = {"vehicle_emission_factors": {"updated": 0}}
@@ -727,7 +732,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     if len(efs_to_create) > 0:
         try:
             VehicleEF.objects.bulk_create(efs_to_create)
-            log.info(f"wrote {len(efs_to_create)} emission-factors")
+            log.debug(f"wrote {len(efs_to_create)} emission-factors")
             return_dict["vehicle_emission_factors"]["created"] = len(efs_to_create)
         except IntegrityError:
             for ef in efs_to_create:
@@ -760,7 +765,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
     except KeyError:
         ImportError("keyword 'attributes' not found in config")
 
-    log.info("create road attributes")
+    log.debug("create road attributes")
 
     # created objects are stored in a nested dict
     defined_attributes = OrderedDict()
@@ -824,7 +829,7 @@ def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
         for rc in RoadClass.objects.prefetch_related(PrefetchRoadClassAttributes())
     }
 
-    log.info("reading roadclass table")
+    log.debug("reading roadclass table")
     with Path(roadclass_file).open(encoding=encoding) as roadclass_stream:
         roadclass_attributes = [a.slug for a in defined_attributes]
         if Path(roadclass_file).suffix == ".csv":
@@ -1224,10 +1229,12 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
 ):
     """Import a road network."""
     return_message = []
-    datasource = DataSource(roadfile)
+    datasource = gpd.read_file(roadfile)
 
-    layer = datasource[0]
-    src_proj = SpatialReference(config["srid"]) if "srid" in config else layer.srs
+    if "srid" in config:
+        src_proj = SpatialReference(config["srid"])
+    else:
+        src_proj = SpatialReference(datasource.crs.to_epsg())
     target_proj = SpatialReference(WGS84_SRID)
     trans = CoordTransform(src_proj, target_proj)
 
@@ -1367,14 +1374,17 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
     messages = {}
 
     def make_road(feature):  # noqa: C901, PLR0912, PLR0915
-        source_geom = feature.geom
-        if len(source_geom) < 2:
+        source_geom = feature.geometry
+
+        if np.shape(source_geom.xy)[1] < 2:
             msg = "invalid geometry (< 2 nodes), instance not imported"
             handle_msg(messages, msg)
             raise ValidationError(msg)
-        source_geom.coord_dim = 2
-        source_geom.transform(trans)
-        geom = source_geom.geos
+
+        gdalgeom = GDALLineString(source_geom.wkt)
+        gdalgeom.coord_dim = 2
+        gdalgeom.transform(trans)
+        geom = gdalgeom.geos
         road_data = {"geom": geom}
 
         for target_name, source_name in attr_dict.items():
@@ -1398,7 +1408,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
                             validation=validation,
                         )
                     )
-                if val is None:
+                if pd.isnull(val):
                     val = default_value
             else:
                 msg = f"no source field specified for target field {target_name}"
@@ -1559,26 +1569,26 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
 
     roads = []
     count = 0
-    nroads = len(layer)
+    nroads = len(datasource)
     old_progress = -1
     ncreated = 0
-    for features in inbatch(layer, chunksize):
+    for features in inbatch(datasource.iterrows(), chunksize):
         for feature in features:
             count += 1
 
             progress = count / nroads * 100
             if int(progress) > old_progress:
                 if not validation:
-                    log.info(f"done {int(progress)}%")
+                    log.debug(f"done {int(progress)}%")
                 old_progress = int(progress)
 
-            if exclude is not None and filter_out(feature, exclude):
+            if exclude is not None and filter_out(feature[1], exclude):
                 continue
-            if only is not None and not filter_out(feature, only):
+            if only is not None and not filter_out(feature[1], only):
                 continue
 
             try:
-                road = make_road(feature)
+                road = make_road(feature[1])
             except ValidationError:
                 continue
             roads.append(road)
@@ -1587,7 +1597,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
         roads = []
         if progress_callback:
             progress_callback(count)
-    log.info(f"created {ncreated} roads")
+    log.debug(f"created {ncreated} roads")
     return_dict = {"roads": {"created": ncreated, "updated": 0}}
     if len(messages) > 0:
         log.warning("Summary: ")

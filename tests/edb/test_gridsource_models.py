@@ -82,7 +82,7 @@ def test_list_rasters(db_raster):
     assert db_raster in rasters, "raster not found in db"
 
 
-def test_create_gridsource(rasterfile, code_sets):
+def test_create_gridsource(rasterfile, code_sets, transactional_db):
     raster_name = "raster1"
     with rio.open(rasterfile, "r") as raster:
         write_gridsource_raster(raster, raster_name)

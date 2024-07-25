@@ -1,5 +1,6 @@
 """Utility functions for emission processing."""
 import argparse
+import glob
 import os
 import shutil
 import subprocess
@@ -7,6 +8,7 @@ from argparse import ArgumentTypeError
 from collections.abc import Iterable
 from pathlib import Path
 from subprocess import CalledProcessError, SubprocessError  # noqa
+from tempfile import gettempdir
 
 from django.core import serializers
 
@@ -14,6 +16,12 @@ from etk import __version__, logging
 from etk.edb.const import SHEET_NAMES
 
 log = logging.getLogger(__name__)
+
+
+class BackupError(Exception):
+    """Error during backup-process."""
+
+    pass
 
 
 def get_db():
@@ -24,10 +32,13 @@ def get_db():
 def get_template_db():
     DATABASE_DIR = Path(
         os.path.join(
-            os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "eclair"
+            os.environ.get(
+                "XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config")
+            ),
+            "eclair",
         )
     )
-    return DATABASE_DIR / "eclair.gpkg"
+    return os.path.join(DATABASE_DIR, "eclair.gpkg")
 
 
 def check_and_get_path(filename):
@@ -36,6 +47,20 @@ def check_and_get_path(filename):
         return p
     else:
         raise ArgumentTypeError(f"Input file {filename} does not exist")
+
+
+def get_backup_path(db_path):
+    return
+
+
+def backup_db():
+    db_path = get_db()
+    if db_path:
+        backup_path = Path(os.path.join(gettempdir(), f"{db_path.name}.bkp"))
+    else:
+        raise ValueError("No database specified, set by $ETK_DATABASE_PATH\n")
+    shutil.copyfile(db_path, backup_path)
+    return backup_path
 
 
 def run_get_settings(db_path=None):
@@ -61,7 +86,7 @@ def run_update_emission_tables(db_path=None, **kwargs):
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
-    return run("etk", "calc", db_path=db_path, *cmd_args)
+    return run_non_blocking("etk", "calc", db_path=db_path, *cmd_args)
 
 
 def run_aggregate_emissions(
@@ -81,7 +106,7 @@ def run_aggregate_emissions(
         if isinstance(substances, str):
             substances = [substances]
         cmd_args += ["--substances"] + substances
-    return run("etk", "calc", db_path=db_path, *cmd_args)
+    return run_non_blocking("etk", "calc", db_path=db_path, *cmd_args)
 
 
 def run_rasterize_emissions(
@@ -95,6 +120,10 @@ def run_rasterize_emissions(
     unit=None,
     sourcetypes=None,
     substances=None,
+    point_ids=None,
+    area_ids=None,
+    road_ids=None,
+    grid_ids=None,
 ):
     """rasterize emissions and store as NetCDF."""
     cmd_args = ["--rasterize", str(outputpath), "--cellsize", str(cellsize)]
@@ -119,8 +148,31 @@ def run_rasterize_emissions(
         if isinstance(substances, str):
             substances = [substances]
         cmd_args += ["--substances"] + substances
-
-    return run("etk", "calc", db_path=db_path, *cmd_args)
+    if point_ids is not None:
+        cmd_args += ["--point-ids"]
+        if not isinstance(point_ids, Iterable):
+            cmd_args += [str(point_ids)]
+        else:
+            cmd_args += list(point_ids)
+    if area_ids is not None:
+        cmd_args += ["--area-ids"]
+        if not isinstance(area_ids, Iterable):
+            cmd_args += [str(area_ids)]
+        else:
+            cmd_args += list(area_ids)
+    if road_ids is not None:
+        cmd_args += ["--road-ids"]
+        if not isinstance(road_ids, Iterable):
+            cmd_args += [str(road_ids)]
+        else:
+            cmd_args += list(road_ids)
+    if grid_ids is not None:
+        cmd_args += ["--grid-ids"]
+        if not isinstance(grid_ids, Iterable):
+            cmd_args += [str(grid_ids)]
+        else:
+            cmd_args += list(grid_ids)
+    return run_non_blocking("etk", "calc", db_path=db_path, *cmd_args)
 
 
 def run_import(filename, sheets=SHEET_NAMES, dry_run=False, db_path=None, **kwargs):
@@ -135,9 +187,15 @@ def run_import(filename, sheets=SHEET_NAMES, dry_run=False, db_path=None, **kwar
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
+
     if dry_run:
         cmd_args.append("--dryrun")
-    return run("etk", "import", *cmd_args)
+        backup_path = backup_db()
+        proc = run_non_blocking("etk", "import", *cmd_args, db_path=backup_path)
+    else:
+        proc = run_non_blocking("etk", "import", *cmd_args, db_path=db_path)
+        backup_path = None
+    return backup_path, proc
 
 
 def run_export(filename, db_path=None, **kwargs):
@@ -146,7 +204,7 @@ def run_export(filename, db_path=None, **kwargs):
     for k, v in kwargs.items():
         cmd_args.append(f"--{k}")
         cmd_args.append(str(v))
-    return run("etk", "export", db_path=db_path, *cmd_args)
+    return run_non_blocking("etk", "export", db_path=db_path, *cmd_args)
 
 
 def create_from_template(filename):
@@ -158,9 +216,9 @@ def set_settings_srid(srid, db_path=None):
     return run("etk", "settings", "--srid", str(srid), db_path=db_path)
 
 
-def run(*args, db_path=None):
+def run(*args, db_path=None, log_level=logging.INFO):
     env = (
-        os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": db_path}
+        os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": str(db_path)}
     )
     proc = subprocess.run(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=env
@@ -169,13 +227,59 @@ def run(*args, db_path=None):
     return proc.stdout, proc.stderr
 
 
+def get_next_counter(prefix, output_path):
+    # Scan the output directory for files with the specified prefix
+    log_files = glob.glob(os.path.join(output_path, prefix + "*"))
+
+    # If no files found, return 1 as the starting counter
+    if not log_files:
+        return 1
+
+    # Extract the counters from the file names and find the maximum
+    counters = [int(f.split("_")[-2]) for f in log_files]
+    return max(counters) + 1
+
+
+def run_non_blocking(*args, db_path=None, log_level=logging.INFO):
+    env = (
+        os.environ if db_path is None else {**os.environ, "ETK_DATABASE_PATH": str(db_path)}
+    )
+
+    prefix = args[0] + "_" + args[1] + "_"
+    # output_path = os.path.dirname(
+    #     os.environ.get("ETK_DATABASE_PATH") if db_path is None else db_path
+    # )
+    counter = get_next_counter(prefix, gettempdir())
+    # Generate file paths for stdout and stderr
+    stdout_path = os.path.join(gettempdir(), f"{prefix}_{counter}_stdout.log")
+    stderr_path = os.path.join(gettempdir(), f"{prefix}_{counter}_stderr.log")
+    # Open the files for writing
+    stdout_file = open(stdout_path, "w")
+    stderr_file = open(stderr_path, "w")
+    # Start the subprocess with stdout and stderr redirected to the files
+    process = subprocess.Popen(
+        args,
+        stdout=stdout_file,
+        stderr=stderr_file,
+        bufsize=1,
+        universal_newlines=True,
+        env=env,
+    )
+
+    # Close the file objects
+    stdout_file.close()
+    stderr_file.close()
+
+    return process
+
+
 class VerboseAction(argparse.Action):
 
     """Argparse action to handle terminal verbosity level."""
 
     def __init__(self, option_strings, dest, default=logging.INFO, help=None):
         baselogger = logging.getLogger("etk")
-        baselogger.setLevel(logging.DEBUG)
+        baselogger.setLevel(default)
         if len(baselogger.handlers) == 0:
             self._loghandler = logging.create_terminal_handler(default)
             baselogger.addHandler(self._loghandler)

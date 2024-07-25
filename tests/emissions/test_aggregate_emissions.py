@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 import rasterio as rio
@@ -27,7 +29,7 @@ def rasterfile(tmpdir):
     data = np.linspace(0, 100, num=nrows * ncols, dtype=np.float32).reshape(
         (nrows, ncols)
     )
-    outfile = str(tmpdir / "gridsource_raster.tiff")
+    outfile = str(os.path.join(tmpdir, "gridsource_raster.tiff"))
     with rio.open(
         outfile,
         "w",
@@ -114,7 +116,7 @@ def test_aggregate_emissions_all_sourcetypes(
     # gdal_raster.extent (367000.0, 6368000.0, 369000.0, 6370000.0)
 
     raster_data, metadata = get_gridsource_raster(db_raster)
-    x1, y1, x2, y2 = metadata["extent"]
+    x1, y1, x2, y2 = metadata["extent"][0]
     left_half_extent = Polygon(
         (
             (x1, y1),
@@ -141,6 +143,6 @@ def test_aggregate_emissions_all_sourcetypes(
     assert len(df) == 1
     assert df.index[0] == ("3", "Diffuse sources")
     assert df.columns[0] == ("emission", "SOx")
-    # reference emission: "seconds of year" * "grid fraction in polygon" / "kg/ton"
-    ref_emis = 1.0 * 365.25 * 24 * 3600 * raster_share / 1000
+    # reference emission: "seconds of year" * "grid fraction in polygon"
+    ref_emis = 1.0 * 365.25 * 24 * 3600 * raster_share
     assert ref_emis == pytest.approx(df.iloc[0, 0], 1e-5)

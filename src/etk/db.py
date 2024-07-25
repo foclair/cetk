@@ -12,7 +12,7 @@ class EtkDatabaseError(Exception):
 def run_migrate(db_path=None):
     env = {**os.environ}
     if db_path is not None:
-        env["ETK_DATABASE_PATH"] = db_path
+        env["ETK_DATABASE_PATH"] = str(db_path)
 
         # handle error in geodjango starting with sqlite 3.36
         # see: https://groups.google.com/g/spatialite-users/c/SnNZt4AGm_o

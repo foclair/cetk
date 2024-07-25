@@ -17,7 +17,7 @@ def default_timevar_month():
 
 
 def get_normalization_constant(typeday, month, timezone):
-    commonyear = pd.date_range("2018", periods=24 * 365, freq="H", tz=timezone)
+    commonyear = pd.date_range("2018", periods=24 * 365, freq="h", tz=timezone)
     values = typeday[commonyear.hour, commonyear.weekday] * month[commonyear.month - 1]
     return len(values) / values.sum()
 

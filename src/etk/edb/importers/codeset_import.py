@@ -6,7 +6,7 @@ from .utils import import_error, worksheet_to_dataframe
 def import_codesetsheet(workbook, validation):
     return_message = []
     return_dict = {}
-    nr_codesets = len(CodeSet.objects.all())
+    nr_codesets = CodeSet.objects.count()
     data = workbook["CodeSet"].values
     df_codeset = worksheet_to_dataframe(data)
     slugs = df_codeset["slug"]

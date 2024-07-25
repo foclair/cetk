@@ -54,7 +54,7 @@ class TestCongestionProfile:
             id=123, traffic_condition=str([[1] * 7, [2] * 7, [3] * 7, [4] * 7] * 6)
         )
         time_index = pd.date_range(
-            start, periods=24 * 7 * 2, freq="H", tz=datetime.timezone.utc
+            start, periods=24 * 7 * 2, freq="h", tz=datetime.timezone.utc
         )
         time_series = congestion.to_series(time_index, timezone=time_index.tz)
         expected_time_series = pd.Series(

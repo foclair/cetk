@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+from pathlib import Path
 
 from etk.edb.models.source_models import Activity
 from etk.tools import Editor
@@ -9,7 +10,7 @@ from etk.tools import Editor
 
 def test_init_db(tmpdir):
     """test to initialize an offline database."""
-    filepath = tmpdir / "test.sqlite"
+    filepath = Path(os.path.join(tmpdir, "test.sqlite"))
     os.environ["ETK_DATABASE_PATH"] = str(filepath)
     editor = Editor()
     editor.migrate()
@@ -22,7 +23,7 @@ def test_edit_test_db(db):
 
 
 def test_etk_cli(tmpdir):
-    filepath = tmpdir / "test.sqlite"
+    filepath = Path(os.path.join(tmpdir, "test.sqlite"))
     os.environ["ETK_DATABASE_PATH"] = str(filepath)
     try:
         subprocess.run(

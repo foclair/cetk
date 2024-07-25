@@ -34,6 +34,7 @@ from etk.edb.models import (
     get_gridsource_raster,
     timevar_to_series,
 )
+from etk.edb.models.gridsource_models import OutsideExtentError
 from etk.edb.traffic import los_to_velocity
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.calc import calculate_source_emissions
@@ -248,9 +249,9 @@ class EmissionRasterizer:
             end: end time in UTC
 
         """
-        time_index = pd.date_range(begin, end, freq="H")
+        time_index = pd.date_range(begin, end, freq="h")
         one_hour = datetime.timedelta(hours=1)
-        shifted_index = pd.date_range(begin - one_hour, end - one_hour, freq="H")
+        shifted_index = pd.date_range(begin - one_hour, end - one_hour, freq="h")
 
         self.flow_timevar_scalings = pd.DataFrame(
             {
@@ -383,8 +384,6 @@ class EmissionRasterizer:
                 raise ValueError(
                     f"Rasterize cannot handle sourcetype {sourcetype} yet."
                 )
-            # TODO check, should add unit="kg/s"? default unit for
-            # calculate_source_emissions is kg/year!
             self.querysets[sourcetype] = calculate_source_emissions(
                 sourcetype,
                 substances=substances,
@@ -589,9 +588,14 @@ class EmissionRasterizer:
             # spatial distribution of a grid is unique for each raster
             source_key = (source_id, raster_name)
             if source_key not in self._cache.gridded_sources[GRID]:
-                raster_data, metadata = get_gridsource_raster(
-                    raster_name, clip_by=polygon
-                )
+                try:
+                    raster_data, metadata = get_gridsource_raster(
+                        raster_name, clip_by=polygon
+                    )
+                except OutsideExtentError:
+                    # no overlap between query and this grid,
+                    # try next gridsource
+                    break
 
                 index_array, source_weights = resample_band(
                     raster_data,
@@ -778,6 +782,7 @@ class EmissionRasterizer:
             self.substances = substances
 
         self.log.debug("reading records from database")
+
         # create querysets for all sources
         self._get_querysets(
             sourcetypes=sourcetypes,
@@ -785,6 +790,8 @@ class EmissionRasterizer:
             tags=tags,
             point_ids=point_ids,
             area_ids=area_ids,
+            road_ids=road_ids,
+            grid_ids=grid_ids,
             polygon=polygon,
             ac1=ac1,
             ac2=ac2,
@@ -845,11 +852,12 @@ class EmissionRasterizer:
         # how many hours that will be processed in the same chunk
         # this is a compromise between required memory, execution time
         # the minimum chunk size of the netcdf variables is used
+
         min_time_chunksize = 1e9
         for substance in self.substances:
-            result_file = os.path.join(self.output.path, substance.name + ".nc")
+            result_file = os.path.join(self.output.path, substance.slug + ".nc")
             with nc.Dataset(result_file, "r", format="NETCDF4") as dset:
-                # variable_name = 'Emission of '+substance.name
+                # variable_name = 'Emission of '+substance.slug
                 # or x, y, time
                 time_chunking = dset.variables["time"].chunking()
                 if time_chunking[0] < min_time_chunksize:
@@ -886,7 +894,7 @@ class EmissionRasterizer:
                 if self.unit_conversion_factor != 1.0:
                     emis_chunk *= self.unit_conversion_factor
 
-                result_file = os.path.join(self.output.path, substance.name + ".nc")
+                result_file = os.path.join(self.output.path, substance.slug + ".nc")
                 with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
                     self.set_data(
                         dset,
@@ -945,7 +953,7 @@ class EmissionRasterizer:
         emis_fac_freeflow = np.ones((timesteps,))
 
         emis_ts = pd.Series(
-            index=pd.date_range(start=begin, end=end, freq="H"),
+            index=pd.date_range(start=begin, end=end, freq="h"),
             data=np.zeros((timesteps,)),
         )
         cstvs_cache = {}

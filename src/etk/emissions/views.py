@@ -2,6 +2,7 @@
 
 from django.db import connection
 
+from etk.edb.const import DEFAULT_EMISSION_UNIT
 from etk.edb.models import Settings, Substance
 from etk.edb.units import emis_conversion_factor_from_si
 from etk.emissions.calc import get_used_substances
@@ -20,7 +21,7 @@ def make_emission_sql(sourcetype, substances):
     return sql
 
 
-def create_emission_view(sourcetype, substances, unit="kg/year"):
+def create_emission_view(sourcetype, substances, unit=DEFAULT_EMISSION_UNIT):
     """create emission view with columns source_id, subst1, subst2...substn."""
     sql = make_emission_sql(sourcetype, substances)
 
@@ -47,7 +48,7 @@ def create_emission_view(sourcetype, substances, unit="kg/year"):
     cur.execute(view_sql)
 
 
-def create_emission_table(sourcetype, substances=None, unit="kg/year"):
+def create_emission_table(sourcetype, substances=None, unit=DEFAULT_EMISSION_UNIT):
     """create emission table with columns source_id, subst1, subst2...substn."""
 
     sql = make_emission_sql(sourcetype, substances)
