@@ -4,8 +4,6 @@
 #
 #    pip-compile --allow-unsafe --constraint=requirements.txt --generate-hashes --output-file=requirements-dev.txt requirements-dev.in
 #
---extra-index-url https://gitlab.smhi.se/api/v4/projects/3495/packages/pypi/simple
-
 asgiref==3.6.0 \
     --hash=sha256:71e68008da809b957b7ee4b43dbccff33d1b23519fb8344e33f049897077afac \
     --hash=sha256:9567dfe7bd8d3c8c892227827c41cce860b368104c3431da67a0c5a65a949506
