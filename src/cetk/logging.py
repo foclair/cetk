@@ -15,7 +15,7 @@ _logLevels = {
 }
 
 
-class EtkHandler(logging.Handler):
+class CetkHandler(logging.Handler):
 
     """Log handler for cetk."""
 
@@ -34,7 +34,7 @@ def create_terminal_handler(loglevel=logging.INFO, prog=None):
 
 def create_cetk_handler(loglevel=logging.INFO):
     """Configure a handler for the Prepper log."""
-    handler = EtkHandler()
+    handler = CetkHandler()
     handler.setLevel(loglevel)
     formatter = logging.Formatter("%(message)s")
     handler.setFormatter(formatter)

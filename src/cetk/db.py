@@ -5,7 +5,7 @@ import sqlite3
 import subprocess
 
 
-class EtkDatabaseError(Exception):
+class CetkDatabaseError(Exception):
     pass
 
 
