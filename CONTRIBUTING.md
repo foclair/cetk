@@ -14,10 +14,10 @@ $ cd etk
 $ python3.9 -m venv --prompt etk .venv
 $ . .venv/bin/activate
 $ pip install -U pip setuptools wheel
-$ pip install -i https://test.pypi.org/simple/ rastafari==0.2.2
 $ pip install -r requirements.txt
 $ pip install djangorestframework
 $ pre-commit install
+$ pip install -e .
 ```
 # Windows
 ``` console
@@ -37,7 +37,6 @@ $ pre-commit run --all-files
 ### Dependency management
 
 Dependencies are organized in the following files:
-TODO not all of these files exist here?
 
 | Filename                           | Contents                                                                  |
 | ---------------------------------- | ------------------------------------------------------------------------- |
