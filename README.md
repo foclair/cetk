@@ -30,14 +30,14 @@ New databases can now be created by copying the template database. This is easie
 cetk create /home/myuser/mydatabase.gpkg
 ```
 
-To use a specific database, set environment variable "ETK_DATABASE_PATH".
+To use a specific database, set environment variable "CETK_DATABASE_PATH".
 ```
-export ETK_DATABASE_PATH="/home/myuser/mydatabase.gpkg"
+export CETK_DATABASE_PATH="/home/myuser/mydatabase.gpkg"
 ```
 
-For more verbose logging, set environment variable ETK_DEBUG=1:
+For more verbose logging, set environment variable CETK_DEBUG=1:
 ```
-export ETK_DEBUG=1
+export CETK_DEBUG=1
 ```
 
 ## Contributing

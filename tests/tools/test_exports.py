@@ -23,7 +23,7 @@ def all_source_xlsx(tmpdir, settings):
 @pytest.fixture
 def tmp_db(tmpdir):
     db_path = tmpdir / "test.sqlite"
-    os.environ["ETK_DATABASE_PATH"] = str(db_path)
+    os.environ["CETK_DATABASE_PATH"] = str(db_path)
     return db_path
 
 

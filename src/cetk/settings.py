@@ -2,7 +2,7 @@
 
 import os
 
-DEBUG = os.environ.get("ETK_DEBUG", False)
+DEBUG = os.environ.get("CETK_DEBUG", False)
 
 if "FLATPAK_ID" in os.environ:
     SPATIALITE_LIBRARY_PATH = "/app/lib/mod_spatialite.so"
@@ -34,7 +34,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.spatialite",
         "NAME": os.environ.get(
-            "ETK_DATABASE_PATH", os.path.join(DATABASE_DIR, "eclair.gpkg")
+            "CETK_DATABASE_PATH", os.path.join(DATABASE_DIR, "eclair.gpkg")
         ),
         "TEST": {"NAME": os.path.join(DATABASE_DIR, "test.eclair.gpkg")},
     }

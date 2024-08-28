@@ -28,8 +28,8 @@ def configure():
             os.environ.get("XDG_CONFIG_HOME", default_config_home), "eclair"
         )
         default_db = os.path.abspath(os.path.join(config_home, "eclair.gpkg"))
-        db_path = os.environ.get("ETK_DATABASE_PATH", default_db)
-        DEBUG = os.environ.get("ETK_DEBUG", False)
+        db_path = os.environ.get("CETK_DATABASE_PATH", default_db)
+        DEBUG = os.environ.get("CETK_DEBUG", False)
         level = "DEBUG" if DEBUG else "INFO"
         if level == "DEBUG":
             cetk_logger = {"handlers": ["console_debug"], "level": level}

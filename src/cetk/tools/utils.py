@@ -25,7 +25,7 @@ class BackupError(Exception):
 
 
 def get_db():
-    db_path = os.environ.get("ETK_DATABASE_PATH")
+    db_path = os.environ.get("CETK_DATABASE_PATH")
     return Path(db_path) if db_path is not None else None
 
 
@@ -58,7 +58,7 @@ def backup_db():
     if db_path:
         backup_path = Path(os.path.join(gettempdir(), f"{db_path.name}.bkp"))
     else:
-        raise ValueError("No database specified, set by $ETK_DATABASE_PATH\n")
+        raise ValueError("No database specified, set by $CETK_DATABASE_PATH\n")
     shutil.copyfile(db_path, backup_path)
     return backup_path
 
@@ -220,7 +220,7 @@ def run(*args, db_path=None, log_level=logging.INFO):
     env = (
         os.environ
         if db_path is None
-        else {**os.environ, "ETK_DATABASE_PATH": str(db_path)}
+        else {**os.environ, "CETK_DATABASE_PATH": str(db_path)}
     )
     proc = subprocess.run(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=env
@@ -246,12 +246,12 @@ def run_non_blocking(*args, db_path=None, log_level=logging.INFO):
     env = (
         os.environ
         if db_path is None
-        else {**os.environ, "ETK_DATABASE_PATH": str(db_path)}
+        else {**os.environ, "CETK_DATABASE_PATH": str(db_path)}
     )
 
     prefix = args[0] + "_" + args[1] + "_"
     # output_path = os.path.dirname(
-    #     os.environ.get("ETK_DATABASE_PATH") if db_path is None else db_path
+    #     os.environ.get("CETK_DATABASE_PATH") if db_path is None else db_path
     # )
     counter = get_next_counter(prefix, gettempdir())
     # Generate file paths for stdout and stderr

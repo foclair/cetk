@@ -15,7 +15,7 @@ def inventory_xlsx(testsettings):
 @pytest.fixture
 def test_db(tmpdir):
     db_path = os.path.join(tmpdir, "test.gpkg")
-    os.environ["ETK_DATABASE_PATH"] = str(db_path)
+    os.environ["CETK_DATABASE_PATH"] = str(db_path)
     run_migrate(db_path=db_path)
     return db_path
 

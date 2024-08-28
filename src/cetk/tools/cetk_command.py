@@ -308,7 +308,7 @@ def main():
         calc     calculate emissions
         settings change database settings
 
-        Current database is {db_path} (set by $ETK_DATABASE_PATH)
+        Current database is {db_path} (set by $CETK_DATABASE_PATH)
         """,
     )
     add_standard_command_options(parser)
@@ -344,7 +344,7 @@ def main():
         and sys.argv[2] not in ("-h", "--help", "--version")
         and db_path == "unspecified"
     ):
-        sys.stderr.write("No database specified, set by $ETK_DATABASE_PATH\n")
+        sys.stderr.write("No database specified, set by $CETK_DATABASE_PATH\n")
         sys.exit(1)
 
     if main_args.command == "info":
