@@ -15,6 +15,7 @@ maintainers = [
   { name = "FO Luft", email = "foluftadmin@smhi.se" },
 ]
 description = "CLAIRs Emission ToolKit cetk"
+license = {file = "LICENSE"}
 readme = "README.md"
 requires-python = ">=3.9"
 dynamic = ["version"]
