@@ -6,7 +6,7 @@ import pytest
 import rasterio as rio
 from django.contrib.gis.geos import Polygon
 
-from etk.edb.models import (
+from cetk.edb.models import (
     GridSource,
     Substance,
     drop_gridsource_raster,
@@ -14,8 +14,8 @@ from etk.edb.models import (
     list_gridsource_rasters,
     write_gridsource_raster,
 )
-from etk.edb.units import emission_unit_to_si
-from etk.utils import GTiffProfile
+from cetk.edb.units import emission_unit_to_si
+from cetk.utils import GTiffProfile
 
 RASTER_EXTENT = (0, 0, 1200, 1000)
 

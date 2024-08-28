@@ -7,8 +7,8 @@ from tempfile import gettempdir
 
 import pytest
 
-from etk.db import run_migrate
-from etk.tools.utils import run_import
+from cetk.db import run_migrate
+from cetk.tools.utils import run_import
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
     backup_path, proc = run_import(pointsourceactivities_xlsx, db_path=tmp_db)
     proc.wait()
     # Read the latest stderr file
-    stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
+    stderr_files = glob.glob(os.path.join(gettempdir(), "cetk_import_*_stderr.log"))
     stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
     if stderr_files:
         latest_stderr_file = stderr_files[-1]
@@ -61,7 +61,7 @@ def test_import_pointsources(tmp_db, pointsourceactivities_xlsx, validation_xlsx
     backup_path, proc = run_import(validation_xlsx, db_path=tmp_db, dry_run=True)
     proc.wait()
     # Read the latest stderr file
-    stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
+    stderr_files = glob.glob(os.path.join(gettempdir(), "cetk_import_*_stderr.log"))
     stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
     if stderr_files:
         latest_stderr_file = stderr_files[-1]
@@ -82,7 +82,7 @@ def test_import_traffic(tmp_db, traffic_xlsx):
     }
 
     # Read the latest stderr file
-    stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
+    stderr_files = glob.glob(os.path.join(gettempdir(), "cetk_import_*_stderr.log"))
     stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
     if stderr_files:
         latest_stderr_file = stderr_files[-1]

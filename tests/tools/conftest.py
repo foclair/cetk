@@ -3,8 +3,8 @@ from importlib import resources
 
 import pytest
 
-from etk.db import run_migrate
-from etk.tools.utils import run_import
+from cetk.db import run_migrate
+from cetk.tools.utils import run_import
 
 
 @pytest.fixture

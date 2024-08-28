@@ -73,7 +73,7 @@ cligj==0.7.2 \
 django==4.2.2 \
     --hash=sha256:2a6b6fbff5b59dd07bef10bcb019bee2ea97a30b2a656d51346596724324badf \
     --hash=sha256:672b3fa81e1f853bb58be1b51754108ab4ffa12a77c06db86aa8df9ed0c46fe5
-    # via etk (setup.cfg)
+    # via cetk (setup.cfg)
 et-xmlfile==1.1.0 \
     --hash=sha256:8eb9e2bc2f8c97e37a2dc85a09ecdcdec9d8a396530a6d5a33b30b9a92da0c5c \
     --hash=sha256:a2ba85d1d6a74ef63837eed693bcb89c3f752169b0e3e7ae5b16ca5e1b3deada
@@ -103,11 +103,11 @@ fiona==1.9.6 \
     --hash=sha256:e7617563b36d2be99f048f0d0054b4d765f4aae454398f88f19de9c2c324b7f8 \
     --hash=sha256:f1b49d51a744874608b689f029766aa1e078dd72e94b44cf8eeef6d7bd2e9051 \
     --hash=sha256:f4230eccbd896a79d1ebfa551d84bf90f512f7bcbe1ca61e3f82231321f1a532
-    # via etk (setup.cfg)
+    # via cetk (setup.cfg)
 geopandas==1.0.1 \
     --hash=sha256:01e147d9420cc374d26f51fc23716ac307f32b49406e4bd8462c07e82ed1d3d6 \
     --hash=sha256:b8bf70a5534588205b7a56646e2082fb1de9a03599651b3d80c99ea4c2ca08ab
-    # via etk (setup.cfg)
+    # via cetk (setup.cfg)
 importlib-metadata==8.1.0 \
     --hash=sha256:3cd29f739ed65973840b068e3132135ce954c254d48b5b640484467ef7ab3c8c \
     --hash=sha256:fcdcb1d5ead7bdf3dd32657bb94ebe9d2aabfe89a19782ddc32da5041d6ebfb4
@@ -140,7 +140,7 @@ netcdf4==1.6.5 \
     --hash=sha256:b994afce2ca4073f6b757385a6c0ffec25ecaae2b8821535b303c7cdbf6de42b \
     --hash=sha256:d23b97cbde2bf413fadc4697c5c255a0436511c02f811e127e0fb12f5b882a4c \
     --hash=sha256:de4dc973fae9e2bbdf42e094125e423a4c25393172a61958314969b055a38889
-    # via etk (setup.cfg)
+    # via cetk (setup.cfg)
 numpy==1.24.2 \
     --hash=sha256:003a9f530e880cb2cd177cba1af7220b9aa42def9c4afc2a2fc3ee6be7eb2b22 \
     --hash=sha256:150947adbdfeceec4e5926d956a06865c1c690f2fd902efede4ca6fe2e657c3f \
@@ -172,7 +172,7 @@ numpy==1.24.2 \
     --hash=sha256:f9006288bcf4895917d02583cf3411f98631275bc67cce355a7f39f8c14338fa
     # via
     #   cftime
-    #   etk (setup.cfg)
+    #   cetk (setup.cfg)
     #   geopandas
     #   netcdf4
     #   pandas
@@ -184,7 +184,7 @@ numpy==1.24.2 \
 openpyxl==3.1.2 \
     --hash=sha256:a6f5977418eff3b2d5500d54d9db50c8277a368436f4e4f8ddb1be3422870184 \
     --hash=sha256:f91456ead12ab3c6c2e9491cf33ba6d08357d802192379bb482f1033ade496f5
-    # via etk (setup.cfg)
+    # via cetk (setup.cfg)
 packaging==24.1 \
     --hash=sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002 \
     --hash=sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124
@@ -218,7 +218,7 @@ pandas==2.0.0 \
     --hash=sha256:d93b7fcfd9f3328072b250d6d001dcfeec5d3bb66c1b9c8941e109a46c0c01a8 \
     --hash=sha256:fcd471c9d9f60926ab2f15c6c29164112f458acb42280365fbefa542d0c2fc74
     # via
-    #   etk (setup.cfg)
+    #   cetk (setup.cfg)
     #   geopandas
 pyogrio==0.9.0 \
     --hash=sha256:019731a856a9abfe909e86f50eb13f8362f6742337caf757c54b7c8acfe75b89 \
@@ -248,7 +248,7 @@ pyogrio==0.9.0 \
     --hash=sha256:f8bf193269ea9d347ac3ddada960a59f1ab2e4a5c009be95dc70e6505346b2fc \
     --hash=sha256:fb04bd80964428491951766452f0071b0bc37c7d38c45ef02502dbd83e5d74a0
     # via
-    #   etk (setup.cfg)
+    #   cetk (setup.cfg)
     #   geopandas
 pyparsing==3.1.2 \
     --hash=sha256:a1bac0ce561155ecc3ed78ca94d3c9378656ad4c94c1270de543f621420f94ad \
@@ -333,7 +333,7 @@ rastafari==0.2.3 \
     --hash=sha256:eb29823d53774db5a978bc0c8276f607699c1e1d2631f2a724a4a417b6f66753 \
     --hash=sha256:f66e07064c489aab705518e706440318d83ad0f6df8ace946ef70df70b795dd2 \
     --hash=sha256:fd765d8151efea4d847955a24d0793d4fb8401fcf2c79f0fbefa7322d37c82f8
-    # via etk (setup.cfg)
+    # via cetk (setup.cfg)
 rasterio==1.3.9 \
     --hash=sha256:0172dbd80bd9adc105ec2c9bd207dbd5519ea06b438a4d965c6290ae8ed6ff9f \
     --hash=sha256:01e428ee5ba8444f5cb4fff56225acb1ab9bc8b77209b6e4198e04565d8a8509 \
@@ -356,11 +356,11 @@ rasterio==1.3.9 \
     --hash=sha256:f65879415df188fdc9388ccf2ee01e0659abae370d12518a17b60151e7d04efe \
     --hash=sha256:fc6d0d290492fa1a5068711cfebb21cc936968891b7ed9da0690c8a7388885c5 \
     --hash=sha256:fd6a850a37840ba590ddcf7ff90ba007b1e231b04434d8b4ac5ce0f746ada91a
-    # via etk (setup.cfg)
+    # via cetk (setup.cfg)
 ruamel-yaml==0.18.6 \
     --hash=sha256:57b53ba33def16c4f3d807c0ccbc00f8a6081827e81ba2491691b76882d0c636 \
     --hash=sha256:8b27e6a217e786c6fbe5634d8f3f11bc63e0f80f6a5890f28863d9c45aac311b
-    # via etk (setup.cfg)
+    # via cetk (setup.cfg)
 ruamel-yaml-clib==0.2.8 \
     --hash=sha256:024cfe1fc7c7f4e1aff4a81e718109e13409767e4f871443cbff3dba3578203d \
     --hash=sha256:03d1162b6d1df1caa3a4bd27aa51ce17c9afc2046c31b0ad60a0a96ec22f8001 \
@@ -456,7 +456,7 @@ shapely==2.0.4 \
     --hash=sha256:ec555c9d0db12d7fd777ba3f8b75044c73e576c720a851667432fabb7057da6c \
     --hash=sha256:fb5cdcbbe3080181498931b52a91a21a781a35dcb859da741c0345c6402bf00c
     # via
-    #   etk (setup.cfg)
+    #   cetk (setup.cfg)
     #   geopandas
 six==1.16.0 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \

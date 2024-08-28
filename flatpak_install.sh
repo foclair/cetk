@@ -13,5 +13,5 @@ flatpak run --command=python $FLATPAK -m pip install -r ./requirements.txt
 flatpak run --command=python $FLATPAK -m pip install -r ./requirements-dev.txt
 flatpak run --command=python $FLATPAK -m pip install -e .
 flatpak override --env=PATH="/app/bin:/usr/bin:/var/data/python/bin" $FLATPAK --user
-version=$(flatpak run --command=etk $FLATPAK --version | cut -d " " -f2)
-echo "successfully installed pip and etk ${version} into flatpak"
+version=$(flatpak run --command=cetk $FLATPAK --version | cut -d " " -f2)
+echo "successfully installed pip and cetk ${version} into flatpak"

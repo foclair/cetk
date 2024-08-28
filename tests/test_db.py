@@ -4,8 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 
-from etk.edb.models.source_models import Activity
-from etk.tools import Editor
+from cetk.edb.models.source_models import Activity
+from cetk.tools import Editor
 
 
 def test_init_db(tmpdir):
@@ -22,12 +22,12 @@ def test_edit_test_db(db):
     assert Activity.objects.filter(name="activity1").exists(), "no record created"
 
 
-def test_etk_cli(tmpdir):
+def test_cetk_cli(tmpdir):
     filepath = Path(os.path.join(tmpdir, "test.sqlite"))
     os.environ["ETK_DATABASE_PATH"] = str(filepath)
     try:
         subprocess.run(
-            ["etk", "migrate"],
+            ["cetk", "migrate"],
             # env={"EKT_DATABASE_PATH": str(filepath)},
             capture_output=True,
             check=True,

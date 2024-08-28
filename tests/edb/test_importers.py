@@ -4,12 +4,12 @@ from importlib import resources
 
 import pytest
 
-from etk.edb.importers import (
+from cetk.edb.importers import (
     import_gridsources,
     import_sourceactivities,
     import_sources,
 )
-from etk.edb.models import (
+from cetk.edb.models import (
     AreaSource,
     AreaSourceActivity,
     CodeSet,
@@ -18,7 +18,7 @@ from etk.edb.models import (
     PointSourceActivity,
     get_gridsource_raster,
 )
-from etk.edb.units import emis_conversion_factor_from_si
+from cetk.edb.units import emis_conversion_factor_from_si
 
 
 @pytest.fixture

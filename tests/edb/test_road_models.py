@@ -8,7 +8,7 @@ import pytest
 from django.contrib.gis.geos import LineString
 from django.db import IntegrityError
 
-from etk.edb.models import CongestionProfile, RoadSource, Substance, Vehicle
+from cetk.edb.models import CongestionProfile, RoadSource, Substance, Vehicle
 
 SWEREF99_TM_SRID = 3006
 WGS84_SRID = 4326

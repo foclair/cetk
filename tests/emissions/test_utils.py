@@ -1,7 +1,7 @@
 """tests for general emission related functions."""
 
 
-from etk.emissions.calc import get_used_substances
+from cetk.emissions.calc import get_used_substances
 
 
 def test_get_used_substances(pointsources):

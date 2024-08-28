@@ -1,9 +1,9 @@
 import pytest
 
-from etk.edb import models
-from etk.emissions.calc import calculate_source_emissions_df
+from cetk.edb import models
+from cetk.emissions.calc import calculate_source_emissions_df
 
-# from etk.emissions.views import create_gridsource_emis_table
+# from cetk.emissions.views import create_gridsource_emis_table
 
 
 # @pytest.mark.django_db(transaction=False)

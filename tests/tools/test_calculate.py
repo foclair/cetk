@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from etk.tools.utils import run_aggregate_emissions, run_rasterize_emissions
+from cetk.tools.utils import run_aggregate_emissions, run_rasterize_emissions
 
 
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")

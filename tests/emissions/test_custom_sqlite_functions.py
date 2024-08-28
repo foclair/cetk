@@ -2,7 +2,7 @@
 
 from django.db import connection
 
-from etk.edb.signals import condition_weight
+from cetk.edb.signals import condition_weight
 
 
 def test_condition_weight(test_flowtimevar, congestionprofiles):

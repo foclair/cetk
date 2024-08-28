@@ -2,6 +2,6 @@
 /.coverage
 /dist/
 /.pytest_cache/
-/src/etk.egg-info/
+/src/cetk.egg-info/
 __pycache__/
 /.venv/

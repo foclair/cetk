@@ -9,9 +9,9 @@
 ## Installation
 # Linux
 ``` console
-$ git clone https://git.smhi.se/foclair/etk.git
-$ cd etk
-$ python3.9 -m venv --prompt etk .venv
+$ git clone https://git.smhi.se/foclair/cetk.git
+$ cd cetk
+$ python3.9 -m venv --prompt cetk .venv
 $ . .venv/bin/activate
 $ pip install -U pip setuptools wheel
 $ pip install -r requirements.txt
@@ -21,9 +21,9 @@ $ pip install -e .
 ```
 # Windows
 ``` console
-$ git clone https://git.smhi.se/foclair/etk.git
-$ cd etk
-$ python3.9 -m venv --prompt etk .venv
+$ git clone https://git.smhi.se/foclair/cetk.git
+$ cd cetk
+$ python3.9 -m venv --prompt cetk .venv
 $ . .venv/Scripts/activate
 $ pip install pre-commit
 $ pip install -e .
@@ -41,5 +41,5 @@ Dependencies are organized in the following files:
 | Filename                           | Contents                                                                  |
 | ---------------------------------- | ------------------------------------------------------------------------- |
 | constraints.txt                    | Version constraints for pinned requirements                               |
-| requirements.txt                   | Pinned requirements for _using_ etk (don't edit)                   |
-| setup.py                    	     | Loose requirements for _using_ etk
+| requirements.txt                   | Pinned requirements for _using_ cetk (don't edit)                   |
+| setup.py                    	     | Loose requirements for _using_ cetk

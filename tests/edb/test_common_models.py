@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 from django.contrib.gis.geos import GEOSGeometry, Polygon
 
-from etk.edb.const import WGS84_SRID
-from etk.edb.models import AreaSource, source_models
-from etk.edb.models.common_models import Settings
+from cetk.edb.const import WGS84_SRID
+from cetk.edb.models import AreaSource, source_models
+from cetk.edb.models.common_models import Settings
 
 
 class TestActivityCodes:

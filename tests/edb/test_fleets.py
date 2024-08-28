@@ -3,7 +3,7 @@
 import pytest
 from pytest_django.asserts import assertNumQueries
 
-from etk.edb.models import Fleet, Vehicle, VehicleFuel, VehicleFuelComb
+from cetk.edb.models import Fleet, Vehicle, VehicleFuel, VehicleFuelComb
 
 
 @pytest.fixture

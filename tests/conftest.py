@@ -8,7 +8,7 @@ import pytest
 from django.contrib.gis.geos import GEOSGeometry, LineString
 
 if sys.argv[0] != "pytest" and "--help" not in sys.argv:
-    from etk.edb import models
+    from cetk.edb import models
 
 # from django.contrib.auth import get_user_model
 import rasterio as rio
@@ -16,8 +16,8 @@ import rasterio as rio
 # from django.contrib.gis.gdal import GDALRaster
 from django.contrib.gis.geos import Point, Polygon
 
-from etk.edb.const import WGS84_SRID
-from etk.edb.models import (
+from cetk.edb.const import WGS84_SRID
+from cetk.edb.models import (
     CongestionProfile,
     Fleet,
     RoadAttribute,
@@ -28,13 +28,13 @@ from etk.edb.models import (
     VehicleFuelComb,
     write_gridsource_raster,
 )
-from etk.edb.units import (
+from cetk.edb.units import (
     activity_ef_unit_to_si,
     activity_rate_unit_to_si,
     emission_unit_to_si,
     vehicle_ef_unit_to_si,
 )
-from etk.utils import GTiffProfile
+from cetk.utils import GTiffProfile
 
 EXTENT = GEOSGeometry(
     "POLYGON ((10.95 55.33, 24.16 55.33, 24.16 69.06, 10.95 69.06, 10.95 55.33))",

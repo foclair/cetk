@@ -9,10 +9,10 @@ from tempfile import gettempdir
 import pytest
 from openpyxl import load_workbook
 
-from etk.db import run_migrate
-from etk.edb.const import SHEET_NAMES
-from etk.edb.importers.utils import worksheet_to_dataframe
-from etk.tools.utils import run_export, run_import
+from cetk.db import run_migrate
+from cetk.edb.const import SHEET_NAMES
+from cetk.edb.importers.utils import worksheet_to_dataframe
+from cetk.tools.utils import run_export, run_import
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def test_export_sources(tmp_db, all_source_xlsx):
     backup_path, proc = run_import(outpath, db_path=tmp_db)
     proc.wait()
 
-    stderr_files = glob.glob(os.path.join(gettempdir(), "etk_import_*_stderr.log"))
+    stderr_files = glob.glob(os.path.join(gettempdir(), "cetk_import_*_stderr.log"))
     stderr_files.sort(key=lambda f: int(f.split("_")[-2]))
     if stderr_files:
         latest_stderr_file = stderr_files[-1]

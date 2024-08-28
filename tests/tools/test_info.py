@@ -2,7 +2,7 @@
 
 import pytest
 
-from etk.tools.utils import run_get_settings, run_update_settings
+from cetk.tools.utils import run_get_settings, run_update_settings
 
 
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")

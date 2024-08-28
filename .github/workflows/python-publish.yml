@@ -16,7 +16,7 @@ jobs:
 
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/etk
+      url: https://test.pypi.org/p/cetk
 
     steps:
     - uses: actions/checkout@v4
@@ -35,5 +35,5 @@ jobs:
       with:
         # remove repository-url to upload to normal PyPI (not test)
         repository-url: https://test.pypi.org/legacy/
-        user: etk-publish
+        user: cetk-publish
         password: ${{ secrets._TEST_PYPI_API_TOKEN }}

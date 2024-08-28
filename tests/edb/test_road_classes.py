@@ -6,7 +6,7 @@ import pytest
 from django.db import IntegrityError
 from pytest_django.asserts import assertNumQueries, assertQuerySetEqual
 
-from etk.edb.models import (
+from cetk.edb.models import (
     PrefetchRoadClassAttributes,
     RoadAttribute,
     RoadAttributeValue,

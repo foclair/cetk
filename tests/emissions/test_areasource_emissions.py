@@ -2,9 +2,9 @@ import pandas as pd
 import pytest
 from django.db import connection
 
-from etk.edb import models
-from etk.emissions.calc import calculate_source_emissions_df
-from etk.emissions.views import create_emission_table, create_emission_view
+from cetk.edb import models
+from cetk.emissions.calc import calculate_source_emissions_df
+from cetk.emissions.views import create_emission_table, create_emission_view
 
 
 def test_create_view(areasources):

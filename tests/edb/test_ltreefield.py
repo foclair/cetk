@@ -1,7 +1,7 @@
 """ Unit tests for the ltreefield lookups. """
 import pytest
 
-from etk.edb.models.source_models import ActivityCode, CodeSet
+from cetk.edb.models.source_models import ActivityCode, CodeSet
 
 
 @pytest.fixture
