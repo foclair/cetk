@@ -1,6 +1,6 @@
 """etk, a python library for editing Clair emission inventories offline."""
 
-__version__ = "0.0.1.dev"
+__version__ = "0.0.3.dev"
 
 import os
 

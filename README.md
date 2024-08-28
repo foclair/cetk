@@ -1,6 +1,9 @@
 # Emission ToolKit etk
 
 Emission toolkit for command line to import, validate, edit and analyse emissions.
+Used in QGIS Plugin Eclair. This package is maintained by [Eef van Dongen][] at SMHI.
+
+[Eef van Dongen]: mailto:eef.vandongen@smhi.se
 
 ## Installation
 ```
