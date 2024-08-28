@@ -21,7 +21,7 @@ dynamic = ["version"]
 dependencies = [
   "django==4.2.2",
   "fiona==1.9.6",
-  "geopandas==1.0.0",
+  "geopandas==1.0.1",
   "netCDF4==1.6.5",
   "numpy==1.24.2",
   "openpyxl==3.1.2",
@@ -29,8 +29,12 @@ dependencies = [
   "pyogrio==0.9.0",
   "rastafari==0.2.3",
   "rasterio==1.3.9",
-  "shapely==2.0.3",
+  "shapely==2.0.4",
 ]
+
+[project.scripts]
+cetk = "cetk.tools.cetk_command:main"
+cetkmanage = "cetk.tools.manage:main"
 
 [tool.black]
 exclude = '''
