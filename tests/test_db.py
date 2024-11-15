@@ -10,7 +10,7 @@ from cetk.tools import Editor
 
 def test_init_db(tmpdir):
     """test to initialize an offline database."""
-    filepath = Path(os.path.join(tmpdir, "test.sqlite"))
+    filepath = Path(os.path.join(tmpdir, "test.eclair.gpkg"))
     os.environ["CETK_DATABASE_PATH"] = str(filepath)
     editor = Editor()
     editor.migrate()
@@ -23,7 +23,7 @@ def test_edit_test_db(db):
 
 
 def test_cetk_cli(tmpdir):
-    filepath = Path(os.path.join(tmpdir, "test.sqlite"))
+    filepath = Path(os.path.join(tmpdir, "test.eclair.gpkg"))
     os.environ["CETK_DATABASE_PATH"] = str(filepath)
     try:
         subprocess.run(

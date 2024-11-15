@@ -28,7 +28,7 @@ def validation_xlsx():
 
 @pytest.fixture
 def tmp_db(tmpdir):
-    db_path = tmpdir / "test.sqlite"
+    db_path = tmpdir / "test.eclair.gpkg"
     os.environ["CETK_DATABASE_PATH"] = str(db_path)
     return db_path
 

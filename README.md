@@ -55,8 +55,21 @@ pre-commit install
 
 Run tests by
 ```
-pytest
+pytest --create-db
 ```
+A known problem is that some of the tests only pass if they are run separately.
+Expected outcome is therefore: 1 failed, 118 passed, 12 xpassed, 6 errors.
+The concerned tests are:
+```
+pytest --create-db  tests/edb/test_gridsource_models.py::test_create_gridsource
+pytest --create-db  tests/edb/test_importers.py::TestImport::test_import_gridsources
+pytest --create-db  tests/edb/test_rasterize.py::TestEmissionRasterizer::test_gridsource_no_timesteps
+pytest --create-db  tests/edb/test_rasterize.py::TestEmissionRasterizer::test_gridsource
+pytest --create-db  tests/emissions/test_aggregate_emissions.py::test_aggregate_emissions
+pytest --create-db  tests/emissions/test_aggregate_emissions.py::test_aggregate_emissions_all_sourcetypes
+pytest --create-db  tests/emissions/test_gridsource_emissions.py::test_calculate_emissions
+```
+
 ### Update requirements
 
 Install pip-tools:
