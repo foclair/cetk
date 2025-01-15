@@ -15,6 +15,7 @@ from pyproj.exceptions import CRSError
 import cetk
 from cetk import logging
 from cetk.db import run_migrate
+from cetk.edb.utils import delete_sources
 from cetk.tools.utils import (
     CalledProcessError,
     SubprocessError,
@@ -304,6 +305,7 @@ def main():
         migrate  migrate an sqlite inventory
         info     print settings
         import   import data
+        delete   delete data
         export   export data
         calc     calculate emissions
         settings change database settings
@@ -315,7 +317,16 @@ def main():
     parser.add_argument(
         "command",
         help="Subcommand to run",
-        choices=("migrate", "create", "info", "import", "export", "calc", "settings"),
+        choices=(
+            "migrate",
+            "create",
+            "info",
+            "import",
+            "delete",
+            "export",
+            "calc",
+            "settings",
+        ),
     )
     verbosity = [arg for arg in sys.argv if arg == "-v"]
     sys_args = [arg for arg in sys.argv if arg != "-v"]
@@ -400,6 +411,28 @@ def main():
 
         editor.import_workbook(args.filename, sheets=args.sheets, dry_run=args.dryrun)
         sys.exit(0)
+    elif main_args.command == "delete":
+        sub_parser = argparse.ArgumentParser(
+            description="Delete sources",
+            usage="cetk delete [options]",
+        )
+        sub_parser.add_argument(
+            "--sourcetype", help="Only one sourcetype out of list", choices=SOURCETYPES
+        )
+        sub_parser.add_argument("--id", nargs="*", help="Id for sources to be deleted")
+        args = sub_parser.parse_args(sub_args)
+        if args.sourcetype == "point":
+            from cetk.edb.models import PointSource
+
+            try:
+                delete_sources(PointSource, args.id)
+                sys.stdout.write(
+                    f"Successfully deleted {args.sourcetype}sources {args.id}\n"
+                )
+                sys.exit(0)
+            except ValueError as e:
+                sys.stderr.write(f"Sources could not be deleted: \n {e} ")
+                sys.exit(1)
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(
             description="Calculate emissions",

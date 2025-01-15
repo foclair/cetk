@@ -212,6 +212,11 @@ def create_from_template(filename):
     shutil.copyfile(get_template_db(), filename)
 
 
+def run_delete_sources(sourcetype, id_list):
+    id_str = [str(id) for id in id_list]
+    return run("cetk", "delete", "--sourcetype", str(sourcetype), "--id", *id_str)
+
+
 def set_settings_srid(srid, db_path=None):
     return run("cetk", "settings", "--srid", str(srid), db_path=db_path)
 
