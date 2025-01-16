@@ -421,11 +421,17 @@ def main():
         )
         sub_parser.add_argument("--id", nargs="*", help="Id for sources to be deleted")
         args = sub_parser.parse_args(sub_args)
-        if args.sourcetype == "point":
-            from cetk.edb.models import PointSource
+        from cetk.edb.models import AreaSource, GridSource, PointSource, RoadSource
 
+        models = {
+            "point": PointSource,
+            "area": AreaSource,
+            "road": RoadSource,
+            "grid": GridSource,
+        }
+        if args.sourcetype in models.keys():
             try:
-                delete_sources(PointSource, args.id)
+                delete_sources(models[args.sourcetype], args.id)
                 sys.stdout.write(
                     f"Successfully deleted {args.sourcetype}sources {args.id}\n"
                 )
@@ -433,6 +439,7 @@ def main():
             except ValueError as e:
                 sys.stderr.write(f"Sources could not be deleted: \n {e} ")
                 sys.exit(1)
+
     elif main_args.command == "calc":
         sub_parser = argparse.ArgumentParser(
             description="Calculate emissions",
