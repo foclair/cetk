@@ -28,7 +28,6 @@ class NamedModelManager(models.Manager):
 
 
 class NaturalKeyManager(models.Manager):
-
     """Database manager for models with natural key."""
 
     def get_by_natural_key(self, *key):

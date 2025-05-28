@@ -62,9 +62,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "cetk": {"format": "%(levelname)s: %(message)s"},  # noqa
-        "cetk_debug": {
-            "format": "%(asctime)s %(levelname)s: %(name)s  %(message)s"
-        },  # noqa
+        "cetk_debug": {"format": "%(asctime)s %(levelname)s: %(name)s  %(message)s"},  # noqa
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "cetk"},
@@ -74,7 +72,6 @@ LOGGING = {
 }
 
 if os.name == "nt":
-
     OSGEO4W = r"C:\OSGeo4W"
     assert os.path.isdir(OSGEO4W), "Directory does not exist: " + OSGEO4W
     os.environ["OSGEO4W_ROOT"] = OSGEO4W

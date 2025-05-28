@@ -30,7 +30,7 @@ def import_codesetsheet(workbook, validation):
             else:
                 return_message.append(
                     import_error(
-                        "Trying to import a new codeset," " but can have maximum 3.",
+                        "Trying to import a new codeset, but can have maximum 3.",
                         validation=validation,
                     )
                 )

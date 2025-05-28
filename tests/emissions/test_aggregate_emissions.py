@@ -37,7 +37,7 @@ def rasterfile(tmpdir):
         width=data.shape[1],
         height=data.shape[0],
         transform=transform,
-        crs=3006
+        crs=3006,
     ) as dset:
         dset.write(data, 1)
     return outfile

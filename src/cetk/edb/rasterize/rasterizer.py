@@ -255,8 +255,7 @@ class EmissionRasterizer:
 
         self.flow_timevar_scalings = pd.DataFrame(
             {
-                fvar.id
-                or "default": timevar_to_series(
+                fvar.id or "default": timevar_to_series(
                     shifted_index, fvar, timezone=self.timezone
                 ).to_numpy()  # discard the shifted index by converting to ndarray
                 for fvar in self.flow_timevars.values()
@@ -265,8 +264,7 @@ class EmissionRasterizer:
         )
         self.traffic_conditions = pd.DataFrame(
             {
-                prof.id
-                or "default": prof.to_series(
+                prof.id or "default": prof.to_series(
                     shifted_index, timezone=self.timezone
                 ).to_numpy()
                 for prof in self.congestion_profiles.values()
@@ -285,8 +283,7 @@ class EmissionRasterizer:
 
         self.source_timevar_scalings = pd.DataFrame(
             {
-                tvar.id
-                or "default": timevar_to_series(
+                tvar.id or "default": timevar_to_series(
                     shifted_index, tvar, timezone=self.output.timezone
                 ).to_numpy()
                 for tvar in self.timevars.values()

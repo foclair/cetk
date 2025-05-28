@@ -38,7 +38,6 @@ class NotInCacheError(Exception):
 
 
 class EmissionCache:
-
     """An emission out-of-memory cache."""
 
     def __init__(self, querysets):

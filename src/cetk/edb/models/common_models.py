@@ -123,9 +123,9 @@ class Settings(models.Model):
 
     def get_codeset_index(self, codeset):
         """Return index of a specific codeset."""
-        if type(codeset) == str:
+        if type(codeset) is str:
             codeset_slug = codeset
-        elif type(codeset) == CodeSet:
+        elif type(codeset) is CodeSet:
             codeset_slug = codeset.slug
         else:
             raise ValueError(f"codeset '{codeset}' is not of valid type")

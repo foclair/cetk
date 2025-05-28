@@ -249,7 +249,6 @@ class TestPrefetchRoadClassAttributes:
                 assert road_class.attributes
 
     def test_with_road_sources(self, road_classes):
-
         with assertNumQueries(1):
             road_sources = list(
                 RoadSource.objects.select_related("roadclass").prefetch_related(

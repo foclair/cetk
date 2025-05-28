@@ -1,6 +1,5 @@
 """Tests for emission model exporters."""
 
-
 import glob
 import os
 from importlib import resources

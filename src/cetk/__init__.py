@@ -80,7 +80,7 @@ def configure():
                     },
                 },
                 "loggers": {"cetk": cetk_logger},
-            }
+            },
         )
         django.setup()
         log.debug("configured django")

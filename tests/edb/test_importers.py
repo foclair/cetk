@@ -42,13 +42,11 @@ def gridsource_xlsx(tmpdir, settings):
 
 
 class TestImport:
-
     """Test importing point-sources from csv."""
 
     def test_import_pointsources(
         self, vertical_dist, pointsource_csv, pointsource_xlsx
     ):
-
         # similar to base_set in gadget
         cs1 = CodeSet.objects.create(name="code set 1", slug="code_set1")
         cs1.codes.create(code="1", label="Energy")
@@ -115,7 +113,6 @@ class TestImport:
         assert PointSourceActivity.objects.all().count() > 0
 
     def test_import_areasources(self, vertical_dist, areasource_xlsx):
-
         # similar to base_set in gadget
         cs1 = CodeSet.objects.create(name="SNAP", slug="SNAP")
         cs1.codes.create(code="1.3", label="Energy", vertical_dist=vertical_dist)
@@ -150,9 +147,9 @@ class TestImport:
     ):
         filepath = resources.files("edb.data") / "gridsources.xlsx"
         updates, messages = import_gridsources(filepath)
-        assert (
-            len(messages) == 0
-        ), f"errors importing gridsources: {', '.join(messages)}"
+        assert len(messages) == 0, (
+            f"errors importing gridsources: {', '.join(messages)}"
+        )
         source1 = GridSource.objects.get(name="gridsource1")
         source2 = GridSource.objects.get(name="gridsource2")
         assert source1.name == "gridsource1"

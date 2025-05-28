@@ -1,6 +1,5 @@
 """Emission database models."""
 
-
 from django.contrib.gis.db import models
 
 from cetk.edb.const import CHAR_FIELD_LENGTH, WGS84_SRID

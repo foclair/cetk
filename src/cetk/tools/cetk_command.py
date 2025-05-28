@@ -199,7 +199,7 @@ class Editor(object):
                     f"{os.linesep}{return_msg[:10]}"
                 )
             else:
-                log.error(f"Errors during {run_type}:" f"{os.linesep}{return_msg}")
+                log.error(f"Errors during {run_type}:{os.linesep}{return_msg}")
         else:
             log.info(f"getting here {datetime.datetime.now()}")
             if not dry_run:

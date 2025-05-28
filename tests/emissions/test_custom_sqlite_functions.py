@@ -6,7 +6,6 @@ from cetk.edb.signals import condition_weight
 
 
 def test_condition_weight(test_flowtimevar, congestionprofiles):
-
     congestion_profile1 = congestionprofiles[0]
 
     weight_freeflow = condition_weight(

@@ -20,7 +20,6 @@ from cetk.edb.units import emission_unit_to_si
 
 
 class TestEmissionRasterizer:
-
     """Unit tests for the Rasterizer class."""
 
     # def test_point_source(  # noqa: PLR0915
@@ -438,7 +437,6 @@ class TestEmissionRasterizer:
             assert np.sum(dset["emission_NOx"]) == pytest.approx(510.0, 1e-6)
 
     def test_gridsource(testsettings, gridsources, tmpdir):
-
         NOx = Substance.objects.get(slug="NOx")
         SOx = Substance.objects.get(slug="SOx")
         extent = (0.0, 0.0, 1200.0, 1200.0)

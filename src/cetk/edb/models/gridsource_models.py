@@ -20,7 +20,6 @@ class OutsideExtentError(Exception):
 
 
 class GridSource(PointAreaGridSourceBase):
-
     sourcetype = "grid"
 
     class Meta(PointAreaGridSourceBase.Meta):

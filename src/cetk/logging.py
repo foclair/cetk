@@ -16,7 +16,6 @@ _logLevels = {
 
 
 class CetkHandler(logging.Handler):
-
     """Log handler for cetk."""
 
 

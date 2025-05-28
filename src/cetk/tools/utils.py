@@ -1,4 +1,5 @@
 """Utility functions for emission processing."""
+
 import argparse
 import glob
 import os
@@ -283,7 +284,6 @@ def run_non_blocking(*args, db_path=None, log_level=logging.INFO):
 
 
 class VerboseAction(argparse.Action):
-
     """Argparse action to handle terminal verbosity level."""
 
     def __init__(self, option_strings, dest, default=logging.INFO, help=None):
@@ -307,7 +307,6 @@ class VerboseAction(argparse.Action):
 
 
 class LogFileAction(argparse.Action):
-
     """Argparse action to setup logging to file."""
 
     def __call__(self, parser, namespace, values, option_string=None):
