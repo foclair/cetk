@@ -67,10 +67,10 @@ def configure():
                 "version": 1,
                 "disable_existing_loggers": False,
                 "formatters": {
-                    "cetk": {"format": "%(levelname)s: %(message)s"},  # noqa
+                    "cetk": {"format": "%(levelname)s: %(message)s"},
                     "cetk_debug": {
                         "format": "%(asctime)s %(levelname)s: %(name)s  %(message)s"
-                    },  # noqa
+                    },
                 },
                 "handlers": {
                     "console": {"class": "logging.StreamHandler", "formatter": "cetk"},
@@ -80,7 +80,7 @@ def configure():
                     },
                 },
                 "loggers": {"cetk": cetk_logger},
-            }
+            },
         )
         django.setup()
         log.debug("configured django")

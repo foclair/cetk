@@ -1,6 +1,5 @@
 """Utility functions for managing emission units."""
 
-
 MASS_UNIT_TO_KILOGRAMS = {
     "ng": 1.0e-12,
     "µg": 1.0e-9,  # support both micro letter and small greek letter mu

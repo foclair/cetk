@@ -5,8 +5,8 @@ from importlib import resources
 import pytest
 from ruamel.yaml import YAML
 
-from cetk.edb.importers import fleet_excel_to_dict  # noqa
 from cetk.edb.importers import (
+    fleet_excel_to_dict,
     import_congestion_profiles,
     import_fleets,
     import_roadclasses,
@@ -17,8 +17,8 @@ from cetk.edb.importers import (
     roadsource_excel_to_dict,
     vehicles_excel_to_dict,
 )
-from cetk.edb.models import ColdstartTimevar  # noqa
 from cetk.edb.models import (
+    ColdstartTimevar,
     CongestionProfile,
     Fleet,
     FlowTimevar,

@@ -37,18 +37,6 @@ dependencies = [
 cetk = "cetk.tools.cetk_command:main"
 cetkmanage = "cetk.tools.manage:main"
 
-[tool.black]
-exclude = '''
-/(
-    build
-  | \.direnv
-  | \.git
-  | src/cetk\.egg-info
-  | \.pytest_cache
-  | \.venv
-)/
-'''
-
 [tool.check-manifest]
 ignore = [
 ]
@@ -59,8 +47,8 @@ branch = true
 omit = [
 ]
 
-[tool.isort]
-profile = "black"
+[tool.mypy]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "--reuse-db"
@@ -70,3 +58,6 @@ filterwarnings = [
     "error",
     "ignore::RuntimeWarning",
 ]
+
+[tool.ruff.lint]
+extend-select = ["I", "RUF100"]

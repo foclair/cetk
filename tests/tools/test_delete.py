@@ -25,7 +25,6 @@ def gridsource_xlsx(tmpdir, settings):
 
 
 class TestDelete:
-
     """Test deleting pointsources."""
 
     def test_delete_pointsources(self, code_sets, pointsource_xlsx):

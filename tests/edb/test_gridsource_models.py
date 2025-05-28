@@ -1,6 +1,5 @@
 """Unit and regression tests for gridsource models."""
 
-
 import numpy as np
 import pytest
 import rasterio as rio
@@ -37,7 +36,7 @@ def rasterfile(tmpdir):
         width=data.shape[1],
         height=data.shape[0],
         transform=transform,
-        crs=3006
+        crs=3006,
     ) as dset:
         dset.write(data, 1)
     return outfile
@@ -54,27 +53,27 @@ def db_raster(rasterfile, transactional_db):
 @pytest.mark.django_db(transaction=False)
 def test_write_and_delete_gridsource_raster(transactional_db, rasterfile):
     """test to write gridsource raster to database."""
-    assert Substance.objects.filter(
-        slug="NOx"
-    ).exists(), "problem with transactions duering testing"
+    assert Substance.objects.filter(slug="NOx").exists(), (
+        "problem with transactions duering testing"
+    )
     with rio.open(rasterfile, "r") as raster:
         write_gridsource_raster(raster, "test")
     assert "test" in list_gridsource_rasters(), "no gridsource raster created in db"
     drop_gridsource_raster("test")
-    assert (
-        "test" not in list_gridsource_rasters()
-    ), "gridsource raster not removed from db"
+    assert "test" not in list_gridsource_rasters(), (
+        "gridsource raster not removed from db"
+    )
     # test to write same raster again (checking that everything has been removed)
     with rio.open(rasterfile, "r") as raster:
         write_gridsource_raster(raster, "test")
-    assert (
-        "test" in list_gridsource_rasters()
-    ), "could not re-write gridsource raster to db"
+    assert "test" in list_gridsource_rasters(), (
+        "could not re-write gridsource raster to db"
+    )
     # clean-up
     drop_gridsource_raster("test")
-    assert Substance.objects.filter(
-        slug="NOx"
-    ).exists(), "problem with transactions duering testing"
+    assert Substance.objects.filter(slug="NOx").exists(), (
+        "problem with transactions duering testing"
+    )
 
 
 def test_list_rasters(db_raster):
@@ -113,13 +112,12 @@ def test_get_raster(rasterfile, transactional_db):
             ref_data = np.where(ref_data != dset.nodata, ref_data / total, -9999.0)
         ref_transform = dset.transform
     assert np.all(ref_data == data), "db raster differs from the original"
-    assert (
-        ref_transform == metadata["transform"]
-    ), "raster transform differs from the original"
+    assert ref_transform == metadata["transform"], (
+        "raster transform differs from the original"
+    )
 
 
 def test_clip_raster(transactional_db, db_raster):
-
     poly = Polygon.from_bbox(RASTER_EXTENT)
     poly.srid = 3006
     full_data, full_metadata = get_gridsource_raster(db_raster)
@@ -128,9 +126,9 @@ def test_clip_raster(transactional_db, db_raster):
     )
 
     assert np.all(full_data == full_clipped_data), "clip alters data without reason"
-    assert (
-        full_metadata["transform"] == full_clipped_metadata["transform"]
-    ), "clip alters raster transform without reason"
+    assert full_metadata["transform"] == full_clipped_metadata["transform"], (
+        "clip alters raster transform without reason"
+    )
 
     x1, y1, x2, y2 = RASTER_EXTENT
     poly = Polygon.from_bbox((x1, y1, x2 / 2, y2 / 2))
@@ -138,6 +136,6 @@ def test_clip_raster(transactional_db, db_raster):
     half_data, _ = get_gridsource_raster(db_raster, clip_by=poly)
 
     assert half_data.shape[1] < full_data.shape[1], "clipping raster did not work"
-    assert (
-        half_data.sum() < full_data.sum()
-    ), "sum of data should be reduced when clipping"
+    assert half_data.sum() < full_data.sum(), (
+        "sum of data should be reduced when clipping"
+    )

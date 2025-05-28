@@ -199,7 +199,7 @@ class Editor(object):
                     f"{os.linesep}{return_msg[:10]}"
                 )
             else:
-                log.error(f"Errors during {run_type}:" f"{os.linesep}{return_msg}")
+                log.error(f"Errors during {run_type}:{os.linesep}{return_msg}")
         else:
             log.info(f"getting here {datetime.datetime.now()}")
             if not dry_run:
@@ -624,7 +624,7 @@ def main():
     elif main_args.command == "settings":
         sub_parser = argparse.ArgumentParser(
             description="Update settings",
-            usage="cetk settings [--srid EPSG] [--codeset1 SLUG] [--codeset2 SLUG] [--codeset3 SLUG]",  # noqa: E501
+            usage="cetk settings [--srid EPSG] [--codeset1 SLUG] [--codeset2 SLUG] [--codeset3 SLUG]",
         )
         sub_parser.add_argument("--srid", type=int, help="Update srid in settings")
         sub_parser.add_argument("--codeset1", help="Update code-set1")

@@ -1,4 +1,5 @@
-""" Unit tests for the ltreefield lookups. """
+"""Unit tests for the ltreefield lookups."""
+
 import pytest
 
 from cetk.edb.models.source_models import ActivityCode, CodeSet

@@ -534,9 +534,9 @@ def create_source_sheet(
             for act in source.activities.all():
                 activity_unit = Activity.objects.get(id=act.activity_id).unit
                 activity_rate = activity_rate_unit_from_si(act.rate, activity_unit)
-                source_activity_rates[
-                    Activity.objects.get(id=act.activity_id).name
-                ] = activity_rate
+                source_activity_rates[Activity.objects.get(id=act.activity_id).name] = (
+                    activity_rate
+                )
             act_row = [
                 source_activity_rates[name] if name in source_activities else 0
                 for name in activity_names

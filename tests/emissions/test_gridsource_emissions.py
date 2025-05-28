@@ -18,7 +18,6 @@ from cetk.emissions.calc import calculate_source_emissions_df
 
 
 def test_calculate_emissions(gridsources):
-
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
     df = calculate_source_emissions_df("grid", [NOx, SOx], unit="ton/year")

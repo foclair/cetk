@@ -1,6 +1,5 @@
 """tests for general emission related functions."""
 
-
 from cetk.emissions.calc import get_used_substances
 
 
