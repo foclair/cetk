@@ -305,7 +305,7 @@ class RoadSource(SourceBase):
                 j += 1
             i += 1
 
-    def emission(  # noqa: C901, PLR0912
+    def emission(
         self,
         *,
         by_vehicle=True,

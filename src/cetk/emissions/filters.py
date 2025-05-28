@@ -51,7 +51,7 @@ def create_tag_where_clause(tags):
         if cond.startswith("!="):
             val = cond[2:].strip()
             conds.append(
-                f"(sources.tags IS NULL OR NOT sources.tags ? {tag} OR sources.tags->>{tag} != {val})"  # noqa
+                f"(sources.tags IS NULL OR NOT sources.tags ? {tag} OR sources.tags->>{tag} != {val})"
             )
         else:
             if cond.startswith("="):

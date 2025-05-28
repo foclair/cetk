@@ -22,7 +22,7 @@ from cetk.edb.units import emission_unit_to_si
 class TestEmissionRasterizer:
     """Unit tests for the Rasterizer class."""
 
-    # def test_point_source(  # noqa: PLR0915
+    # def test_point_source(
     #     self, testsettings, code_sets, test_timevar, tmpdir
     # ):
     #     ac_1_1 = code_sets[0].codes.get(code="1.1")
@@ -81,9 +81,7 @@ class TestEmissionRasterizer:
     #         assert np.sum(dset["Emission of NOx"]) == pytest.approx(3000, 1e-6)
     #         assert dset["Emission of NOx"][0, 0, 0] == pytest.approx(1000, 1e-6)
 
-    def test_empty_raster_point_outside_time(  # noqa: PLR0915
-        self, testsettings, code_sets, tmpdir
-    ):
+    def test_empty_raster_point_outside_time(self, testsettings, code_sets, tmpdir):
         ac_1_1 = code_sets[0].codes.get(code="1.1")
         subst1 = Substance.objects.get(slug="NOx")
         extent = (0.0, 0.0, 100.0, 100.0)
@@ -118,9 +116,7 @@ class TestEmissionRasterizer:
             assert np.sum(dset["emission_NOx"]) == pytest.approx(0, 1e-6)
             assert dset["emission_NOx"][0, 0, 0] == pytest.approx(0, 1e-6)
 
-    def test_empty_raster_point_outside_avg(  # noqa: PLR0915
-        self, testsettings, code_sets, tmpdir
-    ):
+    def test_empty_raster_point_outside_avg(self, testsettings, code_sets, tmpdir):
         ac_1_1 = code_sets[0].codes.get(code="1.1")
         subst1 = Substance.objects.get(slug="NOx")
         extent = (0.0, 0.0, 100.0, 100.0)
@@ -366,7 +362,7 @@ class TestEmissionRasterizer:
             # normalize to 2000 with 16 / 24 nonzero hours
             assert np.sum(dset["emission_SOx"][12, :, :]) == pytest.approx(3000, 1e-6)
 
-    def test_point_source_no_timesteps(  # noqa: PLR0915
+    def test_point_source_no_timesteps(
         self, testsettings, code_sets, test_timevar, tmpdir
     ):
         ac_1_1 = code_sets[0].codes.get(code="1.1")
@@ -454,7 +450,7 @@ class TestEmissionRasterizer:
             assert np.sum(dset["emission_NOx"][0, :, :]) == pytest.approx(510.0, 1e-6)
 
     # ac-filtering not implemented yet!
-    # def test_point_source_filter(  # noqa: PLR0915
+    # def test_point_source_filter(
     #     self, testsettings, code_sets, test_timevar, tmpdir
     # ):
     #     ac_1_1 = code_sets[0].codes.get(code="1.1")

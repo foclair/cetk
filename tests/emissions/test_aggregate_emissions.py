@@ -14,7 +14,7 @@ from cetk.edb.models import (
     write_gridsource_raster,
 )
 from cetk.edb.units import activity_rate_unit_to_si, emission_unit_to_si
-from cetk.emissions.calc import aggregate_emissions  # noqa
+from cetk.emissions.calc import aggregate_emissions
 from cetk.utils import GTiffProfile
 
 RASTER_EXTENT = (0, 0, 1200, 1000)

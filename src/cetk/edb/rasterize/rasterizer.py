@@ -291,7 +291,7 @@ class EmissionRasterizer:
             index=time_index,
         )
 
-    def _get_querysets(  # noqa: C901, PLR0912
+    def _get_querysets(
         self,
         sourcetypes=None,
         name=None,
@@ -654,9 +654,7 @@ class EmissionRasterizer:
         self._cache.write_weights(GRID)
         self._cache.write_emissions(GRID)
 
-    def _create_variables(  # noqa: C901, PLR0912, PLR0915
-        self, substances, *, timeseries=True
-    ):
+    def _create_variables(self, substances, *, timeseries=True):
         """create netCDF variables."""
         if timeseries:
             cell_methods = "1h-mean"
@@ -704,7 +702,7 @@ class EmissionRasterizer:
                 ncreated += len(sourcetype_vars)
         return ncreated > 0
 
-    def process(  # noqa: PLR0915
+    def process(
         self,
         substances,
         begin=None,
@@ -845,7 +843,7 @@ class EmissionRasterizer:
             with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
                 self.set_data(dset, substance, chunk)
 
-    def _process_timeseries(self, begin, end):  # noqa: C901, PLR0912
+    def _process_timeseries(self, begin, end):
         # how many hours that will be processed in the same chunk
         # this is a compromise between required memory, execution time
         # the minimum chunk size of the netcdf variables is used
@@ -904,7 +902,7 @@ class EmissionRasterizer:
             # update chunk time interval
             chunk_begin = chunk_end + datetime.timedelta(hours=1)
 
-    def set_data(self, dset, substance, data, timestamps=None):  # noqa: C901, PLR0912
+    def set_data(self, dset, substance, data, timestamps=None):
         """Add chunk of data to variable."""
 
         var = dset[f"emission_{substance.slug}"]
@@ -922,9 +920,7 @@ class EmissionRasterizer:
             ).total_seconds() / 3600
             time_var[:] = hours_since_1970
 
-    def _timeseries_emis(  # noqa: C901, PLR0912, PLR0915
-        self, substance, begin, end, sourcetype
-    ):
+    def _timeseries_emis(self, substance, begin, end, sourcetype):
         """Get emission timeseries data chunk for sources.
 
         args:
@@ -1157,9 +1153,7 @@ class EmissionRasterizer:
                 chunk[self._cache.feature_ids[sourcetype][source_id]] += emis
         return chunk
 
-    def _rasterize_chunk(  # noqa: C901, PLR0912, PLR0915
-        self, substance, begin, end, sourcetypes
-    ):
+    def _rasterize_chunk(self, substance, begin, end, sourcetypes):
         """Rasterize and return as numpy array.
 
         args:

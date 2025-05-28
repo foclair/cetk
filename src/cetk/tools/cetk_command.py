@@ -624,7 +624,7 @@ def main():
     elif main_args.command == "settings":
         sub_parser = argparse.ArgumentParser(
             description="Update settings",
-            usage="cetk settings [--srid EPSG] [--codeset1 SLUG] [--codeset2 SLUG] [--codeset3 SLUG]",  # noqa: E501
+            usage="cetk settings [--srid EPSG] [--codeset1 SLUG] [--codeset2 SLUG] [--codeset3 SLUG]",
         )
         sub_parser.add_argument("--srid", type=int, help="Update srid in settings")
         sub_parser.add_argument("--codeset1", help="Update code-set1")

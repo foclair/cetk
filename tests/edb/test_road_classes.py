@@ -230,7 +230,7 @@ class TestRoadClass:
 
 class TestPrefetchRoadClassAttributes:
     @pytest.fixture
-    def road_classes(self, road_attributes, traffic_situation):  # noqa: ARG002
+    def road_classes(self, road_attributes, traffic_situation):
         return RoadClass.objects.bulk_create_from_attribute_table(
             [
                 ("dirt road", "50", traffic_situation.ts_id),

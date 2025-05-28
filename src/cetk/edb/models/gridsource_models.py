@@ -149,7 +149,7 @@ def drop_gridsource_raster(name):
 
     sql_operations = [
         f"delete from gpkg_2d_gridded_tile_ancillary where tpudt_name='{table_name}'",
-        f"delete from gpkg_2d_gridded_coverage_ancillary where tile_matrix_set_name='{table_name}'",  # noqa
+        f"delete from gpkg_2d_gridded_coverage_ancillary where tile_matrix_set_name='{table_name}'",
         f"delete from gpkg_extensions where table_name='{table_name}'",
         f"delete from gpkg_tile_matrix_set where table_name='{table_name}'",
         f"delete from gpkg_tile_matrix where table_name='{table_name}'",

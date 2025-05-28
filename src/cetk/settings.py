@@ -61,8 +61,8 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "cetk": {"format": "%(levelname)s: %(message)s"},  # noqa
-        "cetk_debug": {"format": "%(asctime)s %(levelname)s: %(name)s  %(message)s"},  # noqa
+        "cetk": {"format": "%(levelname)s: %(message)s"},
+        "cetk_debug": {"format": "%(asctime)s %(levelname)s: %(name)s  %(message)s"},
     },
     "handlers": {
         "console": {"class": "logging.StreamHandler", "formatter": "cetk"},

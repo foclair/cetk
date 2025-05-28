@@ -23,7 +23,7 @@ def run_migrate(db_path=None):
                     "cetkmanage",
                     "shell",
                     "-c",
-                    "import django;django.db.connection.cursor().execute('SELECT InitSpatialMetaData(1);')",  # noqa: E501
+                    "import django;django.db.connection.cursor().execute('SELECT InitSpatialMetaData(1);')",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

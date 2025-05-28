@@ -8,23 +8,23 @@ from pathlib import Path
 # need to import fiona before geopandas due to gpd bug causing circular imports.
 import fiona  # noqa
 import geopandas as gpd
-import numpy as np  # noqa
+import numpy as np
 import pandas as pd
 from django.contrib.gis.gdal import (
-    CoordTransform,  # noqa
+    CoordTransform,
     SpatialReference,
 )
 from django.contrib.gis.gdal.geometries import LineString as GDALLineString
 from django.contrib.gis.geos import Point, Polygon  # noqa
-from django.core.exceptions import ObjectDoesNotExist, ValidationError  # noqa
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.management.base import CommandError  # noqa
-from django.db import IntegrityError  # noqa
+from django.db import IntegrityError
 from openpyxl import load_workbook
 
 from cetk.edb.const import WGS84_SRID
 from cetk.edb.models import (
     CodeSet,
-    ColdstartTimevar,  # noqa
+    ColdstartTimevar,
     CongestionProfile,
     Fleet,
     FleetMemberFuel,
@@ -291,7 +291,7 @@ def import_traffic(filename, sheets, validation=False):
     return return_dict, return_message  # update dict and messages
 
 
-def import_vehicles(  # noqa: C901, PLR0912, PLR0915
+def import_vehicles(
     vehicles_file,
     config,
     *,
@@ -464,7 +464,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
                         log.debug(f"created vehicle {vehicle_name}")
                 elif not Vehicle.objects.filter(name=vehicle_name).exists():
                     return_message.append(
-                        import_error(  # noqa: TRY301
+                        import_error(
                             f"vehicle '{vehicle_name}' does not exist ",
                             validation=validation,
                         )
@@ -751,7 +751,7 @@ def import_vehicles(  # noqa: C901, PLR0912, PLR0915
     return return_dict
 
 
-def import_roadclasses(  # noqa: C901, PLR0912, PLR0915
+def import_roadclasses(
     roadclass_file, config, *, overwrite=False, validation=False, **kwargs
 ):
     """import roadclasses (traffic-situations must already exist in database)."""
@@ -1019,7 +1019,7 @@ def import_congestion_profiles(profile_data, *, overwrite=False, validation=Fals
     return profiles, return_message
 
 
-def import_fleets(data, *, overwrite=False, validation=False):  # noqa: C901, PLR0912, PLR0915
+def import_fleets(data, *, overwrite=False, validation=False):
     """import fleets
 
     args
@@ -1213,7 +1213,7 @@ def import_fleets(data, *, overwrite=False, validation=False):  # noqa: C901, PL
     return len(fleets), return_message
 
 
-def import_roads(  # noqa: C901, PLR0912, PLR0915
+def import_roads(
     roadfile,
     config,
     exclude=None,
@@ -1368,7 +1368,7 @@ def import_roads(  # noqa: C901, PLR0912, PLR0915
     tag_defaults = defaults.pop("tags", {})
     messages = {}
 
-    def make_road(feature):  # noqa: C901, PLR0912, PLR0915
+    def make_road(feature):
         source_geom = feature.geometry
 
         if np.shape(source_geom.xy)[1] < 2:

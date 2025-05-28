@@ -31,7 +31,7 @@ def create_emission_view(sourcetype, substances, unit=DEFAULT_EMISSION_UNIT):
 
     fac = emis_conversion_factor_from_si(unit)
     source_subst_cols = ",".join(
-        f'sum(rec.emis*{fac if s.slug != "traffic_work" else 1.0}) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'  # noqa
+        f'sum(rec.emis*{fac if s.slug != "traffic_work" else 1.0}) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'
         for s in substances
     )
     view_sql = f"""\
@@ -60,7 +60,7 @@ def create_emission_table(sourcetype, substances=None, unit=DEFAULT_EMISSION_UNI
     if substances is None:
         substances = get_used_substances()
     source_subst_cols = ",".join(
-        f'sum(rec.emis*{fac if s.slug != "traffic_work" else 1.0}) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'  # noqa
+        f'sum(rec.emis*{fac if s.slug != "traffic_work" else 1.0}) FILTER (WHERE rec.substance_id={s.id}) AS "{s.slug}"'
         for s in substances
     )
     table_sql = (

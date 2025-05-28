@@ -174,7 +174,7 @@ class RoadClassManager(models.Manager.from_queryset(RoadClassQuerySet)):
         return road_classes
 
 
-class RoadClass(models.Model):  # noqa: DJ008
+class RoadClass(models.Model):
     """A road class defined by a unique set of road attributes."""
 
     traffic_situation = models.ForeignKey("TrafficSituation", on_delete=models.CASCADE)
