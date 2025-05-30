@@ -43,15 +43,15 @@ def rasterfile(tmpdir):
 
 
 @pytest.fixture
-def db_raster(rasterfile, transactional_db):
+def db_raster(rasterfile, transactional_db, django_db_serialized_rollback):
     name = "raster1"
     with rio.open(rasterfile, "r") as raster:
         write_gridsource_raster(raster, "raster1")
     return name
 
 
-@pytest.mark.django_db(transaction=False)
-def test_write_and_delete_gridsource_raster(transactional_db, rasterfile):
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+def test_write_and_delete_gridsource_raster(rasterfile):
     """test to write gridsource raster to database."""
     assert Substance.objects.filter(slug="NOx").exists(), (
         "problem with transactions duering testing"
@@ -81,7 +81,8 @@ def test_list_rasters(db_raster):
     assert db_raster in rasters, "raster not found in db"
 
 
-def test_create_gridsource(rasterfile, code_sets, transactional_db):
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+def test_create_gridsource(rasterfile, code_sets):
     raster_name = "raster1"
     with rio.open(rasterfile, "r") as raster:
         write_gridsource_raster(raster, raster_name)
@@ -99,7 +100,8 @@ def test_create_gridsource(rasterfile, code_sets, transactional_db):
     )
 
 
-def test_get_raster(rasterfile, transactional_db):
+@pytest.mark.django_db(transaction=True, serialized_rollback=True)
+def test_get_raster(rasterfile):
     raster_name = "raster1"
 
     with rio.open(rasterfile, "r") as raster:
@@ -117,7 +119,7 @@ def test_get_raster(rasterfile, transactional_db):
     )
 
 
-def test_clip_raster(transactional_db, db_raster):
+def test_clip_raster(db_raster):
     poly = Polygon.from_bbox(RASTER_EXTENT)
     poly.srid = 3006
     full_data, full_metadata = get_gridsource_raster(db_raster)

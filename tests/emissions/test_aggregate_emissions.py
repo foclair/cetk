@@ -44,7 +44,7 @@ def rasterfile(tmpdir):
 
 
 @pytest.fixture
-def db_raster(rasterfile, transactional_db):
+def db_raster(rasterfile, transactional_db, django_db_serialized_rollback):
     name = "raster1"
     with rio.open(rasterfile, "r") as raster:
         write_gridsource_raster(raster, "raster1")
