@@ -17,7 +17,7 @@ from cetk.emissions.calc import calculate_source_emissions_df
 #     assert df.loc[0, "SOx"] == pytest.approx(2001000.0)
 
 
-def test_calculate_emissions(gridsources):
+def test_calculate_emissions(transactional_gridsources):
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
     df = calculate_source_emissions_df("grid", [NOx, SOx], unit="ton/year")

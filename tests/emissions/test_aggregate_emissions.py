@@ -52,7 +52,12 @@ def db_raster(rasterfile, transactional_db, django_db_serialized_rollback):
 
 
 def test_aggregate_emissions(
-    testsettings, pointsources, areasources, gridsources, roadsources, db_raster
+    transactional_testsettings,
+    transactional_pointsources,
+    transactional_areasources,
+    transactional_gridsources,
+    transactional_roadsources,
+    db_raster,
 ):
     """test aggregation of emissions"""
 
@@ -74,7 +79,13 @@ def test_aggregate_emissions(
 
 
 def test_aggregate_emissions_all_sourcetypes(
-    roadsources, pointsources, areasources, activities, code_sets, db_raster
+    transactional_testsettings,
+    transactional_roadsources,
+    transactional_pointsources,
+    transactional_areasources,
+    transactional_activities,
+    transactional_code_sets,
+    db_raster,
 ):
     NOx = Substance.objects.get(slug="NOx")
     SOx = Substance.objects.get(slug="SOx")
@@ -94,7 +105,7 @@ def test_aggregate_emissions_all_sourcetypes(
         activitycode1=ActivityCode.objects.get(code="3"),
     )
     src2.activities.create(
-        activity=activities[0],
+        activity=transactional_activities[0],
         rate=activity_rate_unit_to_si(1000, "m3/year"),
         raster=db_raster,
     )
@@ -132,7 +143,7 @@ def test_aggregate_emissions_all_sourcetypes(
     # fraction of raster sum inside polygon
     raster_share = clipped_raster_data.sum() / raster_data.sum()
 
-    codeset = code_sets[0]
+    codeset = transactional_code_sets[0]
     df = aggregate_emissions(
         name="gridsource1",
         substances=[SOx],

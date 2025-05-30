@@ -142,7 +142,9 @@ class TestImport:
         assert AreaSourceActivity.objects.all().count() > 0
 
     @pytest.mark.django_db(transaction=True, serialized_rollback=True)
-    def test_import_gridsources(self, gridsource_xlsx, activities, code_sets):
+    def test_import_gridsources(
+        self, gridsource_xlsx, transactional_activities, transactional_code_sets
+    ):
         filepath = resources.files("edb.data") / "gridsources.xlsx"
         updates, messages = import_gridsources(filepath)
         assert len(messages) == 0, (

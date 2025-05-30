@@ -82,13 +82,13 @@ def test_list_rasters(db_raster):
 
 
 @pytest.mark.django_db(transaction=True, serialized_rollback=True)
-def test_create_gridsource(rasterfile, code_sets):
+def test_create_gridsource(rasterfile, transactional_code_sets):
     raster_name = "raster1"
     with rio.open(rasterfile, "r") as raster:
         write_gridsource_raster(raster, raster_name)
 
     NOx = Substance.objects.get(slug="NOx")
-    code_set1, code_set2 = code_sets
+    code_set1, code_set2 = transactional_code_sets
     ac1 = dict([(ac.code, ac) for ac in code_set1.codes.all()])
     ac2 = dict([(ac.code, ac) for ac in code_set2.codes.all()])
 
