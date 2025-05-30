@@ -36,7 +36,7 @@ DATABASES = {
         "NAME": os.environ.get(
             "CETK_DATABASE_PATH", os.path.join(DATABASE_DIR, "eclair.gpkg")
         ),
-        "TEST": {"NAME": os.path.join(DATABASE_DIR, "test.eclair.gpkg")},
+        "TEST": {"NAME": "test.eclair.gpkg"},
     }
 }
 
