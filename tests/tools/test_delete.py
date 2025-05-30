@@ -14,16 +14,6 @@ def pointsource_xlsx(tmpdir, settings):
     return resources.files("edb.data") / "pointsources.xlsx"
 
 
-@pytest.fixture
-def areasource_xlsx(tmpdir, settings):
-    return resources.files("edb.data") / "areasources.xlsx"
-
-
-@pytest.fixture
-def gridsource_xlsx(tmpdir, settings):
-    return resources.files("edb.data") / "gridsources.xlsx"
-
-
 class TestDelete:
     """Test deleting pointsources."""
 
