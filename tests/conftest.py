@@ -46,6 +46,15 @@ SPEEDS = ["20", "30", "40", "50", "60", "70", "80", "90", "100", "110", "120", "
 
 @pytest.fixture
 def testsettings(code_sets):
+    return set_testsettings(code_sets)
+
+
+@pytest.fixture
+def transactional_testsettings(transactional_code_sets):
+    return set_testsettings(transactional_code_sets)
+
+
+def set_testsettings(code_sets):
     settings = models.Settings.get_current()
     codeset1, codeset2 = code_sets
     settings.srid = 3006
@@ -57,8 +66,17 @@ def testsettings(code_sets):
     return settings
 
 
-@pytest.fixture()
+@pytest.fixture
 def activities(db):
+    return create_activities()
+
+
+@pytest.fixture
+def transactional_activities(transactional_db, django_db_serialized_rollback):
+    return create_activities()
+
+
+def create_activities():
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
     act1 = models.Activity.objects.create(name="activity1", unit="m3")
@@ -78,8 +96,17 @@ def activities(db):
     return (act1, act2)
 
 
-@pytest.fixture()
+@pytest.fixture
 def vertical_dist(db):
+    return create_vertical_dist()
+
+
+@pytest.fixture
+def transactional_vertical_dist(transactional_db, django_db_serialized_rollback):
+    return create_vertical_dist()
+
+
+def create_vertical_dist():
     vdist = models.VerticalDist.objects.create(
         name="vdist1", weights="[[5.0, 0.4], [10.0, 0.6]]"
     )
@@ -98,8 +125,17 @@ def test_timevar(db):
     return test_timevar
 
 
-@pytest.fixture()
+@pytest.fixture
 def code_sets(vertical_dist):
+    return create_code_sets(vertical_dist)
+
+
+@pytest.fixture
+def transactional_code_sets(transactional_vertical_dist):
+    return create_code_sets(transactional_vertical_dist)
+
+
+def create_code_sets(vertical_dist):
     cs1 = models.CodeSet.objects.create(name="codeset1", slug="codeset1")
     cs1.codes.create(code="1", label="Energy")
     cs1.codes.create(
@@ -120,8 +156,17 @@ def code_sets(vertical_dist):
     return (cs1, cs2)
 
 
-@pytest.fixture()
+@pytest.fixture
 def test_flowtimevar(db):
+    return create_test_flowtimevar()
+
+
+@pytest.fixture
+def transactional_test_flowtimevar(transactional_db, django_db_serialized_rollback):
+    return create_test_flowtimevar()
+
+
+def create_test_flowtimevar():
     # array representing daytime activity
     daytime_profile = np.ones((24, 7)) * 100
     daytime_profile[:7, :] = 0
@@ -132,8 +177,19 @@ def test_flowtimevar(db):
     return test_flowtimevar
 
 
-@pytest.fixture()
+@pytest.fixture
 def test_flowtimevar_constant(db):
+    return create_test_flowtimevar_constant()
+
+
+@pytest.fixture
+def transactional_test_flowtimevar_constant(
+    transactional_db, django_db_serialized_rollback
+):
+    return create_test_flowtimevar_constant()
+
+
+def create_test_flowtimevar_constant():
     # array representing daytime activity
     constant_profile = np.ones((24, 7)) * 100
     test_flowtimevar = models.FlowTimevar.objects.create(
@@ -142,8 +198,19 @@ def test_flowtimevar_constant(db):
     return test_flowtimevar
 
 
-@pytest.fixture()
+@pytest.fixture
 def test_coldstarttimevar(db):
+    return create_test_coldstarttimevar()
+
+
+@pytest.fixture
+def transactional_test_coldstarttimevar(
+    transactional_db, django_db_serialized_rollback
+):
+    return create_test_coldstarttimevar()
+
+
+def create_test_coldstarttimevar():
     # array representing constant timevar
     daytime_profile = np.ones((24, 7)) * 100
     test_timevar = models.ColdstartTimevar.objects.create(
@@ -152,22 +219,49 @@ def test_coldstarttimevar(db):
     return test_timevar
 
 
-@pytest.fixture()
+@pytest.fixture
 def vehicle_fuels(db):
+    return create_vehicle_fuels()
+
+
+@pytest.fixture
+def transactional_vehicle_fuels(transactional_db, django_db_serialized_rollback):
+    return create_vehicle_fuels()
+
+
+def create_vehicle_fuels():
     petrol = VehicleFuel.objects.create(name="petrol")
     diesel = VehicleFuel.objects.create(name="diesel")
     return (petrol, diesel)
 
 
-@pytest.fixture()
+@pytest.fixture
 def vehicles(db):
+    return create_vehicles()
+
+
+@pytest.fixture
+def transactional_vehicles(transactional_db, django_db_serialized_rollback):
+    return create_vehicles()
+
+
+def create_vehicles():
     car = models.Vehicle.objects.create(name="car", isheavy=False)
     truck = models.Vehicle.objects.create(name="truck", isheavy=True)
     return (car, truck)
 
 
-@pytest.fixture()
+@pytest.fixture
 def vehicle_ef(vehicles, vehicle_fuels):
+    return create_vehicle_ef(vehicles, vehicle_fuels)
+
+
+@pytest.fixture
+def transactional_vehicle_ef(transactional_vehicles, transactional_vehicle_fuels):
+    return create_vehicle_ef(transactional_vehicles, transactional_vehicle_fuels)
+
+
+def create_vehicle_ef(vehicles, vehicle_fuels):
     substances = list(Substance.objects.filter(slug__in={"NOx", "SOx"}))
     # add emission factors for vehicles in different traffic situations
     efs = []
@@ -196,7 +290,16 @@ def vehicle_ef(vehicles, vehicle_fuels):
 
 
 @pytest.fixture
-def roadclasses(vehicles, vehicle_fuels, vehicle_ef):
+def roadclasses(vehicle_ef):
+    return create_roadclasses()
+
+
+@pytest.fixture
+def transactional_roadclasses(transactional_vehicle_ef):
+    return create_roadclasses()
+
+
+def create_roadclasses():
     rca_roadtype = models.RoadAttribute.objects.create(
         name="road type", slug="roadtype", order=1
     )
@@ -228,8 +331,45 @@ def roadclasses(vehicles, vehicle_fuels, vehicle_ef):
     return roadclasses
 
 
-@pytest.fixture()
+@pytest.fixture
 def fleets(
+    vehicles,
+    code_sets,
+    test_flowtimevar_constant,
+    test_flowtimevar,
+    test_coldstarttimevar,
+    vehicle_fuels,
+):
+    return create_fleets(
+        vehicles,
+        code_sets,
+        test_flowtimevar_constant,
+        test_flowtimevar,
+        test_coldstarttimevar,
+        vehicle_fuels,
+    )
+
+
+@pytest.fixture
+def transactional_fleets(
+    transactional_vehicles,
+    transactional_code_sets,
+    transactional_test_flowtimevar_constant,
+    transactional_test_flowtimevar,
+    transactional_test_coldstarttimevar,
+    transactional_vehicle_fuels,
+):
+    return create_fleets(
+        transactional_vehicles,
+        transactional_code_sets,
+        transactional_test_flowtimevar_constant,
+        transactional_test_flowtimevar,
+        transactional_test_coldstarttimevar,
+        transactional_vehicle_fuels,
+    )
+
+
+def create_fleets(
     vehicles,
     code_sets,
     test_flowtimevar_constant,
@@ -300,8 +440,17 @@ def fleets(
     return [fleet1, fleet2]
 
 
-@pytest.fixture()
+@pytest.fixture
 def roadsources(roadclasses, fleets):
+    return create_roadsources(roadclasses, fleets)
+
+
+@pytest.fixture
+def transactional_roadsources(transactional_roadclasses, transactional_fleets):
+    return create_roadsources(transactional_roadclasses, transactional_fleets)
+
+
+def create_roadsources(roadclasses, fleets):
     """Create road sources."""
     fleet1, fleet2 = fleets[:2]
     # array representing heavy level of service
@@ -411,8 +560,17 @@ def congestionprofiles():
     return [congestion_profile1, congestion_profile2]
 
 
-@pytest.fixture()
-def pointsources(activities, code_sets, testsettings):
+@pytest.fixture
+def pointsources(activities, code_sets):
+    return create_pointsources(activities, code_sets)
+
+
+@pytest.fixture
+def transactional_pointsources(transactional_activities, transactional_code_sets):
+    return create_pointsources(transactional_activities, transactional_code_sets)
+
+
+def create_pointsources(activities, code_sets):
     code_set1, code_set2 = code_sets
     NOx = models.Substance.objects.get(slug="NOx")
     SOx = models.Substance.objects.get(slug="SOx")
@@ -455,8 +613,17 @@ def pointsources(activities, code_sets, testsettings):
     return (src1, src2, src3, src4)
 
 
-@pytest.fixture()
+@pytest.fixture
 def areasources(activities, code_sets):
+    return create_areasources(activities, code_sets)
+
+
+@pytest.fixture
+def transactional_areasources(transactional_activities, transactional_code_sets):
+    return create_areasources(transactional_activities, transactional_code_sets)
+
+
+def create_areasources(activities, code_sets):
     NOx = Substance.objects.get(slug="NOx")
     SOx = Substance.objects.get(slug="SOx")
 
@@ -539,8 +706,10 @@ def areasources(activities, code_sets):
     return (src1, src2, src3, src4, src5, src6, src7, src8)
 
 
-@pytest.fixture()
-def gridsource_raster(tmpdir, transactional_db, django_db_serialized_rollback):
+@pytest.fixture
+def transactional_gridsource_raster(
+    tmpdir, transactional_db, django_db_serialized_rollback
+):
     nrows = 2
     ncols = 2
     x1, y1, x2, y2 = (0, 0, 1000, 1000)
@@ -564,11 +733,13 @@ def gridsource_raster(tmpdir, transactional_db, django_db_serialized_rollback):
     return name
 
 
-@pytest.fixture()
-def gridsources(activities, code_sets, gridsource_raster):
+@pytest.fixture
+def transactional_gridsources(
+    transactional_activities, transactional_code_sets, transactional_gridsource_raster
+):
     NOx = Substance.objects.get(slug="NOx")
     SOx = Substance.objects.get(slug="SOx")
-    code_set1, code_set2 = code_sets
+    code_set1, code_set2 = transactional_code_sets
     ac1 = dict([(ac.code, ac) for ac in code_set1.codes.all()])
     src1 = models.GridSource.objects.create(
         name="gridsource1",
@@ -578,16 +749,16 @@ def gridsources(activities, code_sets, gridsource_raster):
     src1.substances.create(
         substance=NOx,
         value=emission_unit_to_si(500.0, "ton/year"),
-        raster=gridsource_raster,
+        raster=transactional_gridsource_raster,
     )
     src1.substances.create(
         substance=SOx,
         value=emission_unit_to_si(300.0, "ton/year"),
-        raster=gridsource_raster,
+        raster=transactional_gridsource_raster,
     )
     src1.activities.create(
-        activity=activities[0],
+        activity=transactional_activities[0],
         rate=activity_rate_unit_to_si(1000, "m3/year"),
-        raster=gridsource_raster,
+        raster=transactional_gridsource_raster,
     )
     return [src1]
