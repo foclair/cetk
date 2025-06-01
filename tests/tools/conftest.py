@@ -22,6 +22,6 @@ def test_db(tmpdir):
 
 @pytest.fixture
 def inventory(test_db, inventory_xlsx):
-    run_import(inventory_xlsx, db_path=test_db)
-    run_import(inventory_xlsx, db_path=test_db)
+    _, proc = run_import(inventory_xlsx, db_path=test_db)
+    assert proc.wait() == 0
     return test_db
