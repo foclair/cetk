@@ -26,6 +26,8 @@ from cetk.edb.models import (
     TrafficSituation,
     VehicleFuel,
     VehicleFuelComb,
+    drop_gridsource_raster,
+    list_gridsource_rasters,
     write_gridsource_raster,
 )
 from cetk.edb.units import (
@@ -42,6 +44,24 @@ EXTENT = GEOSGeometry(
 )
 ROADTYPES = ["highway", "primary", "secondary", "tertiary", "residential", "busway"]
 SPEEDS = ["20", "30", "40", "50", "60", "70", "80", "90", "100", "110", "120", "130"]
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_teardown(item):
+    marker = item.get_closest_marker("django_db")
+    if (
+        marker
+        and marker.kwargs.get("transaction", False)
+        or "transactional_db" in item.fixturenames
+    ):
+        cleanup_rasters()
+
+    return (yield)
+
+
+def cleanup_rasters():
+    for raster_name in list_gridsource_rasters():
+        drop_gridsource_raster(raster_name)
 
 
 @pytest.fixture
