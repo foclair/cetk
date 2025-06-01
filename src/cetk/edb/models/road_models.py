@@ -1,12 +1,10 @@
 """Database models related to road-traffic."""
 
 import ast
-from itertools import groupby
 
 import numpy as np
 import pandas as pd
 from django.contrib.gis.db import models
-from django.contrib.gis.geos import Point
 from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
 
@@ -261,49 +259,6 @@ class RoadSource(SourceBase):
         if self.heavy_vehicle_share is None:
             return self.fleet.default_heavy_vehicle_share
         return self.heavy_vehicle_share
-
-    def get_segments(self, rel_dist, *, polar=True):
-        """Get segments for a road given a normalized distribution.
-
-        args:
-            rel_dist: sequence of relative receptor distances
-
-        returns:
-            tuple: (center_point_of_segment, orientation)
-        """
-        srid = Settings.get_current().srid
-        geom = self.geom.transform(srid, clone=True)
-        # calculate absolute distribution along road
-        dist = np.array(rel_dist) * geom.length
-        # create an array of nodes with any consecutive duplicates removed
-        nodes = np.array([k for k, g in groupby(geom.coords)])
-        # create cross sections along road
-        node_dist = np.zeros(nodes.shape[0])
-
-        i = 0  # index for road node
-        j = 0  # index for distance along road
-        for p2 in nodes[1:]:
-            p1 = nodes[i, :]
-            seg = p2 - p1  # segment vector
-            seg_length = np.linalg.norm(seg)
-            seg_dir = seg / seg_length  # normalized segment direction
-            node_dist[i + 1] = node_dist[i] + seg_length  # node dist
-            while j < len(dist) and dist[j] <= node_dist[i + 1]:
-                coords = p1 + seg_dir * (dist[j] - node_dist[i])
-                if polar:
-                    seg_dir_degrees = 90 - np.degrees(
-                        np.arctan2(seg_dir[1], seg_dir[0])
-                    )
-                    if seg_dir_degrees < 0:
-                        seg_dir_degrees += 360
-                    yield (
-                        Point(*coords, srid=srid).transform(4326, clone=True),
-                        seg_dir_degrees,
-                    )
-                else:
-                    yield (p1, p2)
-                j += 1
-            i += 1
 
     def emission(
         self,

@@ -177,40 +177,6 @@ class TestRoadSource:
         road = RoadSource(fleet=fleets[0])
         assert road.get_heavy_vehicle_share() == fleets[0].default_heavy_vehicle_share
 
-    @pytest.mark.parametrize(
-        "rel_dist,target_x,target_y,target_bearing",
-        [
-            pytest.param(0.0000, 0.0, 0.0, 45, marks=pytest.mark.xfail),
-            pytest.param(0.1250, 0.5, 0.5, 45, marks=pytest.mark.xfail),
-            pytest.param(0.2499, 1.0, 1.0, 45, marks=pytest.mark.xfail),
-            pytest.param(0.2501, 1.0, 1.0, 135, marks=pytest.mark.xfail),
-            pytest.param(0.3750, 1.5, 0.5, 135, marks=pytest.mark.xfail),
-            pytest.param(0.4999, 2.0, 0.0, 135, marks=pytest.mark.xfail),
-            pytest.param(0.5001, 2.0, 0.0, 225, marks=pytest.mark.xfail),
-            pytest.param(0.6250, 1.5, -0.5, 225, marks=pytest.mark.xfail),
-            pytest.param(0.7499, 1.0, -1.0, 225, marks=pytest.mark.xfail),
-            pytest.param(0.7501, 1.0, -1.0, 315, marks=pytest.mark.xfail),
-            pytest.param(0.8750, 0.5, -0.5, 315, marks=pytest.mark.xfail),
-            pytest.param(1.0000, 0.0, -0.0, 315, marks=pytest.mark.xfail),
-        ],
-    )
-    def test_get_segments(
-        self, roadsources, rel_dist, target_x, target_y, target_bearing
-    ):
-        geom = LineString((0, 0), (1, 1), (2, 0), (1, -1), (0, 0), srid=3006)
-        road = roadsources[0]
-        road.geom = geom.transform(4326, clone=True)
-        ((point, bearing),) = road.get_segments([rel_dist])
-        assert point.transform(3006, clone=True).coords == (
-            pytest.approx(target_x, rel=1e-3, abs=1e-3),
-            pytest.approx(target_y, rel=1e-3, abs=1e-3),
-        )
-        assert bearing == pytest.approx(target_bearing)
-
-        geom = LineString((0, 0), (1, 1), (1, 1), (1, -1), srid=3006)
-        road.geom = geom.transform(4326, clone=True)
-        ((point, bearing),) = road.get_segments([rel_dist])
-
     def test_str(self, roadsources):
         """Test string representation."""
         src1 = roadsources[0]
