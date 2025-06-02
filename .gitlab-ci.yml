@@ -37,6 +37,9 @@ migrations:
 
 test:
   extends: .test
+  variables:
+    KUBERNETES_MEMORY_REQUEST: "512Mi"
+    KUBERNETES_MEMORY_LIMIT: "512Mi"
   script:
     - nox -s test -- --cov --durations=20 --junit-xml=junit.xml
   artifacts:
