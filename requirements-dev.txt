@@ -4,7 +4,7 @@ argcomplete==3.6.2
     # via nox
 asgiref==3.6.0
     # via django
-attrs==23.2.0
+attrs==25.3.0
     # via nox
 build==0.10.0
     # via
