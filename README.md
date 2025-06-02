@@ -53,18 +53,17 @@ pre-commit install
 
 ### Testing
 
-Run tests by
+Run tests with
 ```
-pytest --create-db
+nox
 ```
 
 ### Update requirements
 
-Install pip-tools:
+If any new requirements are added, update
+[requirements.txt](requirements.txt) and
+[requirements-dev.txt](requirements-dev.txt) by running
+
 ```
-pip install pip-tools
-```
-Update requirements.txt and requirements-dev.txt by:
-```
-./compilereqs
+nox -s requirements
 ```
