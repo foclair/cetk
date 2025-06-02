@@ -55,7 +55,8 @@ pythonpath = "tests"
 DJANGO_SETTINGS_MODULE = "cetk.settings"
 filterwarnings = [
     "error",
-    "ignore::RuntimeWarning",
+    "ignore:numpy\\.ndarray size changed:RuntimeWarning",
+    "ignore:np\\.find_common_type is deprecated:DeprecationWarning",
 ]
 
 [tool.ruff.lint]
