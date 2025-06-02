@@ -53,9 +53,9 @@ pre-commit install
 
 ### Testing
 
-Run tests by
+Run tests with
 ```
-pytest --create-db
+nox
 ```
 
 ### Update requirements
