@@ -4,6 +4,7 @@ include           constraints.txt
 include           CONTRIBUTING.md
 include           .env
 include           manage.py
+include           noxfile.py
 include           .pre-commit-config.yaml
 include           pyproject.toml
 include           requirements.*
