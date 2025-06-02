@@ -1,0 +1,41 @@
+{
+  "europavägar tätort": {
+    "default_heavy_vehicle_share": 0.1,
+    "vehicles": {
+      "car": {
+        "fraction": 1,
+        "coldstart_fraction": 0.27,
+        "timevar": "constant",
+        "coldstart_timevar": "constant",
+        "fuels": {
+          "petrol": 0.7,
+          "diesel": 0.3
+        }
+      },
+      "lorry": {
+        "fraction": 1,
+        "coldstart_fraction": 0,
+        "timevar": "constant",
+        "coldstart_timevar": "constant",
+        "fuels": {
+          "diesel": 1
+        }
+      }
+    }
+  },
+  "europavägar landsbygd": {
+    "default_heavy_vehicle_share": 0,
+    "vehicles": {
+      "car": {
+        "fraction": 1,
+        "coldstart_fraction": 0.07,
+        "timevar": "constant",
+        "coldstart_timevar": "constant",
+        "fuels": {
+          "petrol": 0.7,
+          "diesel": 0.3
+        }
+      }
+    }
+  }
+}

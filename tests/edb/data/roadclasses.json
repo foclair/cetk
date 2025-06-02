@@ -1,0 +1,22 @@
+{
+  "attributes": [
+    {
+      "name": "roadtype",
+      "slug": "roadtype",
+      "values": [
+        "motorway",
+        "primary road"
+      ]
+    },
+    {
+      "name": "posted speed",
+      "slug": "speed",
+      "values": [
+        "50",
+        "70",
+        "90",
+        "110"
+      ]
+    }
+  ]
+}

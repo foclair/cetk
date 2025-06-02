@@ -1,9 +1,9 @@
 import ast
+import json
 from contextlib import ExitStack
 from importlib import resources
 
 import pytest
-from ruamel.yaml import YAML
 
 from cetk.edb.importers import (
     fleet_excel_to_dict,
@@ -41,17 +41,16 @@ def get_data_file():
         yield _get_data_file
 
 
-def get_yaml_data(filename):
-    yaml = YAML(typ="safe")
+def get_json_data(filename):
     with resources.files("edb.data").joinpath(filename).open("rb") as fp:
-        return yaml.load(fp)
+        return json.load(fp)
 
 
 def test_import_vehicles(code_sets, get_data_file):
     """test importing vehicles from csv."""
     code_set1, code_set2 = code_sets[:2]
     vehiclefile = get_data_file("vehicles.csv")
-    vehiclesettings = get_yaml_data("vehicles.yaml")
+    vehiclesettings = get_json_data("vehicles.json")
     import_vehicles(vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8")
     assert VehicleFuel.objects.filter(name="diesel").exists()
     assert VehicleFuel.objects.filter(name="petrol").exists()
@@ -96,7 +95,7 @@ def test_import_vehicles_xlsx(code_sets, get_data_file):
 
     code_set1, code_set2 = code_sets[:2]
     vehiclefile = get_data_file("vehicles.xlsx")
-    vehiclesettings = get_yaml_data("vehicles.yaml")
+    vehiclesettings = get_json_data("vehicles.json")
     import_vehicles(vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8")
     assert VehicleFuel.objects.filter(name="diesel").exists()
 
@@ -107,11 +106,11 @@ def test_import_roadclasses(code_sets, get_data_file):
     code_set1, code_set2 = code_sets[:2]
     assert RoadClass.objects.count() == 0
     vehiclefile = get_data_file("vehicles.csv")
-    vehiclesettings = get_yaml_data("vehicles.yaml")
+    vehiclesettings = get_json_data("vehicles.json")
     import_vehicles(vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8")
     assert RoadClass.objects.count() == 0
     roadclassfile = get_data_file("roadclasses.csv")
-    roadclass_settings = get_yaml_data("roadclasses.yaml")
+    roadclass_settings = get_json_data("roadclasses.json")
     import_roadclasses(roadclassfile, roadclass_settings, encoding="utf-8")
     assert RoadClass.objects.count() == 2
     # set more asserts now that roadclasstree removed
@@ -140,11 +139,11 @@ def test_import_roadclasses(code_sets, get_data_file):
 def test_import_roadclasses_1attr(code_sets, get_data_file):
     code_set1, code_set2 = code_sets[:2]
     vehiclefile = get_data_file("vehicles.csv")
-    vehiclesettings = get_yaml_data("vehicles.yaml")
+    vehiclesettings = get_json_data("vehicles.json")
     import_vehicles(vehiclefile, vehiclesettings, unit="kg/m", encoding="utf-8")
 
     roadclassfile = get_data_file("roadclasses_1attr.csv")
-    roadclass_settings = get_yaml_data("roadclasses_1attr.yaml")
+    roadclass_settings = get_json_data("roadclasses_1attr.json")
     import_roadclasses(roadclassfile, roadclass_settings, encoding="utf-8")
 
     assert RoadClass.objects.all().count() == 2
@@ -163,9 +162,9 @@ def test_import_roadclasses_1attr(code_sets, get_data_file):
     assert RoadClass.objects.all().count() == 2
 
 
-def test_import_timevars(db, get_data_file):
-    timevarfile = get_data_file("timevars.yaml")
-    import_timevars(get_yaml_data(timevarfile))
+def test_import_timevars(db):
+    timevardata = get_json_data("timevars.json")
+    import_timevars(timevardata)
     assert FlowTimevar.objects.all().count() == 2
     turist = FlowTimevar.objects.get(name="tourist (heavy)")
     turist_typeday = ast.literal_eval(turist.typeday)
@@ -177,15 +176,14 @@ def test_import_timevars(db, get_data_file):
     assert Timevar.objects.all().count() == 1
 
     # test overwriting
-    import_timevars(get_yaml_data(timevarfile), overwrite=True)
+    import_timevars(timevardata, overwrite=True)
     assert FlowTimevar.objects.all().count() == 2
     assert ColdstartTimevar.objects.all().count() == 1
     assert Timevar.objects.all().count() == 1
 
 
-def test_import_congestion_profiles(db, get_data_file):
-    congestionprofile_file = get_data_file("congestion_profiles.yaml")
-    profile_data = get_yaml_data(congestionprofile_file)
+def test_import_congestion_profiles(db):
+    profile_data = get_json_data("congestion_profiles.json")
     import_congestion_profiles(profile_data)
     assert CongestionProfile.objects.all().count() == 2
     profile = CongestionProfile.objects.get(name="busy")
@@ -204,8 +202,7 @@ def test_import_fleets(db, get_data_file):
     Vehicle.objects.create(name="car")
     Vehicle.objects.create(name="lorry", isheavy=True)
 
-    fleetfile = get_data_file("fleets.yaml")
-    fleet_data = get_yaml_data(fleetfile)
+    fleet_data = get_json_data("fleets.json")
     import_fleets(fleet_data)
 
     assert Fleet.objects.all().count() == 2
@@ -243,7 +240,7 @@ def test_import_fleets(db, get_data_file):
 
 class TestImportRoads:
     def test_import_roads(self, roadefset, get_data_file):
-        config = get_yaml_data("roads.yaml")
+        config = get_json_data("roads.json")
         import_roads(get_data_file("roaddata.gpkg"), config)
 
         assert RoadSource.objects.all().count() == 26
@@ -262,7 +259,7 @@ class TestImportRoads:
         # roadsources are not updated as other sources are
 
     def test_import_roads_exclude(self, roadefset, get_data_file):
-        config = get_yaml_data("roads.yaml")
+        config = get_json_data("roads.json")
         import_roads(
             get_data_file("roaddata.gpkg"),
             config,
@@ -274,7 +271,7 @@ class TestImportRoads:
             RoadSource.objects.get(name="Nynäsvägen")
 
     def test_import_roads_only(self, roadefset, get_data_file):
-        config = get_yaml_data("roads.yaml")
+        config = get_json_data("roads.json")
         import_roads(
             get_data_file("roaddata.gpkg"),
             config,
