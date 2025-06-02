@@ -1,5 +1,4 @@
 include           CHANGES.md
-include           compilereqs
 include           constraints.txt
 include           CONTRIBUTING.md
 include           .env

@@ -60,11 +60,10 @@ pytest --create-db
 
 ### Update requirements
 
-Install pip-tools:
+If any new requirements are added, update
+[requirements.txt](requirements.txt) and
+[requirements-dev.txt](requirements-dev.txt) by running
+
 ```
-pip install pip-tools
-```
-Update requirements.txt and requirements-dev.txt by:
-```
-./compilereqs
+nox -s requirements
 ```

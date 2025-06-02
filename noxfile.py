@@ -13,6 +13,26 @@ TEST_REQUIREMENTS = ["pytest", "pytest-cov", "pytest-django", "ruamel.yaml"]
 
 
 @nox.session
+def requirements(session):
+    """Re-compile the development requirements"""
+    session.install("-c", "requirements-dev.txt", "uv")
+
+    def pip_compile(outputfile, *args):
+        # fmt: off
+        session.run(
+            "uv", "pip", "compile",
+            "--quiet",
+            "--output-file", outputfile,
+            "--custom-compile-command", f"nox -s {session.name}",
+            *session.posargs, *args,
+        )
+        # fmt: on
+
+    pip_compile("requirements.txt", "setup.cfg", "--generate-hashes")
+    pip_compile("requirements-dev.txt", "requirements-dev.in")
+
+
+@nox.session
 def django(session):
     """Run Django's system checks"""
     install_cetk(session)
