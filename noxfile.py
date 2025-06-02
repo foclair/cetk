@@ -9,7 +9,7 @@ nox.needs_version = ">=2024.03.02"
 nox.options.default_venv_backend = "uv|virtualenv"
 nox.options.sessions = ["django", "migrations", "test"]
 
-TEST_REQUIREMENTS = ["pytest", "pytest-cov", "pytest-django", "ruamel.yaml"]
+TEST_REQUIREMENTS = ["pytest", "pytest-cov", "pytest-django"]
 
 
 @nox.session
