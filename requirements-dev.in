@@ -8,6 +8,5 @@ pre-commit
 pytest
 pytest-cov
 pytest-django
-ruamel.yaml
 ruff
 uv

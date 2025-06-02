@@ -1,0 +1,36 @@
+{
+  "code_set1": "codeset1",
+  "code_set2": "codeset2",
+  "vehicles": [
+    {
+      "name": "car",
+      "isheavy": false,
+      "info": "a car",
+      "fuels": {
+        "petrol": {
+          "activitycode1": "1.3.1",
+          "activitycode2": "A"
+        },
+        "diesel": {
+          "activitycode1": "1.3.1",
+          "activitycode2": "A"
+        }
+      }
+    },
+    {
+      "name": "lorry",
+      "isheavy": true,
+      "info": "a lorry",
+      "fuels": {
+        "diesel": {
+          "activitycode1": "1.3.2",
+          "activitycode2": "A"
+        },
+        "petrol": {
+          "activitycode1": "1.3.2",
+          "activitycode2": "A"
+        }
+      }
+    }
+  ]
+}

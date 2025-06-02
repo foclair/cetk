@@ -67,10 +67,6 @@ pytest-django==4.5.2
     # via -r requirements-dev.in
 pyyaml==6.0.1
     # via pre-commit
-ruamel-yaml==0.18.12
-    # via -r requirements-dev.in
-ruamel-yaml-clib==0.2.12
-    # via ruamel-yaml
 ruff==0.11.11
     # via -r requirements-dev.in
 setuptools==69.1.1

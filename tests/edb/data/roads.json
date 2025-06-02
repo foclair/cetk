@@ -1,0 +1,16 @@
+{
+  "name": "Namn_130",
+  "nlanes": "Korfa_497",
+  "width": "IPA_Vagbre",
+  "median_strip_width": "IPA_Mittre",
+  "aadt": "ADTtot",
+  "heavy_vehicle_share": "andel_lb",
+  "speed": "IPA_Hastig",
+  "roadclass": {
+    "roadtype": "IPA_Funkkl",
+    "speed": "IPA_Hastig"
+  },
+  "tags": {
+    "KOMMUNKOD": "KOMMUNKOD"
+  }
+}

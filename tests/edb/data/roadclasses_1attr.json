@@ -1,0 +1,12 @@
+{
+  "attributes": [
+    {
+      "name": "roadtype",
+      "slug": "roadtype",
+      "values": [
+        "motorway",
+        "primary road"
+      ]
+    }
+  ]
+}
