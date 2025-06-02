@@ -51,7 +51,6 @@ omit = [
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "--reuse-db"
 pythonpath = "tests"
 DJANGO_SETTINGS_MODULE = "cetk.settings"
 filterwarnings = [

@@ -36,11 +36,6 @@ def areasource_xlsx(tmpdir, settings):
     return resources.files("edb.data") / "areasources.xlsx"
 
 
-@pytest.fixture
-def gridsource_xlsx(tmpdir, settings):
-    return resources.files("edb.data") / "gridsources.xlsx"
-
-
 class TestImport:
     """Test importing point-sources from csv."""
 
@@ -141,9 +136,9 @@ class TestImport:
         import_sourceactivities(filepath)
         assert AreaSourceActivity.objects.all().count() > 0
 
-    @pytest.mark.django_db(transaction=False)
+    @pytest.mark.django_db(transaction=True, serialized_rollback=True)
     def test_import_gridsources(
-        self, transactional_db, gridsource_xlsx, activities, code_sets
+        self, transactional_activities, transactional_code_sets
     ):
         filepath = resources.files("edb.data") / "gridsources.xlsx"
         updates, messages = import_gridsources(filepath)

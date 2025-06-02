@@ -3,6 +3,7 @@
 /dist/
 /.pytest_cache/
 /src/cetk.egg-info/
-__pycache__/
+/test.eclair.gpkg*
 /.venv/
 /.venv-312/
+__pycache__/

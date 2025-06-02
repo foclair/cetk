@@ -418,7 +418,9 @@ class TestEmissionRasterizer:
             assert np.sum(dset["emission_NOx"]) == pytest.approx(1000, 1e-6)
             assert dset["emission_NOx"][0, 0] == pytest.approx(1000, 1e-6)
 
-    def test_gridsource_no_timesteps(testsettings, gridsources, tmpdir):
+    def test_gridsource_no_timesteps(
+        transactional_testsettings, transactional_gridsources, tmpdir
+    ):
         NOx = Substance.objects.get(slug="NOx")
         SOx = Substance.objects.get(slug="SOx")
         extent = (0.0, 0.0, 1200.0, 1200.0)
@@ -432,7 +434,7 @@ class TestEmissionRasterizer:
             assert dset["emission_NOx"].shape == (4, 4)
             assert np.sum(dset["emission_NOx"]) == pytest.approx(510.0, 1e-6)
 
-    def test_gridsource(testsettings, gridsources, tmpdir):
+    def test_gridsource(transactional_testsettings, transactional_gridsources, tmpdir):
         NOx = Substance.objects.get(slug="NOx")
         SOx = Substance.objects.get(slug="SOx")
         extent = (0.0, 0.0, 1200.0, 1200.0)
