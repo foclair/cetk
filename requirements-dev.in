@@ -1,10 +1,12 @@
 # CI/CD and development requirements for the Gadget
-pip-tools
 build
+coverage[toml]
 django ~=4.2
+nox
+pip-tools
 pre-commit
 pytest
-coverage[toml]
 pytest-cov
 pytest-django
+ruamel.yaml
 ruff

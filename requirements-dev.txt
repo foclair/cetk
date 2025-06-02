@@ -4,12 +4,22 @@
 #
 #    pip-compile --allow-unsafe --constraint=requirements.txt --generate-hashes --output-file=requirements-dev.txt requirements-dev.in
 #
+argcomplete==3.6.2 \
+    --hash=sha256:65b3133a29ad53fb42c48cf5114752c7ab66c1c38544fdf6460f450c09b42591 \
+    --hash=sha256:d0519b1bc867f5f4f4713c41ad0aba73a4a5f007449716b16f385f2166dc6adf
+    # via nox
 asgiref==3.6.0 \
     --hash=sha256:71e68008da809b957b7ee4b43dbccff33d1b23519fb8344e33f049897077afac \
     --hash=sha256:9567dfe7bd8d3c8c892227827c41cce860b368104c3431da67a0c5a65a949506
     # via
     #   -c requirements.txt
     #   django
+attrs==23.2.0 \
+    --hash=sha256:935dc3b529c262f6cf76e50877d35a4bd3c1de194fd41f47a2b7ae8f19971f30 \
+    --hash=sha256:99b87a485a5820b23b879f04c2305b44b951b502fd64be915879d77a7e8fc6f1
+    # via
+    #   -c requirements.txt
+    #   nox
 build==0.10.0 \
     --hash=sha256:af266720050a66c893a6096a2f410989eeac74ff9a68ba194b3f6473e8e26171 \
     --hash=sha256:d5b71264afdb5951d6704482aac78de887c80691c52b88a9ad195983ca2c9269
@@ -26,6 +36,10 @@ click==8.1.7 \
     # via
     #   -c requirements.txt
     #   pip-tools
+colorlog==6.9.0 \
+    --hash=sha256:5906e71acd67cb07a71e779c47c4bcb45fb8c2993eebe9e5adcd6a6f1b283eff \
+    --hash=sha256:bfba54a1b93b94f54e1f4fe48395725a3d92fd2a4af702f6bd70946bdc0c6ac2
+    # via nox
 coverage[toml]==7.3.0 \
     --hash=sha256:07ea61bcb179f8f05ffd804d2732b09d23a1238642bf7e51dad62082b5019b34 \
     --hash=sha256:1084393c6bda8875c05e04fce5cfe1301a425f758eb012f010eab586f1f3905e \
@@ -82,6 +96,10 @@ coverage[toml]==7.3.0 \
     # via
     #   -r requirements-dev.in
     #   pytest-cov
+dependency-groups==1.3.1 \
+    --hash=sha256:51aeaa0dfad72430fcfb7bcdbefbd75f3792e5919563077f30bc0d73f4493030 \
+    --hash=sha256:78078301090517fd938c19f64a53ce98c32834dfe0dee6b88004a569a6adfefd
+    # via nox
 distlib==0.3.7 \
     --hash=sha256:2e24928bc811348f0feb63014e97aaae3037f2cf48712d51ae61df7fd6075057 \
     --hash=sha256:9dafe54b34a028eafd95039d5e5d4851a13734540f1331060d31c9916e7147a8
@@ -112,12 +130,18 @@ nodeenv==1.8.0 \
     --hash=sha256:d51e0c37e64fbf47d017feac3145cdbb58836d7eee8c6f6d3b6880c5456227d2 \
     --hash=sha256:df865724bb3c3adc86b3876fa209771517b0cfe596beff01a92700e0e8be4cec
     # via pre-commit
+nox==2025.5.1 \
+    --hash=sha256:2a571dfa7a58acc726521ac3cd8184455ebcdcbf26401c7b737b5bc6701427b2 \
+    --hash=sha256:56abd55cf37ff523c254fcec4d152ed51e5fe80e2ab8317221d8b828ac970a31
+    # via -r requirements-dev.in
 packaging==24.1 \
     --hash=sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002 \
     --hash=sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124
     # via
     #   -c requirements.txt
     #   build
+    #   dependency-groups
+    #   nox
     #   pytest
 pip-tools==7.3.0 \
     --hash=sha256:8717693288720a8c6ebd07149c93ab0be1fced0b5191df9e9decd3263e20d85e \
@@ -206,6 +230,58 @@ pyyaml==6.0.1 \
     --hash=sha256:fd1592b3fdf65fff2ad0004b5e363300ef59ced41c2e6b3a99d4089fa8c5435d \
     --hash=sha256:fd66fc5d0da6d9815ba2cebeb4205f95818ff4b79c3ebe268e75d961704af52f
     # via pre-commit
+ruamel-yaml==0.18.12 \
+    --hash=sha256:5a38fd5ce39d223bebb9e3a6779e86b9427a03fb0bf9f270060f8b149cffe5e2 \
+    --hash=sha256:790ba4c48b6a6e6b12b532a7308779eb12d2aaab3a80fdb8389216f28ea2b287
+    # via -r requirements-dev.in
+ruamel-yaml-clib==0.2.12 \
+    --hash=sha256:040ae85536960525ea62868b642bdb0c2cc6021c9f9d507810c0c604e66f5a7b \
+    --hash=sha256:0467c5965282c62203273b838ae77c0d29d7638c8a4e3a1c8bdd3602c10904e4 \
+    --hash=sha256:0b7e75b4965e1d4690e93021adfcecccbca7d61c7bddd8e22406ef2ff20d74ef \
+    --hash=sha256:11f891336688faf5156a36293a9c362bdc7c88f03a8a027c2c1d8e0bcde998e5 \
+    --hash=sha256:1492a6051dab8d912fc2adeef0e8c72216b24d57bd896ea607cb90bb0c4981d3 \
+    --hash=sha256:20b0f8dc160ba83b6dcc0e256846e1a02d044e13f7ea74a3d1d56ede4e48c632 \
+    --hash=sha256:22353049ba4181685023b25b5b51a574bce33e7f51c759371a7422dcae5402a6 \
+    --hash=sha256:2c59aa6170b990d8d2719323e628aaf36f3bfbc1c26279c0eeeb24d05d2d11c7 \
+    --hash=sha256:32621c177bbf782ca5a18ba4d7af0f1082a3f6e517ac2a18b3974d4edf349680 \
+    --hash=sha256:3bc2a80e6420ca8b7d3590791e2dfc709c88ab9152c00eeb511c9875ce5778bf \
+    --hash=sha256:3eac5a91891ceb88138c113f9db04f3cebdae277f5d44eaa3651a4f573e6a5da \
+    --hash=sha256:4a6679521a58256a90b0d89e03992c15144c5f3858f40d7c18886023d7943db6 \
+    --hash=sha256:4c8c5d82f50bb53986a5e02d1b3092b03622c02c2eb78e29bec33fd9593bae1a \
+    --hash=sha256:4f6f3eac23941b32afccc23081e1f50612bdbe4e982012ef4f5797986828cd01 \
+    --hash=sha256:5a0e060aace4c24dcaf71023bbd7d42674e3b230f7e7b97317baf1e953e5b519 \
+    --hash=sha256:6442cb36270b3afb1b4951f060eccca1ce49f3d087ca1ca4563a6eb479cb3de6 \
+    --hash=sha256:6c8fbb13ec503f99a91901ab46e0b07ae7941cd527393187039aec586fdfd36f \
+    --hash=sha256:749c16fcc4a2b09f28843cda5a193e0283e47454b63ec4b81eaa2242f50e4ccd \
+    --hash=sha256:7dd5adc8b930b12c8fc5b99e2d535a09889941aa0d0bd06f4749e9a9397c71d2 \
+    --hash=sha256:811ea1594b8a0fb466172c384267a4e5e367298af6b228931f273b111f17ef52 \
+    --hash=sha256:932205970b9f9991b34f55136be327501903f7c66830e9760a8ffb15b07f05cd \
+    --hash=sha256:943f32bc9dedb3abff9879edc134901df92cfce2c3d5c9348f172f62eb2d771d \
+    --hash=sha256:95c3829bb364fdb8e0332c9931ecf57d9be3519241323c5274bd82f709cebc0c \
+    --hash=sha256:96777d473c05ee3e5e3c3e999f5d23c6f4ec5b0c38c098b3a5229085f74236c6 \
+    --hash=sha256:a274fb2cb086c7a3dea4322ec27f4cb5cc4b6298adb583ab0e211a4682f241eb \
+    --hash=sha256:a52d48f4e7bf9005e8f0a89209bf9a73f7190ddf0489eee5eb51377385f59f2a \
+    --hash=sha256:a606ef75a60ecf3d924613892cc603b154178ee25abb3055db5062da811fd969 \
+    --hash=sha256:ab007f2f5a87bd08ab1499bdf96f3d5c6ad4dcfa364884cb4549aa0154b13a28 \
+    --hash=sha256:b82a7c94a498853aa0b272fd5bc67f29008da798d4f93a2f9f289feb8426a58d \
+    --hash=sha256:bb43a269eb827806502c7c8efb7ae7e9e9d0573257a46e8e952f4d4caba4f31e \
+    --hash=sha256:bc5f1e1c28e966d61d2519f2a3d451ba989f9ea0f2307de7bc45baa526de9e45 \
+    --hash=sha256:bd0a08f0bab19093c54e18a14a10b4322e1eacc5217056f3c063bd2f59853ce4 \
+    --hash=sha256:beffaed67936fbbeffd10966a4eb53c402fafd3d6833770516bf7314bc6ffa12 \
+    --hash=sha256:bf165fef1f223beae7333275156ab2022cffe255dcc51c27f066b4370da81e31 \
+    --hash=sha256:cf12567a7b565cbf65d438dec6cfbe2917d3c1bdddfce84a9930b7d35ea59642 \
+    --hash=sha256:d84318609196d6bd6da0edfa25cedfbabd8dbde5140a0a23af29ad4b8f91fb1e \
+    --hash=sha256:d85252669dc32f98ebcd5d36768f5d4faeaeaa2d655ac0473be490ecdae3c285 \
+    --hash=sha256:e143ada795c341b56de9418c58d028989093ee611aa27ffb9b7f609c00d813ed \
+    --hash=sha256:e188d2699864c11c36cdfdada94d781fd5d6b0071cd9c427bceb08ad3d7c70e1 \
+    --hash=sha256:e2f1c3765db32be59d18ab3953f43ab62a761327aafc1594a2a1fbe038b8b8a7 \
+    --hash=sha256:e5b8daf27af0b90da7bb903a876477a9e6d7270be6146906b276605997c7e9a3 \
+    --hash=sha256:e7e3736715fbf53e9be2a79eb4db68e4ed857017344d697e8b9749444ae57475 \
+    --hash=sha256:e8c4ebfcfd57177b572e2040777b8abc537cdef58a2120e830124946aa9b42c5 \
+    --hash=sha256:f66efbc1caa63c088dead1c4170d148eabc9b80d95fb75b6c92ac0aad2437d76 \
+    --hash=sha256:fc4b630cd3fa2cf7fce38afa91d7cfe844a9f75d7f0f36393fa98815e911d987 \
+    --hash=sha256:fd5415dded15c3822597455bc02bcd66e81ef8b7a48cb71a33628fc9fdde39df
+    # via ruamel-yaml
 ruff==0.11.11 \
     --hash=sha256:1adcb9a18802268aaa891ffb67b1c94cd70578f126637118e8099b8e4adcf112 \
     --hash=sha256:1b5ab797fcc09121ed82e9b12b6f27e34859e4227080a42d090881be888755d4 \
@@ -238,6 +314,8 @@ tomli==2.0.1 \
     # via
     #   build
     #   coverage
+    #   dependency-groups
+    #   nox
     #   pip-tools
     #   pyproject-hooks
     #   pytest
@@ -248,7 +326,9 @@ typing-extensions==4.11.0 \
 virtualenv==20.24.3 \
     --hash=sha256:95a6e9398b4967fbcb5fef2acec5efaf9aa4972049d9ae41f95e0972a683fd02 \
     --hash=sha256:e5c3b4ce817b0b328af041506a2a299418c98747c4b1e68cb7527e74ced23efc
-    # via pre-commit
+    # via
+    #   nox
+    #   pre-commit
 wheel==0.41.2 \
     --hash=sha256:0c5ac5ff2afb79ac23ab82bab027a0be7b5dbcf2e54dc50efe4bf507de1f7985 \
     --hash=sha256:75909db2664838d015e3d9139004ee16711748a52c8f336b52882266540215d8
