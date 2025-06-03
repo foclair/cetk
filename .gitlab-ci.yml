@@ -20,6 +20,7 @@ variables:
 build:package:
   stage: build
   extends: .python
+  image: r-harbor.smhi.se/foluft/python:3.11-git-ubi9
   before_script:
     - uv pip install -c requirements-dev.txt build
   script:

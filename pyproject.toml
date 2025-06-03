@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 77.0.3"]
+requires = ["setuptools >= 77.0.3", "setuptools-scm >= 8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -41,10 +41,6 @@ dynamic = ["version"]
 cetk = "cetk.tools.cetk_command:main"
 cetkmanage = "cetk.tools.manage:main"
 
-[tool.check-manifest]
-ignore = [
-]
-
 [tool.coverage.run]
 source = ["cetk"]
 branch = true
@@ -68,3 +64,5 @@ extend-select = ["I", "RUF100"]
 
 [tool.setuptools.dynamic]
 version = { attr = "cetk.__version__" }
+
+[tool.setuptools_scm]
