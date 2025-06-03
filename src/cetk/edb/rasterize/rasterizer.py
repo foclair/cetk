@@ -597,12 +597,12 @@ class EmissionRasterizer:
                 index_array, source_weights = resample_band(
                     raster_data,
                     metadata["extent"],
-                    metadata["nodata"],
                     self.extent,
                     self.nx,
                     self.ny,
                     metadata["srid"],
                     self.srid,
+                    source_nodata=metadata["nodata"],
                     subgridcells=2,
                 )
 

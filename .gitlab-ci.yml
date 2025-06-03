@@ -63,6 +63,8 @@ test:
   stage: test
   extends: .python
   needs: ["build:package"]
+  variables:
+    UV_INDEX_URL: https://gitlab.smhi.se/api/v4/groups/5616/-/packages/pypi/simple
   before_script:
     - uv pip install -c requirements-dev.txt nox
   script:
