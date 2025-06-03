@@ -36,7 +36,16 @@ django:
 migrations:
   extends: .test
 
-test:
+test-py39:
+  extends: .test
+  image: r-harbor.smhi.se/foluft/python:3.9-gdal34-ubi9
+  variables:
+    KUBERNETES_MEMORY_REQUEST: "512Mi"
+    KUBERNETES_MEMORY_LIMIT: "512Mi"
+  script:
+    - nox -s test
+
+test-py312:
   extends: .test
   variables:
     KUBERNETES_MEMORY_REQUEST: "512Mi"
