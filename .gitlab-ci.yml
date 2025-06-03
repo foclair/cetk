@@ -10,7 +10,7 @@ stages:
   - test
 
 default:
-  image: r-harbor.smhi.se/foluft/python:3.11-gdal34-ubi9
+  image: r-harbor.smhi.se/foluft/python:3.12-gdal34-ubi9
   interruptible: true
 
 variables:
@@ -20,7 +20,7 @@ variables:
 build:package:
   stage: build
   extends: .python
-  image: r-harbor.smhi.se/foluft/python:3.11-git-ubi9
+  image: r-harbor.smhi.se/foluft/python:3.12-git-ubi9
   before_script:
     - uv pip install -c requirements-dev.txt build
   script:
