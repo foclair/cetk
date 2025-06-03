@@ -28,7 +28,6 @@ def requirements(session):
         )
         # fmt: on
 
-    pip_compile("requirements.txt", "pyproject.toml", "--generate-hashes")
     pip_compile("requirements-dev.txt", "requirements-dev.in")
 
 
