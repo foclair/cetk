@@ -9,4 +9,5 @@ pytest
 pytest-cov
 pytest-django
 ruff
+setuptools-scm
 uv
