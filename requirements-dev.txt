@@ -26,14 +26,10 @@ distlib==0.3.7
     # via virtualenv
 django==4.2.2
     # via -r requirements-dev.in
-exceptiongroup==1.2.1
-    # via pytest
 filelock==3.12.3
     # via virtualenv
 identify==2.5.27
     # via pre-commit
-importlib-metadata==8.7.0
-    # via setuptools-scm
 iniconfig==2.0.0
     # via pytest
 nodeenv==1.8.0
@@ -81,20 +77,6 @@ setuptools-scm==8.3.1
     # via -r requirements-dev.in
 sqlparse==0.4.3
     # via django
-tomli==2.0.1
-    # via
-    #   build
-    #   coverage
-    #   dependency-groups
-    #   nox
-    #   pip-tools
-    #   pyproject-hooks
-    #   pytest
-    #   setuptools-scm
-typing-extensions==4.11.0
-    # via
-    #   filelock
-    #   setuptools-scm
 uv==0.7.9
     # via -r requirements-dev.in
 virtualenv==20.24.3
@@ -103,5 +85,3 @@ virtualenv==20.24.3
     #   pre-commit
 wheel==0.41.2
     # via pip-tools
-zipp==3.22.0
-    # via importlib-metadata

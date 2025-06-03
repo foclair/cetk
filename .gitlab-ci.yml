@@ -10,7 +10,7 @@ stages:
   - test
 
 default:
-  image: r-harbor.smhi.se/foluft/python:3.11-gdal34-ubi9
+  image: r-harbor.smhi.se/foluft/python:3.12-gdal34-ubi9
   interruptible: true
 
 variables:
@@ -20,7 +20,7 @@ variables:
 build:package:
   stage: build
   extends: .python
-  image: r-harbor.smhi.se/foluft/python:3.11-git-ubi9
+  image: r-harbor.smhi.se/foluft/python:3.12-git-ubi9
   before_script:
     - uv pip install -c requirements-dev.txt build
   script:
@@ -36,7 +36,16 @@ django:
 migrations:
   extends: .test
 
-test:
+test-py39:
+  extends: .test
+  image: r-harbor.smhi.se/foluft/python:3.9-gdal34-ubi9
+  variables:
+    KUBERNETES_MEMORY_REQUEST: "512Mi"
+    KUBERNETES_MEMORY_LIMIT: "512Mi"
+  script:
+    - nox -s test
+
+test-py312:
   extends: .test
   variables:
     KUBERNETES_MEMORY_REQUEST: "512Mi"

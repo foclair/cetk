@@ -104,12 +104,6 @@ geopandas==1.0.1 \
     --hash=sha256:01e147d9420cc374d26f51fc23716ac307f32b49406e4bd8462c07e82ed1d3d6 \
     --hash=sha256:b8bf70a5534588205b7a56646e2082fb1de9a03599651b3d80c99ea4c2ca08ab
     # via cetk (pyproject.toml)
-importlib-metadata==8.1.0 \
-    --hash=sha256:3cd29f739ed65973840b068e3132135ce954c254d48b5b640484467ef7ab3c8c \
-    --hash=sha256:fcdcb1d5ead7bdf3dd32657bb94ebe9d2aabfe89a19782ddc32da5041d6ebfb4
-    # via
-    #   fiona
-    #   rasterio
 netcdf4==1.7.2 \
     --hash=sha256:09d61c2ddb6011afb51e77ea0f25cd0bdc28887fb426ffbbc661d920f20c9749 \
     --hash=sha256:118b476fd00d7e3ab9aa7771186d547da645ae3b49c0c7bdab866793ebf22f07 \
@@ -198,9 +192,9 @@ numpy==2.0.2 \
     #   rastafari
     #   rasterio
     #   shapely
-openpyxl==3.1.2 \
-    --hash=sha256:a6f5977418eff3b2d5500d54d9db50c8277a368436f4e4f8ddb1be3422870184 \
-    --hash=sha256:f91456ead12ab3c6c2e9491cf33ba6d08357d802192379bb482f1033ade496f5
+openpyxl==3.1.5 \
+    --hash=sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2 \
+    --hash=sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050
     # via cetk (pyproject.toml)
 packaging==24.1 \
     --hash=sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002 \
@@ -423,7 +417,3 @@ tzdata==2023.3 \
     --hash=sha256:11ef1e08e54acb0d4f95bdb1be05da659673de4acbd21bf9c69e94cc5e907a3a \
     --hash=sha256:7e65763eef3120314099b6939b5546db7adce1e7d6f2e179e3df563c70511eda
     # via pandas
-zipp==3.19.2 \
-    --hash=sha256:bf1dcf6450f873a13e952a29504887c89e6de7506209e5b1bcc3460135d4de19 \
-    --hash=sha256:f091755f667055f2d02b32c53771a7a6c8b47e1fdbc4b72a8b9072b3eef8015c
-    # via importlib-metadata
