@@ -7,29 +7,30 @@ import nox
 
 nox.needs_version = ">=2024.03.02"
 nox.options.default_venv_backend = "uv|virtualenv"
-nox.options.sessions = ["django", "migrations", "test"]
+nox.options.sessions = ["django", "migrations", "test", "test-lowest"]
 
 TEST_REQUIREMENTS = ["pytest", "pytest-cov", "pytest-django"]
 
 
-@nox.session
-def requirements(session):
+@nox.session(name="requirements-dev")
+def requirements_dev(session):
     """Re-compile the development requirements"""
     session.install("-c", "requirements-dev.txt", "uv")
+    pip_compile(session, "requirements-dev.txt", "requirements-dev.in")
 
-    def pip_compile(outputfile, *args):
-        # fmt: off
-        session.run(
-            "uv", "pip", "compile",
-            "--quiet",
-            "--output-file", outputfile,
-            "--custom-compile-command", f"nox -s {session.name}",
-            *session.posargs, *args,
-        )
-        # fmt: on
 
-    pip_compile("requirements.txt", "pyproject.toml", "--generate-hashes")
-    pip_compile("requirements-dev.txt", "requirements-dev.in")
+@nox.session(name="constraints-lowest", python="3.9")
+def constraints_lowest(session):
+    """Re-compile the constraints for the lowest allowed dependency versions"""
+    session.install("-c", "requirements-dev.txt", "uv")
+    session.run("rm", "-f", "constraints-lowest.txt", external=True)
+    pip_compile(
+        session,
+        "constraints-lowest.txt",
+        "pyproject.toml",
+        "--resolution",
+        "lowest-direct",
+    )
 
 
 @nox.session
@@ -57,6 +58,22 @@ def test(session):
     session.run("pytest", *session.posargs)
 
 
+@nox.session(name="test-lowest", python="3.9")
+def test_lowest(session):
+    """Run the unit and regression tests with the lowest allowed versions."""
+    session.install("-c", "requirements-dev.txt", *TEST_REQUIREMENTS)
+    install_cetk(session, lowest_versions=True)
+    session.run(
+        "pytest",
+        "-Wdefault",
+        "-Wignore::DeprecationWarning",
+        "-Wignore::FutureWarning",
+        "-Wignore::PendingDeprecationWarning",
+        "-Wignore:numpy.ndarray size changed:RuntimeWarning",
+        *session.posargs,
+    )
+
+
 def install_cetk(session, *, lowest_versions=False, use_wheel_in_ci=True):
     constraints = ("-c", "constraints-lowest.txt") if lowest_versions else ()
     if use_wheel_in_ci and "CI" in os.environ:
@@ -66,3 +83,15 @@ def install_cetk(session, *, lowest_versions=False, use_wheel_in_ci=True):
     else:
         # otherwise cetk is installed in editable mode to allow `nox -R`
         session.install(*constraints, "-e", ".")
+
+
+def pip_compile(session, outputfile, *extra_args):
+    # fmt: off
+    session.run(
+        "uv", "pip", "compile",
+        "--quiet",
+        "--output-file", outputfile,
+        "--custom-compile-command", f"nox -s {session.name}",
+        *session.posargs, *extra_args,
+    )
+    # fmt: on

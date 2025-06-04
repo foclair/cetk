@@ -9,7 +9,6 @@ Used in QGIS Plugin Eclair. This package is maintained by [Eef van Dongen][] at 
 ```
 python3 -m venv --prompt cetk .venv
 . .venv/bin/activate
-python -m pip install -r ./requirements.txt
 python -m pip install -e .
 ```
 Check that installation was successful and receive information on how to use the toolkit:
@@ -60,8 +59,8 @@ nox
 
 ### Update requirements
 
-If any new requirements are added, update
-[requirements.txt](requirements.txt) and
+If any new development requirements are added to
+[requirements-dev.in](requirements-dev.in), update
 [requirements-dev.txt](requirements-dev.txt) by running
 
 ```
