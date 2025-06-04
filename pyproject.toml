@@ -23,7 +23,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Atmospheric Science",
 ]
 dependencies = [       # Release date  Comment
-  "django ~=4.2",
+  "django >=4.2,<6",   # 2023-04-03    current LTS
   "fiona >=1.8.18",    # 2020-11-17    first version with cp39 wheel
   "geopandas >=0.12",  # 2022-10-24    first version with shapely 2 support
   "netCDF4 >=1.5.4",   # 2020-07-23    first version with cp39 wheel
@@ -56,6 +56,8 @@ DJANGO_SETTINGS_MODULE = "cetk.settings"
 filterwarnings = [
     "error",
     "ignore:numpy\\.ndarray size changed:RuntimeWarning",
+    "ignore:CheckConstraint\\.check is deprecated:DeprecationWarning",
+    "ignore:coord_dim setter is deprecated:DeprecationWarning",
 ]
 
 [tool.ruff.lint]

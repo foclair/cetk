@@ -2,7 +2,7 @@
 #    nox -s requirements-dev
 argcomplete==3.6.2
     # via nox
-asgiref==3.6.0
+asgiref==3.8.1
     # via django
 attrs==25.3.0
     # via nox
@@ -24,7 +24,7 @@ dependency-groups==1.3.1
     # via nox
 distlib==0.3.7
     # via virtualenv
-django==4.2.2
+django==5.2.1
     # via -r requirements-dev.in
 filelock==3.12.3
     # via virtualenv
