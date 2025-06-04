@@ -1,7 +1,7 @@
 # CI/CD and development requirements for the Gadget
 build
 coverage[toml]
-django ~=4.2
+django >=4.2,<6
 nox
 pip-tools
 pre-commit
