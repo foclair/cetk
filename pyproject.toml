@@ -65,5 +65,3 @@ extend-select = ["I", "RUF100"]
 
 [tool.setuptools.dynamic]
 version = { attr = "cetk.__version__" }
-
-[tool.setuptools_scm]
