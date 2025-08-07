@@ -22,6 +22,7 @@ from cetk.edb.cache import EmissionCache, NotInCacheError
 from cetk.edb.models import (
     VELOCITY_CHOICES,
     AreaSource,
+    CodeSet,
     ColdstartTimevar,
     CongestionProfile,
     FlowTimevar,
@@ -319,17 +320,19 @@ class EmissionRasterizer:
         sourcetypes = sourcetypes or SOURCETYPES
         # not used; srid = Settings.get_current().srid
 
-        if ac1 is not None or ac2 is not None or ac3 is not None:
-            raise ValueError(
-                "filtering for ac not implemented in source_emissions_query yet!"
-            )
+        # if ac1 is not None or ac2 is not None or ac3 is not None:
+        #     breakpoint()
+        #     # raise ValueError(
+        #     #     "filtering for ac not implemented in source_emissions_query yet!"
+        #     # )
         # if activity codes are given as strings, get the corresponding
         # activity code instances
         if ac1 is not None and len(ac1) > 0 and isinstance(ac1[0], str):
             # TODO why code__in= not code= ?
-            ac1_instances = list(
-                Settings.get_current().codeset1.codes.filter(code__in=ac1)
-            )
+            codeset1 = Settings.get_current().codeset1
+            if codeset1 is None:
+                codeset1 = CodeSet.objects.get(id=1)
+            ac1_instances = list(codeset1.codes.filter(code=ac1))
             if len(ac1_instances) == 0:
                 raise ValueError(
                     f"the filter for activitycode1: {ac1} does not match any code"
@@ -339,9 +342,10 @@ class EmissionRasterizer:
             ac1_instances = ac1
 
         if ac2 is not None and len(ac2) > 0 and isinstance(ac2[0], str):
-            ac2_instances = list(
-                Settings.get_current().codeset2.codes.filter(code__in=ac2)
-            )
+            codeset2 = Settings.get_current().codeset2
+            if codeset2 is None:
+                codeset2 = CodeSet.objects.get(id=2)
+            ac2_instances = list(codeset2.codes.filter(code=ac2))
             if len(ac2_instances) == 0:
                 raise ValueError(
                     f"the filter for activitycode2: {ac2} does not match any code"
@@ -351,9 +355,10 @@ class EmissionRasterizer:
             ac2_instances = ac2
 
         if ac3 is not None and len(ac3) > 0 and isinstance(ac3[0], str):
-            ac3_instances = list(
-                Settings.get_current().codeset3.codes.filter(code__in=ac3)
-            )
+            codeset3 = Settings.get_current().codeset3
+            if codeset3 is None:
+                codeset3 = CodeSet.objects.get(id=3)
+            ac3_instances = list(codeset3.codes.filter(code=ac3))
             if len(ac3_instances) == 0:
                 raise ValueError(
                     f"the filter for activitycode3: {ac3} does not match any code"
@@ -395,6 +400,9 @@ class EmissionRasterizer:
                 ids=ids,
                 tags=tags,
                 polygon=polygon,
+                ac1=ac1_instances,
+                ac2=ac2_instances,
+                ac3=ac3_instances,
             )
 
     def _get_weights(self, polygon=None):
@@ -847,7 +855,9 @@ class EmissionRasterizer:
 
             if self.unit_conversion_factor != 1.0:
                 chunk *= self.unit_conversion_factor
-            result_file = os.path.join(self.output.path, substance.slug + ".nc")
+            result_file = os.path.join(
+                self.output.path, self.output.basename + substance.slug + ".nc"
+            )
             with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
                 self.set_data(dset, substance, chunk)
 
@@ -1084,7 +1094,6 @@ class EmissionRasterizer:
 
         # create an empty array
         chunk = np.zeros((self.ny, self.nx), dtype=np.float32)
-
         for sourcetype in sourcetypes:
             if not self._cache.has_sourcetype(sourcetype):
                 continue

@@ -272,6 +272,7 @@ class Editor(object):
         timezone = timezone or datetime.timezone.utc
         srid = srid or DEFAULT_SRID
         extent, ny, nx = adjust_extent(extent, srid, cellsize)
+
         if codeset:
             from cetk.edb.models.source_models import CodeSet
 
@@ -306,6 +307,8 @@ class Editor(object):
                         ac1=code,
                     )
                 except Exception as err:
+                    print(f"could not rasterize emissions: {str(err)}")
+                    continue
                     log.error(f"could not rasterize emissions: {str(err)}")
                     sys.exit(1)
         else:
@@ -500,18 +503,17 @@ def main():
             choices=Substance.objects.values_list("slug", flat=True),
             metavar=("NOx", "PM10"),
         )
+        sub_parser.add_argument(
+            "--codeset",
+            help="Aggregate or rasterize emissions by codeset",
+            metavar="SLUG",
+        )
         calc_grp = sub_parser.add_mutually_exclusive_group()
         calc_grp.add_argument(
             "--update", help="Create/update emission tables", action="store_true"
         )
         calc_grp.add_argument(
             "--aggregate", help="Aggregate emissions", metavar="FILENAME"
-        )
-        aggregate_grp = sub_parser.add_argument_group(
-            "aggregate emissions", description="Options to aggregate emissions"
-        )
-        aggregate_grp.add_argument(
-            "--codeset", help="Aggregate emissions by codeset", metavar="SLUG"
         )
         calc_grp.add_argument(
             "--rasterize", help="Rasterize emissions", metavar="OUTPUTPATH"

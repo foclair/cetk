@@ -135,4 +135,8 @@ class Settings(models.Model):
         if codeset == self.codeset3:
             return 3
 
-        raise ValueError(f"codeset '{codeset}' not found in inventory settings")
+        if self.codeset1 is None and self.codeset2 is None and self.codeset3 is None:
+            # codesets not defined in settings
+            return codeset.id
+        else:
+            raise ValueError(f"codeset '{codeset}' not found in inventory settings")
