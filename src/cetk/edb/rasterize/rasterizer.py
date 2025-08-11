@@ -868,7 +868,9 @@ class EmissionRasterizer:
 
         min_time_chunksize = 1e9
         for substance in self.substances:
-            result_file = os.path.join(self.output.path, substance.slug + ".nc")
+            result_file = os.path.join(
+                self.output.path, self.output.basename + substance.slug + ".nc"
+            )
             with nc.Dataset(result_file, "r", format="NETCDF4") as dset:
                 # variable_name = 'Emission of '+substance.slug
                 # or x, y, time
@@ -907,7 +909,9 @@ class EmissionRasterizer:
                 if self.unit_conversion_factor != 1.0:
                     emis_chunk *= self.unit_conversion_factor
 
-                result_file = os.path.join(self.output.path, substance.slug + ".nc")
+                result_file = os.path.join(
+                    self.output.path, self.output.basename + substance.slug + ".nc"
+                )
                 with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
                     self.set_data(
                         dset,
