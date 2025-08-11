@@ -285,32 +285,33 @@ class Editor(object):
             for code, label in code_labels.items():
                 basename = f"eclair_{codeset}{code}_"
                 log.debug(f"rasterizing for code: {code} : {label}")
-                try:
-                    output = Output(
-                        extent=extent,
-                        timezone=timezone,
-                        path=outputpath,
-                        srid=srid,
-                        basename=basename,
-                    )
-                    rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
-                    rasterizer.process(
-                        substances,
-                        begin=begin,
-                        end=end,
-                        unit=unit,
-                        sourcetypes=sourcetypes,
-                        point_ids=point_ids,
-                        area_ids=area_ids,
-                        grid_ids=grid_ids,
-                        road_ids=road_ids,
-                        ac1=code,
-                    )
-                except Exception as err:
-                    print(f"could not rasterize emissions: {str(err)}")
-                    continue
-                    log.error(f"could not rasterize emissions: {str(err)}")
-                    sys.exit(1)
+                # try:
+                output = Output(
+                    extent=extent,
+                    timezone=timezone,
+                    path=outputpath,
+                    srid=srid,
+                    basename=basename,
+                )
+                rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
+                rasterizer.process(
+                    substances,
+                    begin=begin,
+                    end=end,
+                    unit=unit,
+                    sourcetypes=sourcetypes,
+                    point_ids=point_ids,
+                    area_ids=area_ids,
+                    grid_ids=grid_ids,
+                    road_ids=road_ids,
+                    ac1=code,
+                )
+                # except Exception as err:
+                #     print(f"could not rasterize emissions: {str(err)}")
+                #     breakpoint()
+                #     continue
+                #     log.error(f"could not rasterize emissions: {str(err)}")
+                #     sys.exit(1)
         else:
             try:
                 output = Output(

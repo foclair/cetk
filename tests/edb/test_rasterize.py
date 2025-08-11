@@ -1,4 +1,5 @@
 import datetime
+from pathlib import Path
 
 import netCDF4 as nc
 import numpy as np
@@ -110,11 +111,13 @@ class TestEmissionRasterizer:
         rasterizer = EmissionRasterizer(output, nx=4, ny=4)
         rasterizer.process([subst1], begin, end, unit="ton/year")
 
-        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
-            assert dset["time"][0] == 368160
-            assert dset["emission_NOx"].shape == (3, 4, 4)
-            assert np.sum(dset["emission_NOx"]) == pytest.approx(0, 1e-6)
-            assert dset["emission_NOx"][0, 0, 0] == pytest.approx(0, 1e-6)
+        assert not Path(tmpdir + "/NOx.nc").exists()
+
+        # with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+        #     assert dset["time"][0] == 368160
+        #     assert dset["emission_NOx"].shape == (3, 4, 4)
+        #     assert np.sum(dset["emission_NOx"]) == pytest.approx(0, 1e-6)
+        #     assert dset["emission_NOx"][0, 0, 0] == pytest.approx(0, 1e-6)
 
     def test_empty_raster_point_outside_avg(self, testsettings, code_sets, tmpdir):
         ac_1_1 = code_sets[0].codes.get(code="1.1")
@@ -143,10 +146,12 @@ class TestEmissionRasterizer:
         rasterizer = EmissionRasterizer(output, nx=4, ny=4)
         rasterizer.process([subst1], unit="ton/year")
 
-        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
-            assert dset["emission_NOx"].shape == (4, 4)
-            assert np.sum(dset["emission_NOx"]) == pytest.approx(0, 1e-6)
-            assert dset["emission_NOx"][0, 0] == pytest.approx(0, 1e-6)
+        assert not Path(tmpdir + "/NOx.nc").exists()
+
+        # with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+        #     assert dset["emission_NOx"].shape == (4, 4)
+        #     assert np.sum(dset["emission_NOx"]) == pytest.approx(0, 1e-6)
+        #     assert dset["emission_NOx"][0, 0] == pytest.approx(0, 1e-6)
 
     def test_area_source(self, testsettings, test_timevar, tmpdir):
         daytime_timevar = test_timevar
@@ -227,10 +232,12 @@ class TestEmissionRasterizer:
         end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
         rasterizer.process([subst1, subst2], begin, end, unit="g/s")
 
-        with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
-            assert dset["time"][0] == 368160
-            assert dset["emission_NOx"].shape == (3, 4, 4)
-            assert np.sum(dset["emission_NOx"][0, :, :]) == pytest.approx(0, 1e-6)
+        assert not Path(tmpdir + "/NOx.nc").exists()
+
+        # with nc.Dataset(tmpdir + "/NOx.nc", "r", format="NETCDF4") as dset:
+        #     assert dset["time"][0] == 368160
+        #     assert dset["emission_NOx"].shape == (3, 4, 4)
+        #     assert np.sum(dset["emission_NOx"][0, :, :]) == pytest.approx(0, 1e-6)
 
     def test_area_and_point_source(self, testsettings, code_sets, test_timevar, tmpdir):
         # test where each substance has both area and pointsource

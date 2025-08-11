@@ -681,37 +681,44 @@ class EmissionRasterizer:
 
         self.variables = {}
         for substance in substances:
-            result_file = os.path.join(
-                self.output.path, self.output.basename + substance.slug + ".nc"
-            )
-            with nc.Dataset(result_file, "w", format="NETCDF4") as dset:
-                write_general_attrs(dset)
-                grid_mapping_var = self.create_gridmapping_variable(dset, self.crs)
-                time_var, time_bounds_var = create_time_variable(dset)
-                create_xy_variables(dset, self.extent, self.crs, self.nx, self.ny)
-                subst_vars = self.variables.setdefault(substance.slug, {})
-                # create variables also without emission in extent
-                # if any(
-                #     self._cache.has_substance(sourcetype, substance.id)
-                #     for sourcetype in self.sourcetypes
-                # ):
-                param = Parameter.objects.get(quantity="emission", substance=substance)
-                chunking = self._calc_chunking(
-                    chunk_cache=1e8,
+            # do not create rasters without emission in extent
+            if any(
+                self._cache.has_substance(sourcetype, substance.id)
+                for sourcetype in self.sourcetypes
+            ):
+                result_file = os.path.join(
+                    self.output.path, self.output.basename + substance.slug + ".nc"
                 )
-                var_name = param.slug
-                create_variable(
-                    dset,
-                    grid_mapping_var,
-                    name=var_name,
-                    unit=self.unit,
-                    instance=self.instance,
-                    cell_methods=cell_methods,
-                    parameter=param.name,
-                    time=time,
-                    chunksizes=chunking,
+                with nc.Dataset(result_file, "w", format="NETCDF4") as dset:
+                    write_general_attrs(dset)
+                    grid_mapping_var = self.create_gridmapping_variable(dset, self.crs)
+                    time_var, time_bounds_var = create_time_variable(dset)
+                    create_xy_variables(dset, self.extent, self.crs, self.nx, self.ny)
+                    subst_vars = self.variables.setdefault(substance.slug, {})
+                    param = Parameter.objects.get(
+                        quantity="emission", substance=substance
+                    )
+                    chunking = self._calc_chunking(
+                        chunk_cache=1e8,
+                    )
+                    var_name = param.slug
+                    create_variable(
+                        dset,
+                        grid_mapping_var,
+                        name=var_name,
+                        unit=self.unit,
+                        instance=self.instance,
+                        cell_methods=cell_methods,
+                        parameter=param.name,
+                        time=time,
+                        chunksizes=chunking,
+                    )
+                    subst_vars["field2d"] = {"emission": var_name}
+            else:
+                self.log.info(
+                    f"no emission found for {self.output.basename + substance.slug}"
                 )
-                subst_vars["field2d"] = {"emission": var_name}
+
         ncreated = 0
         for subst_vars in self.variables.values():
             for sourcetype_vars in subst_vars.values():
@@ -830,7 +837,6 @@ class EmissionRasterizer:
             if begin is not None and end is not None:
                 self.log.debug("creating result variables")
                 created = self._create_variables(self.substances, timeseries=True)
-
                 # get time-variation profiles
                 self._get_timevars(sourcetypes or SOURCETYPES)
                 self.log.debug("calculating time-series emissions")
@@ -851,15 +857,17 @@ class EmissionRasterizer:
     def _process_average_emissions(self):
         """Calculate average emission intensity for all substances and source-types."""
         for substance in self.substances:
-            chunk = self._rasterize_average_chunk(substance, self.sourcetypes)
-
-            if self.unit_conversion_factor != 1.0:
-                chunk *= self.unit_conversion_factor
             result_file = os.path.join(
                 self.output.path, self.output.basename + substance.slug + ".nc"
             )
-            with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
-                self.set_data(dset, substance, chunk)
+            if Path(result_file).exists():
+                # if does not exist, no emission for this substance/code within extent
+                chunk = self._rasterize_average_chunk(substance, self.sourcetypes)
+                if self.unit_conversion_factor != 1.0:
+                    chunk *= self.unit_conversion_factor
+
+                with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
+                    self.set_data(dset, substance, chunk)
 
     def _process_timeseries(self, begin, end):
         # how many hours that will be processed in the same chunk
@@ -871,23 +879,28 @@ class EmissionRasterizer:
             result_file = os.path.join(
                 self.output.path, self.output.basename + substance.slug + ".nc"
             )
-            with nc.Dataset(result_file, "r", format="NETCDF4") as dset:
-                # variable_name = 'Emission of '+substance.slug
-                # or x, y, time
-                time_chunking = dset.variables["time"].chunking()
-                if time_chunking[0] < min_time_chunksize:
-                    min_time_chunksize = time_chunking[0]
+            if Path(result_file).exists():
+                with nc.Dataset(result_file, "r", format="NETCDF4") as dset:
+                    # variable_name = 'Emission of '+substance.slug
+                    # or x, y, time
+                    time_chunking = dset.variables["time"].chunking()
+                    if time_chunking[0] < min_time_chunksize:
+                        min_time_chunksize = time_chunking[0]
 
         # rasterizing chunks and writing to dataset
         chunk_begin = begin
         chunk_end = begin
         while chunk_end < end:
-            # chunk includes chunk end-time, so nr of hours
-            # should be reduced by one to get chunk dimension
-            # matching chunksize
-            chunk_end = min(
-                chunk_begin + datetime.timedelta(hours=min_time_chunksize - 1), end
-            )
+            if min_time_chunksize == 1e9:
+                # means no result_files exist
+                chunk_end = end
+            else:
+                # chunk includes chunk end-time, so nr of hours
+                # should be reduced by one to get chunk dimension
+                # matching chunksize
+                chunk_end = min(
+                    chunk_begin + datetime.timedelta(hours=min_time_chunksize - 1), end
+                )
             self.log.debug(
                 f"processing {chunk_begin.strftime('%y%m%d %H')} "
                 f"- {chunk_end.strftime('%y%m%d %H')}"
@@ -898,28 +911,31 @@ class EmissionRasterizer:
 
             for substance in self.substances:
                 self.log.debug(f"substance: {substance.slug}")
-                # add raster timeseries
-                emis_chunk = self._rasterize_chunk(
-                    substance,
-                    chunk_begin,
-                    chunk_end,
-                    self.sourcetypes,
-                )
-
-                if self.unit_conversion_factor != 1.0:
-                    emis_chunk *= self.unit_conversion_factor
-
                 result_file = os.path.join(
                     self.output.path, self.output.basename + substance.slug + ".nc"
                 )
-                with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
-                    self.set_data(
-                        dset,
+                if Path(result_file).exists():
+                    # if does not exist, no emission for this substance/code within extent
+                    # add raster timeseries
+                    emis_chunk = self._rasterize_chunk(
                         substance,
-                        emis_chunk,
-                        timestamps=[chunk_begin, chunk_end],
+                        chunk_begin,
+                        chunk_end,
+                        self.sourcetypes,
                     )
-                    # update time-span of variable and dataset
+
+                    if self.unit_conversion_factor != 1.0:
+                        emis_chunk *= self.unit_conversion_factor
+
+                    with nc.Dataset(result_file, "a", format="NETCDF4") as dset:
+                        if np.sum(emis_chunk) != 0:
+                            self.set_data(
+                                dset,
+                                substance,
+                                emis_chunk,
+                                timestamps=[chunk_begin, chunk_end],
+                            )
+                        # update time-span of variable and dataset
 
             # update chunk time interval
             chunk_begin = chunk_end + datetime.timedelta(hours=1)
