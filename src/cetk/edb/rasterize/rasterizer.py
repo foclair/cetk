@@ -57,12 +57,18 @@ VEHICLE_SPEED_PARAMETER_SLUG = "vehicle_speed"
 
 class Output:
     def __init__(
-        self, extent: tuple, path: Path, srid: int, timezone: datetime.timezone
+        self,
+        extent: tuple,
+        path: Path,
+        srid: int,
+        timezone: datetime.timezone,
+        basename="",
     ):
         self.extent = extent
         self.path = path
         self.srid = srid
         self.timezone = timezone
+        self.basename = basename
 
 
 @cache
@@ -667,7 +673,9 @@ class EmissionRasterizer:
 
         self.variables = {}
         for substance in substances:
-            result_file = os.path.join(self.output.path, substance.slug + ".nc")
+            result_file = os.path.join(
+                self.output.path, self.output.basename + substance.slug + ".nc"
+            )
             with nc.Dataset(result_file, "w", format="NETCDF4") as dset:
                 write_general_attrs(dset)
                 grid_mapping_var = self.create_gridmapping_variable(dset, self.crs)

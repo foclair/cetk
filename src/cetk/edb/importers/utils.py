@@ -28,7 +28,7 @@ def import_error(message, return_message="", validation=False):
     if not validation:
         raise ValidationError(f"VALIDATION: {message}")
     else:
-        return_message += f"VALIDATION: {message}\n"
+        return_message += f"VALIDATION: {message}"
     return return_message
 
 

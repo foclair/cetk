@@ -193,13 +193,16 @@ class Editor(object):
                 run_type = "import"
             else:
                 run_type = "validation"
-            if len(return_msg) > 10:
+            if len(return_msg) > settings.MAX_ERROR_MESSAGES:
                 log.error(
-                    f">10 errors during {run_type}, first 10:"
+                    f">10 errors during {run_type}, first 10:{os.linesep}"
                     f"{os.linesep}{return_msg[:10]}"
                 )
             else:
-                log.error(f"Errors during {run_type}:{os.linesep}{return_msg}")
+                log.error(
+                    f"Errors during {run_type}:{os.linesep}"
+                    f"{os.linesep.join(return_msg)}"
+                )
         else:
             log.info(f"getting here {datetime.datetime.now()}")
             if not dry_run:
@@ -269,25 +272,62 @@ class Editor(object):
         timezone = timezone or datetime.timezone.utc
         srid = srid or DEFAULT_SRID
         extent, ny, nx = adjust_extent(extent, srid, cellsize)
-        try:
-            output = Output(
-                extent=extent, timezone=timezone, path=outputpath, srid=srid
+        if codeset:
+            from cetk.edb.models.source_models import CodeSet
+
+            codeset_index = Settings.get_current().get_codeset_index(codeset)
+            code_labels = dict(
+                CodeSet.objects.filter(id=codeset_index)
+                .first()
+                .codes.values_list("code", "label")
             )
-            rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
-            rasterizer.process(
-                substances,
-                begin=begin,
-                end=end,
-                unit=unit,
-                sourcetypes=sourcetypes,
-                point_ids=point_ids,
-                area_ids=area_ids,
-                grid_ids=grid_ids,
-                road_ids=road_ids,
-            )
-        except Exception as err:
-            log.error(f"could not rasterize emissions: {str(err)}")
-            sys.exit(1)
+            for code, label in code_labels.items():
+                basename = f"eclair_{codeset}{code}_"
+                log.debug(f"rasterizing for code: {code} : {label}")
+                try:
+                    output = Output(
+                        extent=extent,
+                        timezone=timezone,
+                        path=outputpath,
+                        srid=srid,
+                        basename=basename,
+                    )
+                    rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
+                    rasterizer.process(
+                        substances,
+                        begin=begin,
+                        end=end,
+                        unit=unit,
+                        sourcetypes=sourcetypes,
+                        point_ids=point_ids,
+                        area_ids=area_ids,
+                        grid_ids=grid_ids,
+                        road_ids=road_ids,
+                        ac1=code,
+                    )
+                except Exception as err:
+                    log.error(f"could not rasterize emissions: {str(err)}")
+                    sys.exit(1)
+        else:
+            try:
+                output = Output(
+                    extent=extent, timezone=timezone, path=outputpath, srid=srid
+                )
+                rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
+                rasterizer.process(
+                    substances,
+                    begin=begin,
+                    end=end,
+                    unit=unit,
+                    sourcetypes=sourcetypes,
+                    point_ids=point_ids,
+                    area_ids=area_ids,
+                    grid_ids=grid_ids,
+                    road_ids=road_ids,
+                )
+            except Exception as err:
+                log.error(f"could not rasterize emissions: {str(err)}")
+                sys.exit(1)
 
     def export_data(self, filename):
         export_sources(filename)
@@ -589,6 +629,7 @@ def main():
                 srid=args.srid,
                 begin=args.begin,
                 end=args.end,
+                codeset=args.codeset,
             )  # TODO add arguments for codeset, substances, begin/end, timezone!
             sys.stdout.write("Successfully rasterized emissions\n")
             sys.exit(0)

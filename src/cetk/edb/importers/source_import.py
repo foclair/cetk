@@ -51,6 +51,9 @@ from .utils import cache_codeset, import_error, worksheet_to_dataframe
 
 # sys.excepthook = info
 
+# FIXME: get from settings instead, but then tests won't work
+MAX_ERROR_MESSAGES = 10
+
 
 # column facility and name are used as index and is therefore not included here
 REQUIRED_COLUMNS_AREA = {
@@ -277,6 +280,20 @@ def create_or_update_sources(
     activitycode_columns = [key for key in df.columns if key.startswith("activitycode")]
     row_nr = 2
     for row_key, row in df.iterrows():
+        # If we have many errors, no point in continuing
+        if len(return_message) > MAX_ERROR_MESSAGES:
+            return_dict = {
+                "facility": {
+                    "updated": 0,
+                    "created": 0,
+                },
+                "pointsource": {
+                    "updated": 0,
+                    "created": 0,
+                },
+            }
+            return return_dict, return_message
+
         row_dict = row.to_dict()
 
         # initialize activitycodes
@@ -296,6 +313,7 @@ def create_or_update_sources(
                             validation=validation,
                         )
                     )
+                    continue
                 x = float(row_dict["lon"])
                 y = float(row_dict["lat"])
             except ValueError:
@@ -323,6 +341,7 @@ def create_or_update_sources(
                             validation=validation,
                         )
                     )
+                    continue
                 else:
                     source_data[attr] = row_dict[key]
 
@@ -349,6 +368,7 @@ def create_or_update_sources(
                             validation=validation,
                         )
                     )
+                    continue
                 wkt_polygon = row_dict["geometry"]
                 # TODO add check that valid WKT polygon
             except ValueError:
@@ -358,6 +378,7 @@ def create_or_update_sources(
                         validation=validation,
                     )
                 )
+                continue
             source_data["geom"] = GEOSGeometry(f"SRID={4326};" + wkt_polygon)
         else:
             return_message.append(
@@ -802,7 +823,10 @@ def import_sourceactivities(
             cache=caching_sources,
         )
         return_dict.update(ps)
+        # If the pointsource data is not OK, no point in continuing
         return_message += msgs
+        if validation and len(msgs) > 0:
+            return return_dict, return_message
 
         # import pointsourceactivities
         activities = cache_queryset(Activity.objects.all(), "name")
@@ -892,6 +916,10 @@ def import_sourceactivities(
         )
         return_dict.update(ps)
         return_message += msgs
+        # If the areasource data is not OK, no point in continuing
+        if validation and len(msgs) > 0:
+            return return_dict, return_message
+
         # for now always caching areasources, change if case with many areasources
         # becomes relevant.
         areasourceactivities = cache_queryset(

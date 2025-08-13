@@ -60,6 +60,19 @@ def import_activitycodesheet(workbook, validation):
     create_activitycodes = {}
     for row_key, row in df_activitycode.iterrows():
         row_dict = row.to_dict()
+        # check for required fields
+        if None in [
+            row_dict["codeset_slug"],
+            row_dict["activitycode"],
+            row_dict["label"],
+        ]:
+            return_message.append(
+                import_error(
+                    f"Empty fields for ActivityCode sheet on row '{row_key}'",
+                    validation=validation,
+                )
+            )
+            continue
         try:
             codeset = CodeSet.objects.get(slug=row_dict["codeset_slug"])
             if "vertical_distribution_slug" in row_dict:

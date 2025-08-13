@@ -125,6 +125,7 @@ def run_rasterize_emissions(
     area_ids=None,
     road_ids=None,
     grid_ids=None,
+    codeset=None,
 ):
     """rasterize emissions and store as NetCDF."""
     cmd_args = ["--rasterize", str(outputpath), "--cellsize", str(cellsize)]
@@ -173,6 +174,8 @@ def run_rasterize_emissions(
             cmd_args += [str(grid_ids)]
         else:
             cmd_args += list(grid_ids)
+    if codeset is not None:
+        cmd_args += ["--codeset", codeset]
     return run_non_blocking("cetk", "calc", db_path=db_path, *cmd_args)
 
 
