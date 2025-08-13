@@ -1,6 +1,6 @@
 """cetk, a python library for editing Clair emission inventories offline."""
 
-__version__ = "0.0.5.dev"
+__version__ = "0.0.6.dev"
 
 import os
 
