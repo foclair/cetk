@@ -16,6 +16,7 @@ DEFAULT_SETTINGS = {
     "TIME_ZONE": "UTC",
     "USE_I18N": True,
     "USE_TZ": True,
+    "MAX_ERROR_MESSAGES": 10,
 }
 
 log = logging.getLogger(__name__)
