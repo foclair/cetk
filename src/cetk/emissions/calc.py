@@ -28,6 +28,9 @@ def calculate_source_emissions(
     ids=None,
     tags=None,
     polygon=None,
+    ac1=None,
+    ac2=None,
+    ac3=None,
     unit=DEFAULT_EMISSION_UNIT,
 ):
     settings = Settings.get_current()
@@ -40,6 +43,9 @@ def calculate_source_emissions(
         ids=ids,
         tags=tags,
         polygon=polygon,
+        ac1=ac1,
+        ac2=ac2,
+        ac3=ac3,
     )
     cur = connection.cursor()
     cur.execute(sql)

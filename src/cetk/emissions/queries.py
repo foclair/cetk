@@ -5,6 +5,7 @@ from importlib import resources
 
 from cetk.edb.models import Settings, Substance
 from cetk.emissions.filters import (
+    create_activitycode_where_clauses,
     create_ef_substance_where_clause,
     create_ids_where_clause,
     create_name_where_clause,
@@ -27,25 +28,25 @@ def create_source_emis_query(
     tags=None,
     polygon=None,
     substances=None,
-    #    ac1=None,
-    #    ac2=None,
-    #    ac3=None,
+    ac1=None,
+    ac2=None,
+    ac3=None,
 ):
     """
-        Create sql for emissions grouped by source, timevar & substance
+    Create sql for emissions grouped by source, timevar & substance
 
-        Emissions are returned in kg/s.
+    Emissions are returned in kg/s.
 
-        optional arguments:
-            srid: sources will be transformed to this srid, default is inventory srid
-            ids: sequence of source id's for which to include sources
-            name: filter by source name(accepts regexp)
-            tags: filter by tags(specify as dictionary)
-            polygon: only include sources within polygon (EWKT or Polygon)
-            substances: iterable of substance model instances(default is all)
-    #        ac1: iterable of activitycode instances
-    #        ac2: iterable of activitycode instances
-    #        ac3: iterable of activitycode instances
+    optional arguments:
+        srid: sources will be transformed to this srid, default is inventory srid
+        ids: sequence of source id's for which to include sources
+        name: filter by source name(accepts regexp)
+        tags: filter by tags(specify as dictionary)
+        polygon: only include sources within polygon (EWKT or Polygon)
+        substances: iterable of substance model instances(default is all)
+        ac1: iterable of activitycode instances
+        ac2: iterable of activitycode instances
+        ac3: iterable of activitycode instances
     """
 
     sql = load_sql(f"{sourcetype}source_emissions.sql")
@@ -58,6 +59,9 @@ def create_source_emis_query(
         source_filters.append(create_name_where_clause(name))
     if polygon is not None and sourcetype != "grid":
         source_filters.append(create_polygon_where_clause(polygon))
+    if ac1 is not None or ac2 is not None or ac3 is not None:
+        source_filters += create_activitycode_where_clauses(ac1, ac2, ac3)
+
     if len(source_filters) > 0:
         source_filter_sql = "WHERE " + " AND ".join(source_filters)
     else:

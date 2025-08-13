@@ -75,76 +75,52 @@ def create_ef_substance_where_clause(substances):
     return f"ef.substance_id IN ({substance_ids})"
 
 
-# def create_activitycode_where_clauses(ac1, ac2, ac3, first_cond=True):
-#     """filter to only include specified activitycodes.
-#     args:
-#         ac1: iterable with activitycode instances
-#         ac2: iterable with activitycode instances
-#         ac3: iterable with activitycode instances
+def create_activitycode_where_clauses(ac1, ac2, ac3):
+    """filter to only include specified activitycodes.
+    args:
+        ac1: iterable with activitycode instances
+        ac2: iterable with activitycode instances
+        ac3: iterable with activitycode instances
 
-#     kwargs:
-#         first_cond: True adds WHERE, False adds AND
+    returns sql, params
 
-#     returns sql, params
+    returned where clause includes place-holders for codes named:
+    ac1_code_1, ac1_code_2, ac2_code_1, ac2_code_2 etc.
+    """
 
-#     returned where clause includes place-holders for codes named:
-#     ac1_code_1, ac1_code_2, ac2_code_1, ac2_code_2 etc.
-#     """
+    sql_list = []  # return list of sql strings
+    # TODO
+    # breakpoint()
 
-#     # ac1, ac2, ac3 can be either a single code or an iterable
-#     sql = ""
-#     params = {}
-#     if ac1 is not None:
-#         if not isinstance(ac1, Iterable):
-#             ac1 = [ac1]
-#         else:
-#             ac1 = list(ac1)
-#         if not first_cond:
-#             sql += " AND ("
-#         else:
-#             sql += " WHERE ("
-#             first_cond = False
-#         sql += " OR ".join(
-#             [f"ac1.code <@ %(ac1_code_{i})s" for i, ac in enumerate(ac1)]
-#         )
-#         sql += ")"
-#         params.update({f"ac1_code_{i}": ac.code for i, ac in enumerate(ac1)})
+    # ac1, ac2, ac3 can be either a single code or an iterable
+    if ac1 is not None:
+        if not isinstance(ac1, Iterable):
+            ac1 = [ac1]
+        else:
+            ac1 = list(ac1)
 
-#     if ac2 is not None:
-#         if not isinstance(ac2, Iterable):
-#             ac2 = [ac2]
-#         else:
-#             ac2 = list(ac2)
-#         if not first_cond:
-#             sql += " AND ("
-#         else:
-#             sql += " WHERE ("
-#             first_cond = False
-#         sql += " OR ".join(
-#             [f"ac2.code <@ %(ac2_code_{i})s" for i, ac in enumerate(ac2)]
-#         )
-#         sql += ")"
-#         params.update({f"ac2_code_{i}": ac.code for i, ac in enumerate(ac2)})
+        sql = " OR ".join([f"(ac1.code LIKE '{ac.code}')" for ac in ac1])
+        sql_list.append(sql)
 
-#     if ac3 is not None:
-#         if not isinstance(ac3, Iterable):
-#             ac3 = [ac3]
-#         else:
-#             ac3 = list(ac3)
+    if ac2 is not None:
+        if not isinstance(ac2, Iterable):
+            ac2 = [ac2]
+        else:
+            ac2 = list(ac2)
 
-#         if not first_cond:
-#             sql += " AND ("
-#         else:
-#             sql += " WHERE ("
-#             first_cond = False
+        sql = " OR ".join([f"(ac2.code LIKE '{ac.code}')" for ac in ac2])
+        sql_list.append(sql)
 
-#         sql += " OR ".join(
-#             [f"ac3.code <@ %(ac3_code_{i})s" for i, ac in enumerate(ac3)]
-#         )
-#         sql += ")"
-#         params.update({f"ac3_code_{i}": ac.code for i, ac in enumerate(ac3)})
+    if ac3 is not None:
+        if not isinstance(ac3, Iterable):
+            ac3 = [ac3]
+        else:
+            ac3 = list(ac3)
 
-#     return sql, params
+        sql = " OR ".join([f"(ac3.code LIKE '{ac.code}')" for ac in ac3])
+        sql_list.append(sql)
+
+    return sql_list
 
 
 def create_substance_emis_where_clause(substances):

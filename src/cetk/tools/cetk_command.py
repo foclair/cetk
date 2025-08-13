@@ -272,6 +272,7 @@ class Editor(object):
         timezone = timezone or datetime.timezone.utc
         srid = srid or DEFAULT_SRID
         extent, ny, nx = adjust_extent(extent, srid, cellsize)
+
         if codeset:
             from cetk.edb.models.source_models import CodeSet
 
@@ -284,30 +285,33 @@ class Editor(object):
             for code, label in code_labels.items():
                 basename = f"eclair_{codeset}{code}_"
                 log.debug(f"rasterizing for code: {code} : {label}")
-                try:
-                    output = Output(
-                        extent=extent,
-                        timezone=timezone,
-                        path=outputpath,
-                        srid=srid,
-                        basename=basename,
-                    )
-                    rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
-                    rasterizer.process(
-                        substances,
-                        begin=begin,
-                        end=end,
-                        unit=unit,
-                        sourcetypes=sourcetypes,
-                        point_ids=point_ids,
-                        area_ids=area_ids,
-                        grid_ids=grid_ids,
-                        road_ids=road_ids,
-                        ac1=code,
-                    )
-                except Exception as err:
-                    log.error(f"could not rasterize emissions: {str(err)}")
-                    sys.exit(1)
+                # try:
+                output = Output(
+                    extent=extent,
+                    timezone=timezone,
+                    path=outputpath,
+                    srid=srid,
+                    basename=basename,
+                )
+                rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
+                rasterizer.process(
+                    substances,
+                    begin=begin,
+                    end=end,
+                    unit=unit,
+                    sourcetypes=sourcetypes,
+                    point_ids=point_ids,
+                    area_ids=area_ids,
+                    grid_ids=grid_ids,
+                    road_ids=road_ids,
+                    ac1=code,
+                )
+                # except Exception as err:
+                #     print(f"could not rasterize emissions: {str(err)}")
+                #     breakpoint()
+                #     continue
+                #     log.error(f"could not rasterize emissions: {str(err)}")
+                #     sys.exit(1)
         else:
             try:
                 output = Output(
@@ -500,18 +504,17 @@ def main():
             choices=Substance.objects.values_list("slug", flat=True),
             metavar=("NOx", "PM10"),
         )
+        sub_parser.add_argument(
+            "--codeset",
+            help="Aggregate or rasterize emissions by codeset",
+            metavar="SLUG",
+        )
         calc_grp = sub_parser.add_mutually_exclusive_group()
         calc_grp.add_argument(
             "--update", help="Create/update emission tables", action="store_true"
         )
         calc_grp.add_argument(
             "--aggregate", help="Aggregate emissions", metavar="FILENAME"
-        )
-        aggregate_grp = sub_parser.add_argument_group(
-            "aggregate emissions", description="Options to aggregate emissions"
-        )
-        aggregate_grp.add_argument(
-            "--codeset", help="Aggregate emissions by codeset", metavar="SLUG"
         )
         calc_grp.add_argument(
             "--rasterize", help="Rasterize emissions", metavar="OUTPUTPATH"
