@@ -708,10 +708,12 @@ class EmissionRasterizer:
                         name=var_name,
                         unit=self.unit,
                         instance=self.instance,
+                        substance=substance.slug,
                         cell_methods=cell_methods,
                         parameter=param.name,
                         time=time,
                         chunksizes=chunking,
+                        quantity="emission",
                     )
                     subst_vars["field2d"] = {"emission": var_name}
             else:
@@ -1405,7 +1407,7 @@ class EmissionRasterizer:
             self.log.info(
                 f"No exact match for EPSG and spatial ref, using best guess: {epsg}"
             )
-            grid_mapping.srid = epsg
+        grid_mapping.srid = epsg
         grid_mapping.crs_wkt = crs.to_wkt()  # for CF Conventions 1.7
         return grid_mapping
 
@@ -1416,6 +1418,7 @@ def create_variable(
     name: str,
     unit: Optional[str] = None,
     quantity: Optional[str] = None,
+    substance: Optional[str] = None,
     instance: Optional[str] = None,
     cell_methods: Optional[str] = None,
     parameter: Optional[str] = None,
@@ -1444,6 +1447,8 @@ def create_variable(
         var.parameter = parameter
     if quantity is not None:
         var.quantity = quantity
+    if substance is not None:
+        var.substance = substance
     if instance is not None:
         var.instance = instance
     if cell_methods is not None:
