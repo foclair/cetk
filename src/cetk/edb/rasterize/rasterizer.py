@@ -890,6 +890,7 @@ class EmissionRasterizer:
         # rasterizing chunks and writing to dataset
         chunk_begin = begin
         chunk_end = begin
+        chunk_time_ind = 0
         while chunk_end < end:
             if min_time_chunksize == 1e9:
                 # means no result_files exist
@@ -934,13 +935,19 @@ class EmissionRasterizer:
                                 substance,
                                 emis_chunk,
                                 timestamps=[chunk_begin, chunk_end],
+                                chunk_time_ind=chunk_time_ind,
                             )
                         # update time-span of variable and dataset
 
             # update chunk time interval
+            chunk_time_ind = (
+                chunk_time_ind
+                + int((chunk_end - chunk_begin).total_seconds() / 3600)
+                + 1
+            )
             chunk_begin = chunk_end + datetime.timedelta(hours=1)
 
-    def set_data(self, dset, substance, data, timestamps=None):
+    def set_data(self, dset, substance, data, timestamps=None, chunk_time_ind=0):
         """Add chunk of data to variable."""
 
         var = dset[f"emission_{substance.slug}"]
@@ -951,12 +958,12 @@ class EmissionRasterizer:
         else:
             time_var = dset["time"]
             # map_oriented, np.fliplr flips 3d data along second dimension
-            var[:, :, :] = np.fliplr(data)
+            var[chunk_time_ind:, :, :] = np.fliplr(data)
             times = pd.date_range(timestamps[0], timestamps[1], freq=self.time_step)
             hours_since_1970 = (
                 times - pd.to_datetime("1970-01-01").tz_localize(self.timezone)
             ).total_seconds() / 3600
-            time_var[:] = hours_since_1970
+            time_var[chunk_time_ind:] = hours_since_1970
 
     def _timeseries_emis(self, substance, begin, end, sourcetype):
         """Get emission timeseries data chunk for sources.
