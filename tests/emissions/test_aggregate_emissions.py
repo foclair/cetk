@@ -155,5 +155,5 @@ def test_aggregate_emissions_all_sourcetypes(
     assert df.index[0] == ("3", "Diffuse sources")
     assert df.columns[0] == ("emission", "SOx")
     # reference emission: "seconds of year" * "grid fraction in polygon"
-    ref_emis = 1.0 * 365.25 * 24 * 3600 * raster_share
+    ref_emis = 1.0 * raster_share
     assert ref_emis == pytest.approx(df.iloc[0, 0], 1e-5)

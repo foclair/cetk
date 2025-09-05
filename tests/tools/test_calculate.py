@@ -45,8 +45,12 @@ def test_aggregate(inventory, tmpdir):
     assert np.all(df.columns.levels[0] == ["emission"])
     assert np.all(df.columns.levels[1] == ["CO", "NMVOC", "NOx", "PM10", "PM25", "SOx"])
     assert df.index.names == ["activity"]
-    assert df.loc["total", ("emission", "NOx")].item() == pytest.approx(45108)
-    assert df.loc["total", ("emission", "PM25")].item() == pytest.approx(5.411264e6)
+    assert df.loc["total", ("emission", "NOx")].item() == pytest.approx(
+        45108 / (365.25 * 24 * 3600)
+    )
+    assert df.loc["total", ("emission", "PM25")].item() == pytest.approx(
+        5.411264e6 / (365.25 * 24 * 3600)
+    )
 
 
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
