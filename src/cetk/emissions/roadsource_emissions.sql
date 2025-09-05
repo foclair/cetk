@@ -65,7 +65,7 @@ fleet_veh as (
     LEFT JOIN edb_activitycode as ac1 ON vfc.activitycode1_id=ac1.id
     LEFT JOIN edb_activitycode as ac2 ON vfc.activitycode2_id=ac2.id
     LEFT JOIN edb_activitycode as ac3 ON vfc.activitycode3_id=ac3.id
-    WHERE veh_ef.substance_id != {traffic_work_subst_id}
+    WHERE veh_ef.substance_id != {traffic_work_subst_id} {ac_filter}
     GROUP BY fm.fleet_id, fm.id, veh_ef.traffic_situation_id,
       fm.vehicle_id, veh_ef.substance_id
     UNION
@@ -89,6 +89,7 @@ fleet_veh as (
     LEFT JOIN edb_activitycode as ac1 ON vfc.activitycode1_id=ac1.id
     LEFT JOIN edb_activitycode as ac2 ON vfc.activitycode2_id=ac2.id
     LEFT JOIN edb_activitycode as ac3 ON vfc.activitycode3_id=ac3.id
+    WHERE 1=1 {ac_filter}
   ) as ef
   JOIN edb_fleetmember fm ON ef.fleetmember_id = fm.id
   JOIN edb_vehicle veh ON ef.vehicle_id=veh.id
@@ -101,7 +102,8 @@ fleet_veh as (
      ef.stopngo_ef != 0 OR
      ef.heavy_ef != 0 OR
      ef.saturated_ef != 0
-   ) {ef_substance_filter}
+   )
+   {ef_substance_filter}
 ),
 /*
 Calculate weight of each LOS (Level Of Service) for all valid combinations

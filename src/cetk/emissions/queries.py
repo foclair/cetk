@@ -50,6 +50,7 @@ def create_source_emis_query(
     """
 
     sql = load_sql(f"{sourcetype}source_emissions.sql")
+    ac_filter = ""
     source_filters = []
     if tags is not None:
         source_filters.append(create_tag_where_clause(tags))
@@ -60,7 +61,11 @@ def create_source_emis_query(
     if polygon is not None and sourcetype != "grid":
         source_filters.append(create_polygon_where_clause(polygon))
     if ac1 is not None or ac2 is not None or ac3 is not None:
-        source_filters += create_activitycode_where_clauses(ac1, ac2, ac3)
+        if sourcetype != "road":
+            source_filters += create_activitycode_where_clauses(ac1, ac2, ac3)
+        else:
+            ac_filter = create_activitycode_where_clauses(ac1, ac2, ac3)
+            ac_filter = "AND " + ac_filter[0]
 
     if len(source_filters) > 0:
         source_filter_sql = "WHERE " + " AND ".join(source_filters)
@@ -81,13 +86,23 @@ def create_source_emis_query(
         emis_subst_filter = ""
 
     # replace place-holders by generated sql
-    sql = sql.format(
-        srid=srid,
-        source_filters=source_filter_sql,
-        ef_substance_filter=ef_subst_filter,
-        emis_substance_filter=emis_subst_filter,
-        traffic_work_subst_id=traffic_work.id,
-    )
+    if sourcetype != "road":
+        sql = sql.format(
+            srid=srid,
+            source_filters=source_filter_sql,
+            ef_substance_filter=ef_subst_filter,
+            emis_substance_filter=emis_subst_filter,
+            traffic_work_subst_id=traffic_work.id,
+        )
+    else:
+        sql = sql.format(
+            srid=srid,
+            source_filters=source_filter_sql,
+            ef_substance_filter=ef_subst_filter,
+            emis_substance_filter=emis_subst_filter,
+            traffic_work_subst_id=traffic_work.id,
+            ac_filter=ac_filter,
+        )
     return sql
 
 

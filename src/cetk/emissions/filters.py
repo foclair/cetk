@@ -89,8 +89,6 @@ def create_activitycode_where_clauses(ac1, ac2, ac3):
     """
 
     sql_list = []  # return list of sql strings
-    # TODO
-    # breakpoint()
 
     # ac1, ac2, ac3 can be either a single code or an iterable
     if ac1 is not None:

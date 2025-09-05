@@ -318,15 +318,7 @@ class EmissionRasterizer:
         """Get querysets for emissions."""
 
         sourcetypes = sourcetypes or SOURCETYPES
-        # not used; srid = Settings.get_current().srid
 
-        # if ac1 is not None or ac2 is not None or ac3 is not None:
-        #     breakpoint()
-        #     # raise ValueError(
-        #     #     "filtering for ac not implemented in source_emissions_query yet!"
-        #     # )
-        # if activity codes are given as strings, get the corresponding
-        # activity code instances
         if ac1 is not None and len(ac1) > 0 and isinstance(ac1[0], str):
             # TODO why code__in= not code= ?
             codeset1 = Settings.get_current().codeset1

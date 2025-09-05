@@ -293,6 +293,7 @@ class Editor(object):
                     srid=srid,
                     basename=basename,
                 )
+                kwargs = {f"ac{codeset_index}": code}
                 rasterizer = EmissionRasterizer(output, nx=nx, ny=ny)
                 rasterizer.process(
                     substances,
@@ -304,14 +305,8 @@ class Editor(object):
                     area_ids=area_ids,
                     grid_ids=grid_ids,
                     road_ids=road_ids,
-                    ac1=code,
+                    **kwargs,
                 )
-                # except Exception as err:
-                #     print(f"could not rasterize emissions: {str(err)}")
-                #     breakpoint()
-                #     continue
-                #     log.error(f"could not rasterize emissions: {str(err)}")
-                #     sys.exit(1)
         else:
             try:
                 output = Output(

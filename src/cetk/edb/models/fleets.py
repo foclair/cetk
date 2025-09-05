@@ -25,7 +25,6 @@ class FleetManager(models.Manager):
         for f in data:
             for m in f["members"]:
                 for fu in m["fuels"]:
-                    # breakpoint()
                     if (m["vehicle"], fu["fuel"]) not in validcombinations:
                         raise ValueError(
                             f"{m['vehicle']}/{fu['fuel']} is not a valid vehicle/fuel"

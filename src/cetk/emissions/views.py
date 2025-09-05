@@ -79,7 +79,7 @@ def create_emission_table(sourcetype, substances=None, unit=DEFAULT_EMISSION_UNI
     """
     cur = connection.cursor()
     cur.execute(f"DROP TABLE IF EXISTS {sourcetype}source_emissions")
-    # breakpoint()
+
     cur.execute(table_sql)
     cur.execute(
         f"""

@@ -34,7 +34,6 @@ class TestActivityCodes:
         ac1 = code_set.codes.get(code="1")
         ac13 = code_set.codes.get(code="1.3")
         ac131 = code_set.codes.get(code="1.3.1")
-        # breakpoint()
         assert ac13 in list(ac1.get_children())
         assert ac131 not in list(ac1.get_children())
         assert ac131 in list(ac13.get_children())
