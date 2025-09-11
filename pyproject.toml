@@ -31,7 +31,7 @@ dependencies = [       # Release date  Comment
   "openpyxl >=3.0.7",  # 2021-03-09    required by pandas 2.0.0
   "pandas >=2.0",      # 2023-04-03    cetk import test fails with earlier versions
   "pyogrio >=0.4.2",   # 2022-10-06    cetk export test fails with earlier versions
-  "rastafari >=0.4",
+  "rastafari2 >=0.4",
   "rasterio >=1.3",    # 2022-07-06    rasterio.CRS is missing in earlier versions
   "shapely >=2.0",     # 2022-12-12    cetk calc --rasterize fails with earlier versions
 ]
