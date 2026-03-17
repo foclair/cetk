@@ -68,10 +68,15 @@ def cache_codesets():
 
 
 def worksheet_to_dataframe(data):
+    # breakpoint()
     data = list(data)
     if not data:
         raise EmptySheet("Sheet is empty")
-    df = pd.DataFrame(data)
+    # df = pd.DataFrame(data)
+    df = pd.DataFrame(data, dtype=object)
+    # Convert all NaN to None
+    df = df.where(pd.notna(df), None)
+
     # Set the first row as the header
     df.columns = df.iloc[0]
     df = df[1:].reset_index(drop=True)

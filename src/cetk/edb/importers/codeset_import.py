@@ -1,3 +1,5 @@
+import pandas as pd
+
 from cetk.edb.models import ActivityCode, CodeSet, VerticalDist
 
 from .utils import import_error, worksheet_to_dataframe
@@ -76,7 +78,7 @@ def import_activitycodesheet(workbook, validation):
         try:
             codeset = CodeSet.objects.get(slug=row_dict["codeset_slug"])
             if "vertical_distribution_slug" in row_dict:
-                if row_dict["vertical_distribution_slug"] is not None:
+                if not pd.isna(row_dict["vertical_distribution_slug"]):
                     try:
                         vdist = VerticalDist.objects.get(
                             slug=row_dict["vertical_distribution_slug"]
