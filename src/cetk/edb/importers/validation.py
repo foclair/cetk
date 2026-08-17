@@ -99,9 +99,9 @@ def validate_timevar(values, timevars, row_nr, src=None):
 
 
 def data_to_raster(raster_name, raster_path, datadir, substance):
-    if raster_path is not None:
+    if not pd.isna(raster_path):
         # generate raster name form path
-        if raster_name is None:
+        if pd.isna(raster_name):
             raster_name = splitext(basename(raster_path))[0]
         # if placeholder is used for substance in path
         # the raster-name will be given a suffix

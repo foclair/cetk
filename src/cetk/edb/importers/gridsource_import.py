@@ -105,7 +105,7 @@ def validate_gridsources(df, timevars, code_sets, raster_names, datadir):
         messages += validate_activitycodes(row_dict, code_sets, row_nr=row_nr)
         messages += validate_timevar(row_dict, timevars, row_nr=row_nr)
         messages += validate_unit(row_dict, row_nr)
-        for col in filter(lambda x: row_dict[x] is not None, subst_cols):
+        for col in filter(lambda x: not pd.isna(row_dict[x]), subst_cols):
             subst_slug = col[6:]
             messages += validate_raster(
                 row_dict, raster_names, datadir, rasters, row_nr, subst_slug
@@ -121,7 +121,7 @@ def validate_gridsources(df, timevars, code_sets, raster_names, datadir):
                         subst_slug,
                     )
                 )
-        for col in filter(lambda x: row_dict[x] is not None, act_cols):
+        for col in filter(lambda x: not pd.isna(row_dict[x]), act_cols):
             act_name = col[4:].strip()
             messages += validate_raster(
                 row_dict, raster_names, datadir, rasters, row_nr, subst_slug
@@ -205,7 +205,7 @@ def import_gridsources(filepath, encoding=None):
         # set tags
         tag_keys = [key for key in row_dict.keys() if key.startswith("tag:")]
         src.tags = {
-            key[4:]: row_dict[key] for key in tag_keys if row_dict[key] is not None
+            key[4:]: row_dict[key] for key in tag_keys if not pd.isna(row_dict[key])
         }
         validate_activitycodes(row_dict, code_sets, row_nr, src)
         validate_timevar(row_dict, timevars, row_nr, src)
@@ -216,7 +216,7 @@ def import_gridsources(filepath, encoding=None):
             src.substances.all().delete()
             src.activities.all().delete()
 
-        for col in filter(lambda x: row_dict[x] is not None, subst_cols):
+        for col in filter(lambda x: not pd.isna(row_dict[x]), subst_cols):
             subst = col[6:]
             # if sum is specified instead of an emission total,
             # the emission value is calculated as the sum of the raster
@@ -232,7 +232,7 @@ def import_gridsources(filepath, encoding=None):
                 emis["value"] = emission_unit_to_si(float(emis_value), unit)
             src.substances.create(**emis)
 
-        for col in filter(lambda x: row_dict[x] is not None, act_cols):
+        for col in filter(lambda x: not pd.isna(row_dict[x]), act_cols):
             activity_name = col[4:]
             rname, rpath = data_to_raster(
                 row_dict["rastername"], row_dict["path"], datadir, subst

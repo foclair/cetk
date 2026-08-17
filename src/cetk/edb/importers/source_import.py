@@ -261,9 +261,7 @@ def create_or_update_sources(
 
     # set dataframe index
     try:
-        df.set_index(
-            ["facility_id", "source_name"], verify_integrity=True, inplace=True
-        )
+        df.set_index(["facility_id", "source_name"], inplace=True)
     except ValueError as err:
         return_message.append(
             import_error(

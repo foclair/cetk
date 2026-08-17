@@ -183,7 +183,6 @@ class TestEmissionRasterizer:
         output = Output(
             extent=extent, timezone=datetime.timezone.utc, path=tmpdir, srid=srid
         )
-
         rasterizer = EmissionRasterizer(output, nx=4, ny=4)
         begin = datetime.datetime(2012, 1, 1, 0, tzinfo=datetime.timezone.utc)
         end = datetime.datetime(2012, 1, 1, 2, tzinfo=datetime.timezone.utc)
