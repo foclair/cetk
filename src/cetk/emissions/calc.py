@@ -125,7 +125,7 @@ def aggregate_emissions(
         code_labels = dict(codeset.codes.values_list("code", "label"))
         for ind in df.index:
             code = df.loc[ind, "activitycode"]
-            if code is not None:
+            if not pd.isna(code):
                 df.loc[ind, "activity"] = code_labels[code]
         # add to index (to remain also after pivoting)
         df.set_index(["activitycode", "activity"], inplace=True)
