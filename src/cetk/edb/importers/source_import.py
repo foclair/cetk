@@ -810,7 +810,14 @@ def import_sourceactivities(
         log.debug("validating/importing sheet PointSource")
         data = workbook["PointSource"].values
         df_pointsource = worksheet_to_dataframe(data)
-        df_pointsource = set_datatypes(df_pointsource, "point")
+
+        try:
+            df_pointsource = set_datatypes(df_pointsource, "point")
+        except ValueError as exc:
+            return_message.append(
+                import_error(str(exc) + " in spreadsheet 'PointSource'", validation)
+            )
+
         # import pointsources and pointsourcesubstances
         caching_sources = len(df_pointsource) > PointSource.objects.count()
         ps, msgs = create_or_update_sources(
