@@ -814,7 +814,9 @@ def import_sourceactivities(
         try:
             df_pointsource = set_datatypes(df_pointsource, "point")
         except ValueError as exc:
-            return_message.append(import_error(str(exc), validation))
+            return_message.append(
+                import_error(str(exc) + " in spreadsheet 'PointSource'", validation)
+            )
 
         # import pointsources and pointsourcesubstances
         caching_sources = len(df_pointsource) > PointSource.objects.count()
