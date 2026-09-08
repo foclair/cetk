@@ -599,7 +599,7 @@ def create_or_update_sources(
                 else:
                     return_message.append(
                         import_error(
-                            f"multiple rows for the same point-source '{source_name}'",
+                            f"Multiple rows have the same source_name '{source_name}' in the PointSource sheet. Correct duplicates under facility_id or source_name before import.",
                             validation=validation,
                         )
                     )
