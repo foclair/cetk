@@ -248,6 +248,13 @@ def import_emissionfactorsheet(workbook, validation):
                             validation=validation,
                         )
                     )
+            except Exception:
+                return_message.append(
+                    import_error(
+                        f"Failed to import sheet 'EmissionFactor'. Check row {row_nr + 2} for errors.",
+                        validation=validation,
+                    )
+                )
         except KeyError:
             return_message.append(
                 import_error(
