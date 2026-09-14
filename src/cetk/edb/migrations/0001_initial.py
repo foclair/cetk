@@ -1445,7 +1445,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="fleet",
             constraint=models.CheckConstraint(
-                check=models.Q(("default_heavy_vehicle_share__range", (0, 1))),
+                condition=models.Q(("default_heavy_vehicle_share__range", (0, 1))),
                 name="fleet_default_heavy_vehicle_share_between_0_and_1",
             ),
         ),
@@ -1594,25 +1594,25 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="roadsource",
             constraint=models.CheckConstraint(
-                check=models.Q(("aadt__gte", 0)), name="road_source_aadt_gte_0"
+                condition=models.Q(("aadt__gte", 0)), name="road_source_aadt_gte_0"
             ),
         ),
         migrations.AddConstraint(
             model_name="roadsource",
             constraint=models.CheckConstraint(
-                check=models.Q(("nolanes__gt", 0)), name="road_source_nolanes_gt_0"
+                condition=models.Q(("nolanes__gt", 0)), name="road_source_nolanes_gt_0"
             ),
         ),
         migrations.AddConstraint(
             model_name="roadsource",
             constraint=models.CheckConstraint(
-                check=models.Q(("width__gt", 0)), name="road_source_width_gt_0"
+                condition=models.Q(("width__gt", 0)), name="road_source_width_gt_0"
             ),
         ),
         migrations.AddConstraint(
             model_name="roadsource",
             constraint=models.CheckConstraint(
-                check=models.Q(
+                condition=models.Q(
                     ("median_strip_width__gte", 0),
                     ("median_strip_width__lt", models.F("width")),
                 ),
@@ -1622,7 +1622,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="roadsource",
             constraint=models.CheckConstraint(
-                check=models.Q(("heavy_vehicle_share__range", (0, 1))),
+                condition=models.Q(("heavy_vehicle_share__range", (0, 1))),
                 name="road_source_heavy_vehicle_share_between_0_and_1",
             ),
         ),
