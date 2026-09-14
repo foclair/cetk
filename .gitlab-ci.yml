@@ -38,7 +38,7 @@ migrations:
 
 test:oldest:
   extends: .test
-  image: r-harbor.smhi.se/foluft/python:3.9-gdal34-ubi9
+  image: r-harbor.smhi.se/foluft/python:3.11-gdal34-ubi9
   variables:
     KUBERNETES_MEMORY_REQUEST: "512Mi"
     KUBERNETES_MEMORY_LIMIT: "512Mi"
