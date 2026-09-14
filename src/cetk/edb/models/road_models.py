@@ -228,19 +228,23 @@ class RoadSource(SourceBase):
     class Meta:
         default_related_name = "roadsources"
         constraints = [
-            models.CheckConstraint(check=Q(aadt__gte=0), name="road_source_aadt_gte_0"),
             models.CheckConstraint(
-                check=Q(nolanes__gt=0), name="road_source_nolanes_gt_0"
+                condition=Q(aadt__gte=0), name="road_source_aadt_gte_0"
             ),
-            models.CheckConstraint(check=Q(width__gt=0), name="road_source_width_gt_0"),
             models.CheckConstraint(
-                check=(
+                condition=Q(nolanes__gt=0), name="road_source_nolanes_gt_0"
+            ),
+            models.CheckConstraint(
+                condition=Q(width__gt=0), name="road_source_width_gt_0"
+            ),
+            models.CheckConstraint(
+                condition=(
                     Q(median_strip_width__gte=0) & Q(median_strip_width__lt=F("width"))
                 ),
                 name="road_source_median_strip_width_between_0_and_width",
             ),
             models.CheckConstraint(
-                check=Q(heavy_vehicle_share__range=(0, 1)),
+                condition=Q(heavy_vehicle_share__range=(0, 1)),
                 name="road_source_heavy_vehicle_share_between_0_and_1",
             ),
         ]

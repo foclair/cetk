@@ -86,7 +86,7 @@ class Fleet(models.Model):
         default_related_name = "fleets"
         constraints = [
             models.CheckConstraint(
-                check=Q(default_heavy_vehicle_share__range=(0, 1)),
+                condition=Q(default_heavy_vehicle_share__range=(0, 1)),
                 name="fleet_default_heavy_vehicle_share_between_0_and_1",
             ),
         ]

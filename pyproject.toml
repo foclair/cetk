@@ -24,7 +24,7 @@ classifiers = [
 ]
 dependencies = [       # Release date  Comment
   "affine<3.0.1",      # 2026-08-28    required by rasterio - support for 3.0.1+ pending
-  "django >=4.2,<6",   # 2023-04-03    current LTS
+  "django >=5.2.16,<6",# 2026-07-07    due to dependabot alerts
   "fiona >=1.8.22",    # 2022-10-17    first version with cp311 wheel
   "geopandas >=0.12",  # 2022-10-24    first version with shapely 2 support
   "netCDF4 >=1.6.1",   # 2022-09-15    first version with cp311 wheel
