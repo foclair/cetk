@@ -58,7 +58,6 @@ filterwarnings = [
     "error",
     "ignore:numpy\\.ndarray size changed:RuntimeWarning",
     "ignore:CheckConstraint\\.check is deprecated:DeprecationWarning",
-    "ignore:coord_dim setter is deprecated:DeprecationWarning",
 ]
 
 [tool.ruff.lint]
