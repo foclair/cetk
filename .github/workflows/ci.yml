@@ -36,7 +36,6 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-          cache: uv
 
       - name: Install build
         run: uv pip install --system -c requirements-dev.txt build
