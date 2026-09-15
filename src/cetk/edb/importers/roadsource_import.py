@@ -1377,7 +1377,11 @@ def import_roads(
             raise ValidationError(msg)
 
         gdalgeom = GDALLineString(source_geom.wkt)
-        gdalgeom.coord_dim = 2
+        if gdalgeom.coord_dim == 3:
+            xy_coords = [point[:2] for point in gdalgeom.tuple]
+            wkt_string = f"LINESTRING ({', '.join(f'{x} {y}' for x, y in xy_coords)})"
+            gdalgeom = GDALLineString(wkt_string)
+
         gdalgeom.transform(trans)
         geom = gdalgeom.geos
         road_data = {"geom": geom}
