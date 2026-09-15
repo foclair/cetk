@@ -11,7 +11,7 @@
 ``` console
 $ git clone https://git.smhi.se/foclair/cetk.git
 $ cd cetk
-$ python3.11 -m venv --prompt cetk .venv
+$ python3.12 -m venv --prompt cetk .venv
 $ . .venv/bin/activate
 $ pip install -U pip setuptools wheel
 $ pip install -r requirements.txt
@@ -23,7 +23,7 @@ $ pip install -e .
 ``` console
 $ git clone https://git.smhi.se/foclair/cetk.git
 $ cd cetk
-$ python3.11 -m venv --prompt cetk .venv
+$ python3.12 -m venv --prompt cetk .venv
 $ . .venv/Scripts/activate
 $ pip install pre-commit
 $ pip install -e .

@@ -19,7 +19,7 @@ def requirements_dev(session):
     pip_compile(session, "requirements-dev.txt", "requirements-dev.in")
 
 
-@nox.session(name="constraints-lowest", python="3.11")
+@nox.session(name="constraints-lowest", python="3.12")
 def constraints_lowest(session):
     """Re-compile the constraints for the lowest allowed dependency versions"""
     session.install("-c", "requirements-dev.txt", "uv")
@@ -58,7 +58,7 @@ def test(session):
     session.run("pytest", *session.posargs)
 
 
-@nox.session(name="test-lowest", python="3.11")
+@nox.session(name="test-lowest", python="3.12")
 def test_lowest(session):
     """Run the unit and regression tests with the lowest allowed versions."""
     session.install("-c", "requirements-dev.txt", *TEST_REQUIREMENTS)
