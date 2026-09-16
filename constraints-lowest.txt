@@ -13,6 +13,7 @@ attrs==26.1.0
 certifi==2026.7.22
     # via
     #   fiona
+    #   netcdf4
     #   pyogrio
     #   pyproj
     #   rasterio
@@ -32,21 +33,19 @@ cligj==0.7.2
     # via
     #   fiona
     #   rasterio
-django==5.2.16
+django==6.1
     # via cetk (pyproject.toml)
 et-xmlfile==2.0.0
     # via openpyxl
-fiona==1.8.22
+fiona==1.9.5
     # via
     #   cetk (pyproject.toml)
     #   geopandas
 geopandas==0.12.1
     # via cetk (pyproject.toml)
-munch==4.0.0
-    # via fiona
-netcdf4==1.6.1
+netcdf4==1.6.5
     # via cetk (pyproject.toml)
-numpy==1.23.2
+numpy==1.26.0
     # via
     #   cetk (pyproject.toml)
     #   cftime
@@ -57,19 +56,19 @@ numpy==1.23.2
     #   rasterio
     #   shapely
     #   snuggs
-openpyxl==3.0.7
+openpyxl==3.0.10
     # via cetk (pyproject.toml)
 packaging==26.3
     # via geopandas
-pandas==2.0.0
+pandas==2.1.1
     # via
     #   cetk (pyproject.toml)
     #   geopandas
-pyogrio==0.5.0
+pyogrio==0.7.0
     # via cetk (pyproject.toml)
 pyparsing==3.3.2
     # via snuggs
-pyproj==3.7.2
+pyproj==3.8.0
     # via
     #   geopandas
     #   rastafari
@@ -79,13 +78,13 @@ pytz==2026.3.post1
     # via pandas
 rastafari==0.4.2.1
     # via cetk (pyproject.toml)
-rasterio==1.3.3
+rasterio==1.3.9
     # via cetk (pyproject.toml)
 setuptools==84.0.0
     # via
     #   fiona
     #   rasterio
-shapely==2.0.0
+shapely==2.0.2
     # via
     #   cetk (pyproject.toml)
     #   geopandas
