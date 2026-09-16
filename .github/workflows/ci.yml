@@ -188,7 +188,7 @@ jobs:
       - name: Run
         env:
           SPATIALITE_LIBRARY_PATH: /usr/lib/x86_64-linux-gnu/mod_spatialite.so
-        run: nox -s test -- --cov --duration=20 --junit-xml=junit.xml
+        run: nox -s test -- --cov --durations=20 --junit-xml=junit.xml
 
       - name: Test Report
         uses: dorny/test-reporter@v3
