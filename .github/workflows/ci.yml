@@ -97,7 +97,7 @@ jobs:
       - name: Install GDAL dependencies
         run: |
           sudo apt update
-          sudo apt install -y gdal-bin libgdal-dev python3-gdal
+          sudo apt install -y gdal-bin libgdal-dev python3-gdal libsqlite3-mod-spatialite
 
       - uses: actions/setup-python@v7
         with:
