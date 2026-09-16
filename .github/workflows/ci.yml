@@ -94,6 +94,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install GDAL dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y gdal-bin libgdal-dev python3-gdal
+
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
@@ -125,7 +130,7 @@ jobs:
       - name: Install GDAL dependencies
         run: |
           sudo apt update
-          sudo apt install -y gdal-bin libgdal-dev python3-gdal
+          sudo apt install -y gdal-bin libgdal-dev python3-gdal libsqlite3-mod-spatialite
 
       - uses: actions/setup-python@v7
         with:
@@ -158,11 +163,11 @@ jobs:
       - name: Install GDAL dependencies
         run: |
           sudo apt update
-          sudo apt install -y gdal-bin libgdal-dev python3-gdal
+          sudo apt install -y gdal-bin libgdal-dev python3-gdal libsqlite3-mod-spatialite
 
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.15"
+          python-version: "3.14"
 
       - uses: astral-sh/setup-uv@v10.1.0
 
