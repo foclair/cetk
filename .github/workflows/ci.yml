@@ -83,6 +83,9 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y gdal-bin libgdal-dev python3-gdal libsqlite3-mod-spatialite
+          find /usr -name "mod_spatialite.so" 2>/dev/null
+          find /lib -name "mod_spatialite.so" 2>/dev/null
+          find /lib64 -name "mod_spatialite.so" 2>/dev/null
 
       - uses: actions/setup-python@v7
         with:
