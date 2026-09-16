@@ -5,13 +5,21 @@ import os
 DEBUG = os.environ.get("CETK_DEBUG", False)
 
 if "FLATPAK_ID" in os.environ:
-    SPATIALITE_LIBRARY_PATH = "/app/lib/mod_spatialite.so"
+    SPATIALITE_LIBRARY_PATH = os.environ.get(
+        "SPATIALITE_LIBRARY_PATH", "/app/lib/mod_spatialite.so"
+    )
 elif os.name == "posix":
-    SPATIALITE_LIBRARY_PATH = "/usr/lib64/mod_spatialite.so"
+    SPATIALITE_LIBRARY_PATH = os.environ.get(
+        "SPATIALITE_LIBRARY_PATH", "/usr/lib64/mod_spatialite.so"
+    )
 elif os.name == "nt":
-    SPATIALITE_LIBRARY_PATH = r"C:\OSGeo4W\bin\mod_spatialite.dll"
+    SPATIALITE_LIBRARY_PATH = os.environ.get(
+        "SPATIALITE_LIBRARY_PATH", r"C:\OSGeo4W\bin\mod_spatialite.dll"
+    )
 else:
-    SPATIALITE_LIBRARY_PATH = "/usr/lib64/mod_spatialite.so"
+    SPATIALITE_LIBRARY_PATH = os.environ.get(
+        "SPATIALITE_LIBRARY_PATH", "/usr/lib64/mod_spatialite.so"
+    )
 
 # Application definition
 INSTALLED_APPS = [
