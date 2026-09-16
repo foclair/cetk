@@ -9,6 +9,21 @@ on:
       - main
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - uses: pre-commit/action@v3.0.1
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -104,3 +119,77 @@ jobs:
         env:
           SPATIALITE_LIBRARY_PATH: /usr/lib/x86_64-linux-gnu/mod_spatialite.so
         run: nox -s migrations
+
+  test-lowest:
+    name: Test (lowest)
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install GDAL dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y gdal-bin libgdal-dev python3-gdal libsqlite3-mod-spatialite
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v10.1.0
+
+      - name: Download artifact
+        uses: actions/download-artifact@v8
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Install nox
+        run: uv pip install --system -c requirements-dev.txt nox
+
+      - name: Run
+        run: nox -s test-lowest
+
+  test-latest:
+    name: Test (latest)
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install GDAL dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y gdal-bin libgdal-dev python3-gdal libsqlite3-mod-spatialite
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v10.1.0
+
+      - name: Download artifact
+        uses: actions/download-artifact@v8
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Install nox
+        run: uv pip install --system -c requirements-dev.txt nox
+
+      - name: Run
+        run: nox -s test -- --cov --duration=20 --junit-xml=junit.xml
+
+      - name: Test Report
+        uses: dorny/test-reporter@v3
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}       # run this step even if previous step failed
+        with:
+          name: test-results
+          path: junit.xml
+          reporter: jest-junit
