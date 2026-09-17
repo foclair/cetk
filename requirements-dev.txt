@@ -39,6 +39,7 @@ packaging==24.1
     #   nox
     #   pytest
     #   setuptools-scm
+    #   wheel
 pip==23.2.1
     # via pip-tools
 pip-tools==7.3.0
@@ -77,5 +78,7 @@ virtualenv==20.24.3
     # via
     #   nox
     #   pre-commit
-wheel==0.41.2
-    # via pip-tools
+wheel==0.48.0
+    # via
+    #   -r requirements-dev.in
+    #   pip-tools

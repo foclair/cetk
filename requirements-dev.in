@@ -10,3 +10,4 @@ pytest-django
 ruff
 setuptools-scm
 uv
+wheel >=0.46.2
