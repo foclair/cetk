@@ -79,7 +79,7 @@ setuptools==84.0.0
     #   setuptools-scm
 setuptools-scm==8.3.1
     # via -r requirements-dev.in
-uv==0.7.9
+uv==0.12.16
     # via -r requirements-dev.in
 virtualenv==21.7.14
     # via
