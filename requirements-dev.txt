@@ -42,8 +42,10 @@ packaging==24.1
     #   pytest
     #   setuptools-scm
     #   wheel
-pip==23.2.1
-    # via pip-tools
+pip==26.2.1
+    # via
+    #   -r requirements-dev.in
+    #   pip-tools
 pip-tools==7.3.0
     # via -r requirements-dev.in
 platformdirs==3.10.0
