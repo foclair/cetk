@@ -12,3 +12,4 @@ setuptools >=83.0.0
 setuptools-scm
 uv
 wheel >=0.46.2
+virtualenv >=20.36.1
