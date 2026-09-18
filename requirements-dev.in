@@ -2,10 +2,10 @@
 build
 coverage[toml]
 nox
-pip-tools
 pip >=26.2.0
+pip-tools
 pre-commit
-pytest
+pytest >=9.0.3
 pytest-cov
 pytest-django
 ruff
