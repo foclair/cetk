@@ -77,7 +77,7 @@ class CongestionProfile(models.Model):
         traffic_condition = np.array(ast.literal_eval(self.traffic_condition))
         local_time_index = time_index.tz_convert(timezone)
         return pd.Series(
-            traffic_condition[local_time_index.hour, local_time_index.weekday],
+            traffic_condition[local_time_index.hour, local_time_index.day_of_week],
             index=time_index,
         )
 

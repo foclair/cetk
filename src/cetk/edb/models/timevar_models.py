@@ -18,7 +18,9 @@ def default_timevar_month():
 
 def get_normalization_constant(typeday, month, timezone):
     commonyear = pd.date_range("2018", periods=24 * 365, freq="h", tz=timezone)
-    values = typeday[commonyear.hour, commonyear.weekday] * month[commonyear.month - 1]
+    values = (
+        typeday[commonyear.hour, commonyear.day_of_week] * month[commonyear.month - 1]
+    )
     return len(values) / values.sum()
 
 
@@ -37,7 +39,7 @@ def timevar_to_series(time_index, *timevars, timezone=None):
 
     local_time_index = time_index.tz_convert(timezone)
     values = (
-        typeday[local_time_index.hour, local_time_index.weekday]
+        typeday[local_time_index.hour, local_time_index.day_of_week]
         * month[local_time_index.month - 1]
     )
     return pd.Series(normalization_constant * values, index=time_index)

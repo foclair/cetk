@@ -259,9 +259,11 @@ def create_or_update_sources(
                     )
                 )
 
-    # set dataframe index
+    # Set the index on the passed-in dataframe to preserve the side-effect
+    # expected by callers (e.g. import_sourceactivities), without using the
+    # deprecated inplace keyword.
     try:
-        df.set_index(["facility_id", "source_name"], inplace=True)
+        indexed_df = df.set_index(["facility_id", "source_name"])
     except ValueError as err:
         return_message.append(
             import_error(
@@ -269,6 +271,10 @@ def create_or_update_sources(
                 validation=validation,
             )
         )
+    else:
+        df.index = indexed_df.index
+        del df["facility_id"]
+        del df["source_name"]
     update_facilities = []
     create_facilities = {}
     drop_substances = []

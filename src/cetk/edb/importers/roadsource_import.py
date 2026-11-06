@@ -851,11 +851,10 @@ def import_roadclasses(
                     sheet_name="TrafficSituation",
                     usecols=column_names,
                 )
-                df.rename(
+                df = df.rename(
                     columns={"attr:" + rc: rc for rc in roadclass_attributes},
-                    inplace=True,
                 )
-                df.set_index([a.slug for a in defined_attributes], inplace=True)
+                df = df.set_index([a.slug for a in defined_attributes])
             except Exception as err:
                 raise ImportError(
                     "could not read xlsx, are all roadclass attributes "
