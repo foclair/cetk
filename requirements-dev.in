@@ -1,6 +1,7 @@
-# CI/CD and development requirements for the Gadget
+# CI/CD and development requirements
 build
 coverage[toml]
+filelock >=4.2.1
 nox
 pip >=26.2.0
 pip-tools
