@@ -19,7 +19,7 @@ certifi==2026.10.23
     #   rasterio
 cftime==1.6.6.1
     # via netcdf4
-click==8.5.0
+click==8.5.1
     # via
     #   click-plugins
     #   cligj
