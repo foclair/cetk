@@ -72,19 +72,19 @@ def calculate_source_emissions_df(
     )
     df = pd.DataFrame(cur.fetchall(), columns=[col[0] for col in cur.description])
     if sourcetype == "grid":
-        df.set_index(["source_id", "substance", "raster"], inplace=True)
+        df = df.set_index(["source_id", "substance", "raster"])
     elif sourcetype == "road":
-        df.set_index(["source_id", "substance", "vehicle"], inplace=True)
+        df = df.set_index(["source_id", "substance", "vehicle"])
         traffic_work = df.loc[(slice(None), "traffic_work"), :]["emis"]
         traffic_work.name = "traffic_work"
         traffic_work.index = traffic_work.index.droplevel("substance")
-        df.drop(level="substance", labels=["traffic_work"], inplace=True)
+        df = df.drop(level="substance", labels=["traffic_work"])
         df = df.join(traffic_work)
         df = df.reorder_levels(["source_id", "substance", "vehicle"])
     else:
-        df.set_index(["source_id", "substance"], inplace=True)
+        df = df.set_index(["source_id", "substance"])
     df.loc[:, "emis"] *= emis_conversion_factor_from_si(unit)
-    df.sort_index(inplace=True)
+    df = df.sort_index()
     return df
 
 
@@ -128,11 +128,11 @@ def aggregate_emissions(
             if not pd.isna(code):
                 df.loc[ind, "activity"] = code_labels[code]
         # add to index (to remain also after pivoting)
-        df.set_index(["activitycode", "activity"], inplace=True)
+        df = df.set_index(["activitycode", "activity"])
         df = df.pivot(columns="substance")
     else:
         df.insert(1, "activity", "total")
-        df.set_index(["activity"], inplace=True)
+        df = df.set_index(["activity"])
         df = df.pivot(columns="substance")
     df.columns = df.columns.set_names(["quantity", "substance"])
     if "traffic_work" in df.columns.get_level_values("substance"):

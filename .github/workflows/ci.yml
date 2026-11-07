@@ -52,6 +52,10 @@ jobs:
       - name: Install GDAL dependencies
         run: |
           sudo apt update
+          # In order to get gdal >=3.9 on ubuntu noble
+          sudo apt install -y software-properties-common
+          sudo add-apt-repository -y ppa:ubuntugis/ubuntugis-unstable
+          sudo apt update
           sudo apt install -y gdal-bin libgdal-dev python3-gdal libsqlite3-mod-spatialite
 
       - uses: actions/setup-python@v7
