@@ -40,7 +40,6 @@ packaging==26.3
     #   dependency-groups
     #   nox
     #   pytest
-    #   setuptools-scm
     #   virtualenv
     #   wheel
 pip==26.2.1
@@ -76,12 +75,8 @@ ruff==0.11.11
     # via -r requirements-dev.in
 setuptools==84.0.0
     # via
-    #   -r requirements-dev.in
     #   nodeenv
     #   pip-tools
-    #   setuptools-scm
-setuptools-scm==8.3.1
-    # via -r requirements-dev.in
 uv==0.13.7
     # via -r requirements-dev.in
 virtualenv==21.15.6

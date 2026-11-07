@@ -9,8 +9,6 @@ pytest >=9.0.3
 pytest-cov
 pytest-django
 ruff
-setuptools
-setuptools-scm
 uv >=0.13.4
 virtualenv >=21.14.9
 wheel >=0.46.2
