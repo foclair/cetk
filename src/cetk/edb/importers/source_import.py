@@ -171,12 +171,13 @@ def import_sources(
 
     df = set_datatypes(df, sourcetype)
 
-    return create_or_update_sources(
+    return_dict, return_message, _ = create_or_update_sources(
         df,
         validation=validation,
         srid=None,
         sourcetype=sourcetype,
     )
+    return return_dict, return_message
 
 
 def set_datatypes(df, sourcetype):
@@ -259,11 +260,9 @@ def create_or_update_sources(
                     )
                 )
 
-    # Set the index on the passed-in dataframe to preserve the side-effect
-    # expected by callers (e.g. import_sourceactivities), without using the
-    # deprecated inplace keyword.
+    # set dataframe index
     try:
-        indexed_df = df.set_index(["facility_id", "source_name"])
+        df = df.set_index(["facility_id", "source_name"])
     except ValueError as err:
         return_message.append(
             import_error(
@@ -271,10 +270,6 @@ def create_or_update_sources(
                 validation=validation,
             )
         )
-    else:
-        df.index = indexed_df.index
-        del df["facility_id"]
-        del df["source_name"]
     update_facilities = []
     create_facilities = {}
     drop_substances = []
@@ -296,7 +291,7 @@ def create_or_update_sources(
                     "created": 0,
                 },
             }
-            return return_dict, return_message
+            return return_dict, return_message, df
 
         row_dict = row.to_dict()
 
@@ -757,7 +752,7 @@ def create_or_update_sources(
             },
         }
     # print(datetime.now().strftime("%H:%M:%S") + "finish point import")
-    return return_dict, return_message
+    return return_dict, return_message, df
 
 
 # @profile
@@ -826,7 +821,7 @@ def import_sourceactivities(
 
         # import pointsources and pointsourcesubstances
         caching_sources = len(df_pointsource) > PointSource.objects.count()
-        ps, msgs = create_or_update_sources(
+        ps, msgs, df_pointsource = create_or_update_sources(
             df_pointsource,
             srid=srid,
             validation=validation,
@@ -919,7 +914,7 @@ def import_sourceactivities(
         data = workbook["AreaSource"].values
         df_areasource = worksheet_to_dataframe(data)
         df_areasource = set_datatypes(df_areasource, "area")
-        ps, msgs = create_or_update_sources(
+        ps, msgs, df_areasource = create_or_update_sources(
             df_areasource,
             srid=srid,
             validation=validation,
