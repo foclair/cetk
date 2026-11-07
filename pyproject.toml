@@ -23,7 +23,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Atmospheric Science",
 ]
 dependencies = [       # Release date  Comment
-  "affine<3.0.1",      # 2026-08-28    required by rasterio - support for 3.0.1+ pending
+  "affine>=3.0.1",     # 2026-08-28    required by rasterio
   "django >=6.1",      # 2026-08-05    introduced support for GDAL3.13 - QGIS4.2 depends on GDAL3.13
   "fiona >=1.9.5",     # 2023-10-12    first version with cp312 wheel
   "geopandas >=0.12",  # 2022-10-24    first version with shapely 2 support

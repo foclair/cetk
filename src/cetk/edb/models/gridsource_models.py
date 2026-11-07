@@ -90,8 +90,8 @@ def get_gridsource_raster(name, clip_by=None):
                 raise OutsideExtentError("polygon is completely outside extent")
             metadata["transform"] = transform
             rows, cols = data.shape
-            x_bl, y_bl = transform * (0, rows)
-            x_tr, y_tr = transform * (cols, 0)
+            x_bl, y_bl = transform @ (0, rows)
+            x_tr, y_tr = transform @ (cols, 0)
             metadata["extent"] = (x_bl, y_bl, x_tr, y_tr)
         else:
             metadata["extent"] = (
