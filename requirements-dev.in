@@ -12,5 +12,5 @@ ruff
 setuptools
 setuptools-scm
 uv >=0.13.4
-virtualenv >=20.36.1
+virtualenv >=21.14.9
 wheel >=0.46.2
